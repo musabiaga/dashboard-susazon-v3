@@ -79,7 +79,7 @@ function getApiConfig(source: ApiSource): ApiConfig {
     if (!url || !apiKey) {
       throw new Error("SUSAZON_API_URL y SUSAZON_API_KEY no están configurados");
     }
-    return { url, apiKey, empresaCode: 0, timeoutMs: 45_000 };
+    return { url, apiKey, empresaCode: 0, timeoutMs: 120_000 }; // Susazón es SQL Enterprise — margen amplio
   }
 
   // suve
@@ -90,7 +90,7 @@ function getApiConfig(source: ApiSource): ApiConfig {
       "SUVE_API_URL y SUVE_API_KEY no configurados — Suve sigue deshabilitado"
     );
   }
-  return { url, apiKey, empresaCode: 1, timeoutMs: 120_000 }; // Suve más lento
+  return { url, apiKey, empresaCode: 1, timeoutMs: 600_000 }; // Suve es SQL Express — hasta 10 min por página
 }
 
 /**

@@ -9,6 +9,11 @@ import {
   type ApiSource,
 } from "@/lib/susazon-api";
 
+// Vercel: extiende el límite de ejecución de la función serverless.
+// Hobby plan: max 60s (no llega para Suve). Pro plan: max 800s (~13 min).
+// En dev local (Next.js) este flag no aplica, pero queda listo para deploy.
+export const maxDuration = 800;
+
 /**
  * POST /api/data/refresh
  * Trae datos desde la API REST de Susazón y/o Suve → guarda en sales_rows.
@@ -118,6 +123,29 @@ export async function POST(request: NextRequest) {
 
       const validRows = filterValidRows(result.rows);
       if (validRows.length === 0) continue;
+
+      // Idempotencia: antes de insertar lo nuevo, borrar lo que ya esté para
+      // este (empresa, año, mes). Hacemos esto SOLO después de confirmar que
+      // tenemos data nueva válida — si la API falló o devolvió 0 rows, NO
+      // borramos para no perder lo que ya estaba.
+      const empresaCode = source === "susazon" ? 0 : 1;
+      const { error: delErr, count: deletedCount } = await admin
+        .from("sales_rows")
+        .delete({ count: "exact" })
+        .eq("empresa", empresaCode)
+        .eq("anio", year)
+        .eq("mes", month);
+      if (delErr) {
+        errors.push({
+          source,
+          month: `${year}-${String(month).padStart(2, "0")}`,
+          error: `Delete previo: ${delErr.message}`,
+        });
+        continue;
+      }
+      console.log(
+        `[refresh] ${source} ${year}-${month}: borradas ${deletedCount ?? 0} filas previas, insertando ${validRows.length} nuevas`
+      );
 
       // Insert en chunks de 5000
       const chunkSize = 5000;
