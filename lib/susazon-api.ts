@@ -1,36 +1,141 @@
 /**
- * Wrapper server-side de la API REST de Susazón.
- * NUNCA importar desde Client Components — la API key vive en process.env.
+ * Wrapper server-side de las APIs REST de Susazón y Suve.
+ * NUNCA importar desde Client Components — las API keys viven en process.env.
+ *
+ * Susazón está en SQL Enterprise (rápido). Suve está en SQL Express (lento;
+ * timeouts ~90s por mes). Vercel Edge tolera timeouts más largos que el browser
+ * del V2.2, así que ambas se llaman directo desde el servidor.
  */
 
-export interface SusazonRow {
-  empresa: number; // 0=Susazón, 1=Suve
+/**
+ * Fila tal como viene de la API (algunos tipos no son los esperados).
+ */
+export interface SusazonApiRow {
+  empresa: string; // "SUSAZON" | "SUVE" — viene como string, NO int
   no_cliente: string;
   cliente: string;
   territorio: string;
   vendedor: string;
   sku: string;
-  kg: number;
+  kg: number | string;
   fecha: string; // YYYY-MM-DD
+  anio: number | string;
+  mes: number | string;
+  venta: number | string;
+  margen: number | string;
+  familia: string | null;
+  grupo: string | null;
+}
+
+/**
+ * Fila normalizada lista para insertar en `sales_rows`.
+ */
+export interface NormalizedRow {
+  empresa: 0 | 1; // 0 = Susazón, 1 = Suve
+  no_cliente: string;
+  cliente: string | null;
+  territorio: string;
+  vendedor: string | null;
+  sku: string | null;
+  kg: number;
+  fecha: string;
   anio: number;
   mes: number;
   venta: number;
   margen: number;
   familia: string | null;
-  grupo: string | null; // Campo nuevo abr 2026
+  grupo: string | null;
 }
 
 export interface MonthFetchResult {
   desde: string;
   hasta: string;
-  rows: SusazonRow[];
+  source: ApiSource;
+  rows: NormalizedRow[];
   pagesFetched: number;
   totalPages: number;
   error?: string;
 }
 
-const PAGE_SIZE = 50000;
-const FETCH_TIMEOUT_MS = 45_000;
+export type ApiSource = "susazon" | "suve";
+
+interface ApiConfig {
+  url: string;
+  apiKey: string;
+  empresaCode: 0 | 1;
+  timeoutMs: number;
+}
+
+const PAGE_SIZE = 50_000;
+
+/**
+ * Devuelve la config (url + key + empresa code) para una source dada.
+ * Lee de process.env — server-side only.
+ */
+function getApiConfig(source: ApiSource): ApiConfig {
+  if (source === "susazon") {
+    const url = process.env.SUSAZON_API_URL;
+    const apiKey = process.env.SUSAZON_API_KEY;
+    if (!url || !apiKey) {
+      throw new Error("SUSAZON_API_URL y SUSAZON_API_KEY no están configurados");
+    }
+    return { url, apiKey, empresaCode: 0, timeoutMs: 45_000 };
+  }
+
+  // suve
+  const url = process.env.SUVE_API_URL;
+  const apiKey = process.env.SUVE_API_KEY;
+  if (!url || !apiKey || apiKey.includes("PEGAR_AQUI")) {
+    throw new Error(
+      "SUVE_API_URL y SUVE_API_KEY no configurados — Suve sigue deshabilitado"
+    );
+  }
+  return { url, apiKey, empresaCode: 1, timeoutMs: 120_000 }; // Suve más lento
+}
+
+/**
+ * Convierte la fila cruda de la API a la fila normalizada para insert.
+ * - empresa: string ("SUSAZON"|"SUVE") → int (0|1)
+ * - kg/anio/mes/venta/margen: a number
+ * - cliente/vendedor/sku/familia/grupo: trim + null si vacío
+ */
+function normalizeRow(raw: SusazonApiRow, fallbackEmpresa: 0 | 1): NormalizedRow {
+  const empresaStr = String(raw.empresa ?? "").toUpperCase().trim();
+  const empresa: 0 | 1 =
+    empresaStr === "SUSAZON" || empresaStr === "0"
+      ? 0
+      : empresaStr === "SUVE" || empresaStr === "1"
+      ? 1
+      : fallbackEmpresa;
+
+  const num = (v: unknown): number => {
+    const n = typeof v === "number" ? v : parseFloat(String(v ?? "0"));
+    return isNaN(n) ? 0 : n;
+  };
+
+  const trimNull = (v: unknown): string | null => {
+    if (v == null) return null;
+    const s = String(v).trim();
+    return s === "" ? null : s;
+  };
+
+  return {
+    empresa,
+    no_cliente: String(raw.no_cliente ?? "").trim(),
+    cliente: trimNull(raw.cliente),
+    territorio: String(raw.territorio ?? "Sin territorio").trim(),
+    vendedor: trimNull(raw.vendedor),
+    sku: trimNull(raw.sku),
+    kg: num(raw.kg),
+    fecha: String(raw.fecha ?? ""),
+    anio: Math.trunc(num(raw.anio)),
+    mes: Math.trunc(num(raw.mes)),
+    venta: num(raw.venta),
+    margen: num(raw.margen),
+    familia: trimNull(raw.familia),
+    grupo: trimNull(raw.grupo),
+  };
+}
 
 /**
  * Limpia trailing HTML/garbage que la API a veces incluye después del JSON.
@@ -43,9 +148,6 @@ function cleanResponseText(text: string): string {
   return text.trim();
 }
 
-/**
- * Fetch con timeout — Susazón a veces se cuelga.
- */
 async function fetchWithTimeout(url: string, init: RequestInit, ms: number) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
@@ -57,24 +159,21 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms: number) {
 }
 
 /**
- * Trae todas las filas de un mes específico (paginadas).
- * Tolerante a fallos: si una página falla, continúa con la siguiente.
+ * Trae todas las filas de un mes específico de la source dada (paginadas).
+ * Tolerante a fallos: si una página falla, devuelve lo acumulado + error.
  */
-export async function fetchSusazonMonth(
+export async function fetchMonth(
+  source: ApiSource,
   year: number,
   month: number
 ): Promise<MonthFetchResult> {
-  const url = process.env.SUSAZON_API_URL!;
-  const apiKey = process.env.SUSAZON_API_KEY!;
-  if (!url || !apiKey) {
-    throw new Error("SUSAZON_API_URL y SUSAZON_API_KEY deben estar configurados");
-  }
+  const cfg = getApiConfig(source);
 
   const desde = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(year, month, 0).getDate();
   const hasta = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-  const allRows: SusazonRow[] = [];
+  const allRows: NormalizedRow[] = [];
   let page = 1;
   let totalPages = 1;
   let lastError: string | undefined;
@@ -82,12 +181,12 @@ export async function fetchSusazonMonth(
   while (page <= totalPages) {
     try {
       const res = await fetchWithTimeout(
-        url,
+        cfg.url,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-API-KEY": apiKey,
+            "X-API-KEY": cfg.apiKey,
           },
           body: JSON.stringify({
             page,
@@ -96,31 +195,33 @@ export async function fetchSusazonMonth(
             hasta,
           }),
         },
-        FETCH_TIMEOUT_MS
+        cfg.timeoutMs
       );
 
       if (!res.ok) {
-        lastError = `HTTP ${res.status} en página ${page}`;
+        lastError = `HTTP ${res.status} en página ${page} (${source})`;
         break;
       }
 
       const rawText = await res.text();
       const cleaned = cleanResponseText(rawText);
 
-      let parsed: { status?: string; total_paginas?: number; data?: SusazonRow[] };
+      let parsed: { status?: string; total_paginas?: number; data?: SusazonApiRow[] };
       try {
         parsed = JSON.parse(cleaned);
       } catch {
-        lastError = `JSON inválido en página ${page}`;
+        lastError = `JSON inválido en página ${page} (${source})`;
         break;
       }
 
       if (parsed.total_paginas) totalPages = parsed.total_paginas;
 
-      const rows = Array.isArray(parsed.data) ? parsed.data : [];
-      allRows.push(...rows);
+      const rawRows = Array.isArray(parsed.data) ? parsed.data : [];
+      for (const raw of rawRows) {
+        allRows.push(normalizeRow(raw, cfg.empresaCode));
+      }
 
-      if (rows.length < PAGE_SIZE) break; // optimización: si no llenamos página, no hay más
+      if (rawRows.length < PAGE_SIZE) break; // optimización: no más páginas
       page++;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
@@ -131,6 +232,7 @@ export async function fetchSusazonMonth(
   return {
     desde,
     hasta,
+    source,
     rows: allRows,
     pagesFetched: page - 1,
     totalPages,
@@ -166,10 +268,6 @@ export function monthsBetween(
  * - kg > 0 (descartar líneas sin volumen)
  * - anio >= 2024
  */
-export function filterValidRows(rows: SusazonRow[]): SusazonRow[] {
-  return rows.filter((r) => {
-    const kg = Number(r.kg);
-    const anio = Number(r.anio);
-    return !isNaN(kg) && kg > 0 && anio >= 2024;
-  });
+export function filterValidRows(rows: NormalizedRow[]): NormalizedRow[] {
+  return rows.filter((r) => r.kg > 0 && r.anio >= 2024);
 }
