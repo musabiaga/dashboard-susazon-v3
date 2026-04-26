@@ -1,26 +1,227 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================================
+   THEME 1: DASHBOARD CLEAN (replica V2.2)
+   ============================================================================ */
+:root,
+[data-theme="clean"] {
+  --bg-page: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-muted: #f1f5f9;
+  --bg-header: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  --bg-header-solid: #1e293b;
+
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --text-on-header: #ffffff;
+  --text-on-header-muted: rgba(255, 255, 255, 0.75);
+
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-soft: #eff6ff;
+
+  --success: #10b981;
+  --success-soft: #d1fae5;
+  --danger: #ef4444;
+  --danger-soft: #fee2e2;
+  --warning: #f59e0b;
+  --warning-soft: #fef3c7;
+
+  --chart-2024: #94a3b8;
+  --chart-2025: #3b82f6;
+  --chart-2026: #10b981;
+
+  --font-display: var(--font-system);
+  --font-body: var(--font-system);
+
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 4px 12px rgba(59, 130, 246, 0.1);
+
+  --logo-filter: none;
 }
 
+/* ============================================================================
+   THEME 2: SUSAZÓN EDITORIAL DECK (/diseno-presentaciones-susazon-v1)
+   Dark Azure + Warm Neo Paper + White + Orange · Bebas Neue + Montserrat
+   ============================================================================ */
+[data-theme="editorial"] {
+  --bg-page: #f5efe5;          /* Warm Neo Paper */
+  --bg-surface: #ffffff;
+  --bg-surface-muted: #ede5d3;
+  --bg-header: #1a2332;        /* Dark Azure solid */
+  --bg-header-solid: #1a2332;
+
+  --text-primary: #1a2332;
+  --text-secondary: #4a5568;
+  --text-muted: #8b95a3;
+  --text-on-header: #f5efe5;
+  --text-on-header-muted: rgba(245, 239, 229, 0.75);
+
+  --border: #d6cdb8;
+  --border-strong: #b8ad95;
+
+  --accent: #D97757;           /* Orange */
+  --accent-hover: #c5613f;
+  --accent-soft: #fbeee6;
+
+  --success: #2d7a5f;
+  --success-soft: #d4ebde;
+  --danger: #b91c1c;
+  --danger-soft: #fecaca;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+
+  --chart-2024: #8b95a3;
+  --chart-2025: #1a2332;
+  --chart-2026: #D97757;
+
+  --font-display: var(--font-bebas);
+  --font-body: var(--font-montserrat);
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+
+  --shadow-card: 0 1px 2px rgba(26, 35, 50, 0.08);
+  --shadow-card-hover: 0 8px 24px rgba(26, 35, 50, 0.12);
+
+  --logo-filter: none;
+}
+
+/* ============================================================================
+   THEME 3: WARM NEO-EDITORIAL (/diseno-warm-neo-editorial)
+   Crema #F5F0E8 + Coral #D97757 · estilo Anthropic
+   ============================================================================ */
+[data-theme="warm-neo"] {
+  --bg-page: #F5F0E8;          /* Cream */
+  --bg-surface: #FFFFFF;
+  --bg-surface-muted: #EDE6D9;
+  --bg-header: #FFFFFF;
+  --bg-header-solid: #FFFFFF;
+
+  --text-primary: #1A1A1A;
+  --text-secondary: #5C5C5C;
+  --text-muted: #8E8E8E;
+  --text-on-header: #1A1A1A;
+  --text-on-header-muted: #5C5C5C;
+
+  --border: #E5DCC9;
+  --border-strong: #C9BFA8;
+
+  --accent: #D97757;           /* Coral */
+  --accent-hover: #B85F44;
+  --accent-soft: #F8E8E0;
+
+  --success: #4D7C5A;
+  --success-soft: #DDEAD9;
+  --danger: #B5413D;
+  --danger-soft: #F4D9D7;
+  --warning: #C77D2E;
+  --warning-soft: #F7E5C9;
+
+  --chart-2024: #C9BFA8;
+  --chart-2025: #5C5C5C;
+  --chart-2026: #D97757;
+
+  --font-display: var(--font-montserrat);
+  --font-body: var(--font-montserrat);
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+
+  --shadow-card: 0 1px 2px rgba(26, 26, 26, 0.04);
+  --shadow-card-hover: 0 4px 16px rgba(26, 26, 26, 0.08);
+
+  --logo-filter: invert(11%) sepia(11%) saturate(0%) hue-rotate(180deg);
+}
+
+/* ============================================================================
+   TAILWIND THEME BRIDGE
+   Expone los CSS vars como utilities Tailwind: bg-page, text-primary, etc.
+   ============================================================================ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-page: var(--bg-page);
+  --color-surface: var(--bg-surface);
+  --color-surface-muted: var(--bg-surface-muted);
+  --color-header: var(--bg-header-solid);
+
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-on-header: var(--text-on-header);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+
+  --color-chart-2024: var(--chart-2024);
+  --color-chart-2025: var(--chart-2025);
+  --color-chart-2026: var(--chart-2026);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+
+  --radius-sm: var(--radius-sm);
+  --radius: var(--radius);
+  --radius-lg: var(--radius-lg);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ============================================================================
+   BASE STYLES
+   ============================================================================ */
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-body), system-ui, -apple-system, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+html {
+  --font-system: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Headings usan font-display */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display), system-ui, sans-serif;
+}
+
+/* Theme 2 (Editorial) hace los headings más grandes y aireados (Bebas Neue) */
+[data-theme="editorial"] h1,
+[data-theme="editorial"] h2,
+[data-theme="editorial"] h3 {
+  letter-spacing: 0.02em;
+  font-weight: 400;
+}
+
+/* Logo: filtro condicional según theme */
+.theme-logo {
+  filter: var(--logo-filter);
+  transition: filter 0.2s ease;
+}
+
+/* Smooth transition al cambiar de theme */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
