@@ -8,10 +8,11 @@ import { PlaceholderTab } from "@/components/dashboard/PlaceholderTab";
 import { TrackingDiarioTab } from "@/components/dashboard/TrackingDiarioTab";
 import { VentasTab } from "@/components/dashboard/VentasTab";
 import {
-  GrupoProductoTab,
+  DimensionTab,
   type DimensionRow,
-} from "@/components/dashboard/GrupoProductoTab";
+} from "@/components/dashboard/DimensionTab";
 import { ProductosTab } from "@/components/dashboard/ProductosTab";
+import { VendedoresTab } from "@/components/dashboard/VendedoresTab";
 import { AlertCircle } from "lucide-react";
 
 interface DimensionDataset {
@@ -41,6 +42,13 @@ interface DashboardClientProps {
   grupos: DimensionDataset;
   // Tab Productos
   skus: DimensionDataset;
+  // Tab Clientes
+  clientes: DimensionDataset;
+  // Tab Vendedores: 2 datasets para toggle Sus/Suve
+  vendedores: {
+    separados: DimensionDataset;
+    unidos: DimensionDataset;
+  };
 }
 
 /**
@@ -70,6 +78,8 @@ export function DashboardClient({
   currentMonth,
   grupos,
   skus,
+  clientes,
+  vendedores,
 }: DashboardClientProps) {
   const [selectedTerritory, setSelectedTerritory] = useState<string>(""); // "" = Todos
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
@@ -230,11 +240,14 @@ export function DashboardClient({
                     ? grupos.total
                     : grupos.byTerritory[effectiveSelected] ?? [];
                 return (
-                  <GrupoProductoTab
+                  <DimensionTab
                     rows={grupoRows}
                     monthLabel24={prev2MonthShortYY}
                     monthLabel25={prevMonthShortYY}
                     monthLabel26={monthShortYY}
+                    dimensionLabel="Grupo"
+                    dimensionLabelPlural="Grupos"
+                    topNChart={10}
                   />
                 );
               }
@@ -246,6 +259,44 @@ export function DashboardClient({
                 return (
                   <ProductosTab
                     rows={skuRows}
+                    monthLabel24={prev2MonthShortYY}
+                    monthLabel25={prevMonthShortYY}
+                    monthLabel26={monthShortYY}
+                  />
+                );
+              }
+              if (activeTab === "clientes") {
+                const clienteRows =
+                  effectiveSelected === ""
+                    ? clientes.total
+                    : clientes.byTerritory[effectiveSelected] ?? [];
+                return (
+                  <DimensionTab
+                    rows={clienteRows}
+                    monthLabel24={prev2MonthShortYY}
+                    monthLabel25={prevMonthShortYY}
+                    monthLabel26={monthShortYY}
+                    dimensionLabel="Cliente"
+                    dimensionLabelPlural="Clientes"
+                    topNChart={10}
+                    topNTable={50}
+                  />
+                );
+              }
+              if (activeTab === "vendedores") {
+                const rowsSeparados =
+                  effectiveSelected === ""
+                    ? vendedores.separados.total
+                    : vendedores.separados.byTerritory[effectiveSelected] ??
+                      [];
+                const rowsUnidos =
+                  effectiveSelected === ""
+                    ? vendedores.unidos.total
+                    : vendedores.unidos.byTerritory[effectiveSelected] ?? [];
+                return (
+                  <VendedoresTab
+                    rowsSeparados={rowsSeparados}
+                    rowsUnidos={rowsUnidos}
                     monthLabel24={prev2MonthShortYY}
                     monthLabel25={prevMonthShortYY}
                     monthLabel26={monthShortYY}

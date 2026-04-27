@@ -7,7 +7,7 @@ import type {
   TerritoryKpi,
   MonthlyPoint,
 } from "@/components/dashboard/Sidebar";
-import type { DimensionRow } from "@/components/dashboard/GrupoProductoTab";
+import type { DimensionRow } from "@/components/dashboard/DimensionTab";
 import { countBizDays } from "@/lib/business-days";
 
 export interface DimensionDataset {
@@ -42,6 +42,57 @@ function emptyKpi(): TerritoryKpi {
 
 function withMarginPct(k: TerritoryKpi): TerritoryKpi {
   return { ...k, marginPct: k.venta > 0 ? (k.margen / k.venta) * 100 : 0 };
+}
+
+/**
+ * Helper genérico para construir DimensionDataset desde rows del view
+ * (anio, mes, territorio, dim_value, total_venta). Aggrega por territorio
+ * y total (sumando across territorios).
+ */
+function buildDimDataset<
+  T extends {
+    territorio: string;
+    anio: number;
+    total_venta: number | string | null;
+  },
+>(
+  rows: T[] | null,
+  getName: (r: T) => string,
+  cy: number
+): DimensionDataset {
+  const byTerrMap = new Map<string, Map<string, DimensionRow>>();
+  for (const row of rows ?? []) {
+    let m = byTerrMap.get(row.territorio);
+    if (!m) {
+      m = new Map();
+      byTerrMap.set(row.territorio, m);
+    }
+    const name = getName(row);
+    const cur = m.get(name) ?? { name, v24: 0, v25: 0, v26: 0 };
+    const v = Number(row.total_venta) || 0;
+    if (row.anio === cy - 2) cur.v24 = v;
+    else if (row.anio === cy - 1) cur.v25 = v;
+    else if (row.anio === cy) cur.v26 = v;
+    m.set(name, cur);
+  }
+  const byTerritory: Record<string, DimensionRow[]> = {};
+  const totalMap = new Map<string, DimensionRow>();
+  for (const [terr, m] of byTerrMap) {
+    byTerritory[terr] = Array.from(m.values());
+    for (const r of m.values()) {
+      const cur = totalMap.get(r.name) ?? {
+        name: r.name,
+        v24: 0,
+        v25: 0,
+        v26: 0,
+      };
+      cur.v24 += r.v24;
+      cur.v25 += r.v25;
+      cur.v26 += r.v26;
+      totalMap.set(r.name, cur);
+    }
+  }
+  return { byTerritory, total: Array.from(totalMap.values()) };
 }
 
 export default async function DashboardPage() {
@@ -123,6 +174,8 @@ export default async function DashboardPage() {
   const [
     { data: grupoRowsRaw },
     { data: skuRowsRaw },
+    { data: clienteRowsRaw },
+    { data: vendedorRowsRaw },
   ] = await Promise.all([
     supabase
       .from("kpi_grupo_summary")
@@ -134,62 +187,45 @@ export default async function DashboardPage() {
       .select("territorio, sku, anio, total_venta, total_kg")
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
+    supabase
+      .from("kpi_cliente_summary")
+      .select("territorio, no_cliente, cliente, anio, total_venta")
+      .in("anio", [currentYear - 2, currentYear - 1, currentYear])
+      .eq("mes", currentMonth),
+    supabase
+      .from("kpi_vendedor_summary")
+      .select("territorio, vendedor, empresa, anio, total_venta")
+      .in("anio", [currentYear - 2, currentYear - 1, currentYear])
+      .eq("mes", currentMonth),
   ]);
 
-  // Repartir filas grupo en 3 buckets por año
-  const grupo24Rows = (grupoRowsRaw ?? []).filter((r) => r.anio === currentYear - 2);
-  const grupo25Rows = (grupoRowsRaw ?? []).filter((r) => r.anio === currentYear - 1);
-  const grupo26Rows = (grupoRowsRaw ?? []).filter((r) => r.anio === currentYear);
-
-  // Aggregar grupo data: por territorio + total agregado.
-  // Estructura intermedia: territorio → grupo → {v24, v25, v26}
-  const gruposByTerritoryMap = new Map<
-    string,
-    Map<string, { v24: number; v25: number; v26: number }>
-  >();
-  const ingestGrupoRow = (
-    rows: Array<{ territorio: string; grupo: string; total_venta: number }> | null,
-    yearKey: "v24" | "v25" | "v26"
-  ) => {
-    for (const row of rows ?? []) {
-      let terrMap = gruposByTerritoryMap.get(row.territorio);
-      if (!terrMap) {
-        terrMap = new Map();
-        gruposByTerritoryMap.set(row.territorio, terrMap);
-      }
-      const cur = terrMap.get(row.grupo) ?? { v24: 0, v25: 0, v26: 0 };
-      cur[yearKey] = Number(row.total_venta) || 0;
-      terrMap.set(row.grupo, cur);
-    }
-  };
-  ingestGrupoRow(grupo24Rows, "v24");
-  ingestGrupoRow(grupo25Rows, "v25");
-  ingestGrupoRow(grupo26Rows, "v26");
-
-  // Convertir a arrays + computar el "Total" sumando todos los territorios
-  const gruposByTerritory: Record<string, DimensionRow[]> = {};
-  const totalGruposMap = new Map<
-    string,
-    { v24: number; v25: number; v26: number }
-  >();
-  for (const [terr, grupoMap] of gruposByTerritoryMap) {
-    gruposByTerritory[terr] = Array.from(grupoMap.entries()).map(
-      ([name, data]) => ({ name, ...data })
-    );
-    for (const [name, data] of grupoMap) {
-      const cur = totalGruposMap.get(name) ?? { v24: 0, v25: 0, v26: 0 };
-      cur.v24 += data.v24;
-      cur.v25 += data.v25;
-      cur.v26 += data.v26;
-      totalGruposMap.set(name, cur);
-    }
-  }
-  const gruposTotal: DimensionRow[] = Array.from(
-    totalGruposMap.entries()
-  ).map(([name, data]) => ({ name, ...data }));
-  const grupos: DimensionDataset = {
-    byTerritory: gruposByTerritory,
-    total: gruposTotal,
+  // Build datasets para grupos, clientes y vendedores via helper genérico
+  const grupos = buildDimDataset(
+    grupoRowsRaw,
+    (r) => r.grupo,
+    currentYear
+  );
+  const clientes = buildDimDataset(
+    clienteRowsRaw,
+    (r) => r.cliente,
+    currentYear
+  );
+  // Vendedores: 2 datasets para soportar toggle Sus/Suve
+  // Separados (con sufijo): replica V2.2, una fila por (vendedor, empresa)
+  const vendedoresSeparados = buildDimDataset(
+    vendedorRowsRaw,
+    (r) => `${r.vendedor} (${r.empresa === 0 ? "Sus" : "Suve"})`,
+    currentYear
+  );
+  // Unidos (sin sufijo): aggrega ambas empresas por persona
+  const vendedoresUnidos = buildDimDataset(
+    vendedorRowsRaw,
+    (r) => r.vendedor,
+    currentYear
+  );
+  const vendedores = {
+    separados: vendedoresSeparados,
+    unidos: vendedoresUnidos,
   };
 
   // ============ SKUs (Tab Productos) ============
@@ -455,6 +491,8 @@ export default async function DashboardPage() {
         currentMonth={currentMonth}
         grupos={grupos}
         skus={skus}
+        clientes={clientes}
+        vendedores={vendedores}
       />
     </div>
   );

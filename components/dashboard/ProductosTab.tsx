@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatMoney, formatKilos } from "@/lib/format";
-import type { DimensionRow } from "@/components/dashboard/GrupoProductoTab";
+import type { DimensionRow } from "@/components/dashboard/DimensionTab";
 
 interface Props {
   rows: DimensionRow[];

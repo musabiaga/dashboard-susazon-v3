@@ -12,63 +12,73 @@ export interface DimensionRow {
   v24: number;
   v25: number;
   v26: number;
-  // Opcionales — solo Productos los popula (kg) por ahora.
-  // Otros tabs los ignoran.
+  // Opcionales — Productos los popula con kg y margen.
   k24?: number;
   k25?: number;
   k26?: number;
   m24?: number;
   m25?: number;
   m26?: number;
+  // Tab Vendedores y Clientes pueden traer info extra
+  empresa?: string; // "Sus" | "Suve" para Vendedores
 }
 
 interface Props {
   rows: DimensionRow[];
-  monthLabel24: string; // "Abr 24"
-  monthLabel25: string; // "Abr 25"
-  monthLabel26: string; // "Abr 26"
-  topN?: number; // cuantos en chart (resto en tabla). Default 10.
+  monthLabel24: string;
+  monthLabel25: string;
+  monthLabel26: string;
+  /** Header/columna: "Grupo" / "Cliente" / "Vendedor" */
+  dimensionLabel: string;
+  /** Plural usado en titulo del chart: "Grupos" / "Clientes" / "Vendedores" */
+  dimensionLabelPlural: string;
+  /** Cuantos en chart (resto en tabla). Si null, muestra TODOS en chart. Default 10. */
+  topNChart?: number | null;
+  /** Cuantos en tabla. Si null, muestra TODOS. Default null (todos). */
+  topNTable?: number | null;
 }
 
-const SERIES_ABR_24_25_26: (
-  monthLabel24: string,
-  monthLabel25: string,
-  monthLabel26: string
-) => GroupedBarSeries[] = (l24, l25, l26) => [
-  { key: "v24", label: l24, color: "#94a3b8" }, // gris
-  { key: "v25", label: l25, color: "#3b82f6" }, // azul
-  { key: "v26", label: l26, color: "#10b981" }, // verde
-];
-
 /**
- * Tab Grupo Producto:
- *  - Replica del tab Familia del V2.2, pero usando el campo `grupo` (cambio #1).
- *  - Cambio #2: eje X muestra nombres de grupos correctamente (en V2.2 el bug
- *    de Chart.js mostraba "$0, $1, $2..."). Recharts con dataKey="name".
+ * Componente generico para tabs basados en una dimension (grupo, cliente,
+ * vendedor) con la misma estructura: bar chart top N + tabla con
+ * comparacion 3 anos + Var %.
  *
- * Estructura:
- *  - Bar chart vertical con top 10 grupos por venta del mes actual (Abr 26).
- *  - Tabla debajo con TODOS los grupos.
- *  - Var % = (v26 - v25) / v25 × 100, color verde si crece, rojo si baja.
+ * Usado por:
+ *  - Tab Grupo Producto (cambio funcional #1 + #2)
+ *  - Tab Clientes (cambio #3)
+ *  - Tab Vendedores
+ *
+ * El bug del V2.2 ("$0, $1, $2..." en eje X) se resuelve usando Recharts
+ * con XAxis dataKey="name" en GroupedBarChart.
  */
-export function GrupoProductoTab({
+export function DimensionTab({
   rows,
   monthLabel24,
   monthLabel25,
   monthLabel26,
-  topN = 10,
+  dimensionLabel,
+  dimensionLabelPlural,
+  topNChart = 10,
+  topNTable = null,
 }: Props) {
   const sorted = useMemo(
     () => [...rows].sort((a, b) => b.v26 - a.v26),
     [rows]
   );
-  const top = useMemo(() => sorted.slice(0, topN), [sorted, topN]);
-
-  const series = SERIES_ABR_24_25_26(
-    monthLabel24,
-    monthLabel25,
-    monthLabel26
+  const top = useMemo(
+    () => (topNChart == null ? sorted : sorted.slice(0, topNChart)),
+    [sorted, topNChart]
   );
+  const tableRows = useMemo(
+    () => (topNTable == null ? sorted : sorted.slice(0, topNTable)),
+    [sorted, topNTable]
+  );
+
+  const series: GroupedBarSeries[] = [
+    { key: "v24", label: monthLabel24, color: "#94a3b8" },
+    { key: "v25", label: monthLabel25, color: "#3b82f6" },
+    { key: "v26", label: monthLabel26, color: "#10b981" },
+  ];
 
   return (
     <div className="space-y-4">
@@ -94,7 +104,9 @@ export function GrupoProductoTab({
               className="mb-2 text-xs font-semibold uppercase tracking-wider"
               style={{ color: "var(--text-secondary)" }}
             >
-              Top {top.length} Grupos · {monthLabel26}
+              {topNChart == null
+                ? `${dimensionLabelPlural} · ${monthLabel26}`
+                : `Top ${top.length} ${dimensionLabelPlural} · ${monthLabel26}`}
             </h3>
             <GroupedBarChart
               data={top.map((r) => ({
@@ -106,14 +118,14 @@ export function GrupoProductoTab({
               series={series}
               height={520}
               xAngle={-30}
-              xLabelHeight={110}
+              xLabelHeight={130}
             />
           </>
         )}
       </div>
 
-      {/* Tabla todos los grupos */}
-      {sorted.length > 0 && (
+      {/* Tabla */}
+      {tableRows.length > 0 && (
         <div
           className="rounded-[var(--radius-lg)] border"
           style={{
@@ -125,7 +137,7 @@ export function GrupoProductoTab({
             <table className="w-full text-sm tabular-nums">
               <thead>
                 <tr style={{ background: "var(--bg-surface-muted)" }}>
-                  <Th>Grupo</Th>
+                  <Th>{dimensionLabel}</Th>
                   <Th align="right">{monthLabel24}</Th>
                   <Th align="right">{monthLabel25}</Th>
                   <Th align="right">{monthLabel26}</Th>
@@ -133,12 +145,12 @@ export function GrupoProductoTab({
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((r, i) => {
+                {tableRows.map((r, i) => {
                   const varPct =
                     r.v25 > 0 ? ((r.v26 - r.v25) / r.v25) * 100 : null;
                   return (
                     <tr
-                      key={r.name}
+                      key={r.name + i}
                       style={{
                         background:
                           i % 2 === 0
@@ -171,6 +183,18 @@ export function GrupoProductoTab({
               </tbody>
             </table>
           </div>
+          {topNTable != null && sorted.length > tableRows.length && (
+            <div
+              className="border-t px-3 py-2 text-center text-[11px]"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-muted)",
+              }}
+            >
+              Mostrando top {tableRows.length} de {sorted.length}{" "}
+              {dimensionLabelPlural.toLowerCase()}
+            </div>
+          )}
         </div>
       )}
     </div>
