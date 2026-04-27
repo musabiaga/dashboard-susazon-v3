@@ -12,6 +12,14 @@ export interface DimensionRow {
   v24: number;
   v25: number;
   v26: number;
+  // Opcionales — solo Productos los popula (kg) por ahora.
+  // Otros tabs los ignoran.
+  k24?: number;
+  k25?: number;
+  k26?: number;
+  m24?: number;
+  m25?: number;
+  m26?: number;
 }
 
 interface Props {

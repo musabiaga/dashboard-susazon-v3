@@ -118,23 +118,28 @@ export default async function DashboardPage() {
       .order("fecha"),
   ]);
 
-  // Fetch grupo data en paralelo (3 queries por año para evitar limite de
-  // Supabase de 1000 filas: 25 grupos x 16 territorios = 400 por año).
-  const fetchGrupoYear = (year: number) =>
+  // Fetch dimension data en paralelo. Con max-rows = 50000 en Supabase,
+  // single queries con .in([3 anos]) caben sin problema.
+  const [
+    { data: grupoRowsRaw },
+    { data: skuRowsRaw },
+  ] = await Promise.all([
     supabase
       .from("kpi_grupo_summary")
-      .select("territorio, grupo, total_venta")
-      .eq("anio", year)
-      .eq("mes", currentMonth);
-  const [
-    { data: grupo24Rows },
-    { data: grupo25Rows },
-    { data: grupo26Rows },
-  ] = await Promise.all([
-    fetchGrupoYear(currentYear - 2),
-    fetchGrupoYear(currentYear - 1),
-    fetchGrupoYear(currentYear),
+      .select("territorio, grupo, anio, total_venta")
+      .in("anio", [currentYear - 2, currentYear - 1, currentYear])
+      .eq("mes", currentMonth),
+    supabase
+      .from("kpi_sku_summary")
+      .select("territorio, sku, anio, total_venta, total_kg")
+      .in("anio", [currentYear - 2, currentYear - 1, currentYear])
+      .eq("mes", currentMonth),
   ]);
+
+  // Repartir filas grupo en 3 buckets por año
+  const grupo24Rows = (grupoRowsRaw ?? []).filter((r) => r.anio === currentYear - 2);
+  const grupo25Rows = (grupoRowsRaw ?? []).filter((r) => r.anio === currentYear - 1);
+  const grupo26Rows = (grupoRowsRaw ?? []).filter((r) => r.anio === currentYear);
 
   // Aggregar grupo data: por territorio + total agregado.
   // Estructura intermedia: territorio → grupo → {v24, v25, v26}
@@ -185,6 +190,63 @@ export default async function DashboardPage() {
   const grupos: DimensionDataset = {
     byTerritory: gruposByTerritory,
     total: gruposTotal,
+  };
+
+  // ============ SKUs (Tab Productos) ============
+  // Necesitamos venta y kilos por SKU x territorio x año (mes filter).
+  const skusByTerritoryMap = new Map<
+    string,
+    Map<string, {
+      v24: number; v25: number; v26: number;
+      k24: number; k25: number; k26: number;
+    }>
+  >();
+  for (const row of skuRowsRaw ?? []) {
+    let terrMap = skusByTerritoryMap.get(row.territorio);
+    if (!terrMap) {
+      terrMap = new Map();
+      skusByTerritoryMap.set(row.territorio, terrMap);
+    }
+    const cur = terrMap.get(row.sku) ?? {
+      v24: 0, v25: 0, v26: 0,
+      k24: 0, k25: 0, k26: 0,
+    };
+    const v = Number(row.total_venta) || 0;
+    const k = Number(row.total_kg) || 0;
+    if (row.anio === currentYear - 2) { cur.v24 = v; cur.k24 = k; }
+    else if (row.anio === currentYear - 1) { cur.v25 = v; cur.k25 = k; }
+    else if (row.anio === currentYear) { cur.v26 = v; cur.k26 = k; }
+    terrMap.set(row.sku, cur);
+  }
+
+  const skusByTerritory: Record<string, DimensionRow[]> = {};
+  const totalSkusMap = new Map<
+    string,
+    {
+      v24: number; v25: number; v26: number;
+      k24: number; k25: number; k26: number;
+    }
+  >();
+  for (const [terr, skuMap] of skusByTerritoryMap) {
+    skusByTerritory[terr] = Array.from(skuMap.entries()).map(
+      ([name, data]) => ({ name, ...data })
+    );
+    for (const [name, data] of skuMap) {
+      const cur = totalSkusMap.get(name) ?? {
+        v24: 0, v25: 0, v26: 0,
+        k24: 0, k25: 0, k26: 0,
+      };
+      cur.v24 += data.v24; cur.v25 += data.v25; cur.v26 += data.v26;
+      cur.k24 += data.k24; cur.k25 += data.k25; cur.k26 += data.k26;
+      totalSkusMap.set(name, cur);
+    }
+  }
+  const skusTotal: DimensionRow[] = Array.from(totalSkusMap.entries()).map(
+    ([name, data]) => ({ name, ...data })
+  );
+  const skus: DimensionDataset = {
+    byTerritory: skusByTerritory,
+    total: skusTotal,
   };
 
   // states es la fuente de verdad para la lista completa de territorios.
@@ -392,6 +454,7 @@ export default async function DashboardPage() {
         currentYear={currentYear}
         currentMonth={currentMonth}
         grupos={grupos}
+        skus={skus}
       />
     </div>
   );

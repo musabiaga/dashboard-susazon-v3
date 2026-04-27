@@ -11,6 +11,7 @@ import {
   GrupoProductoTab,
   type DimensionRow,
 } from "@/components/dashboard/GrupoProductoTab";
+import { ProductosTab } from "@/components/dashboard/ProductosTab";
 import { AlertCircle } from "lucide-react";
 
 interface DimensionDataset {
@@ -38,6 +39,8 @@ interface DashboardClientProps {
   currentMonth: number; // 1-12
   // Tab Grupo Producto
   grupos: DimensionDataset;
+  // Tab Productos
+  skus: DimensionDataset;
 }
 
 /**
@@ -66,6 +69,7 @@ export function DashboardClient({
   currentYear,
   currentMonth,
   grupos,
+  skus,
 }: DashboardClientProps) {
   const [selectedTerritory, setSelectedTerritory] = useState<string>(""); // "" = Todos
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
@@ -228,6 +232,20 @@ export function DashboardClient({
                 return (
                   <GrupoProductoTab
                     rows={grupoRows}
+                    monthLabel24={prev2MonthShortYY}
+                    monthLabel25={prevMonthShortYY}
+                    monthLabel26={monthShortYY}
+                  />
+                );
+              }
+              if (activeTab === "productos") {
+                const skuRows =
+                  effectiveSelected === ""
+                    ? skus.total
+                    : skus.byTerritory[effectiveSelected] ?? [];
+                return (
+                  <ProductosTab
+                    rows={skuRows}
                     monthLabel24={prev2MonthShortYY}
                     monthLabel25={prevMonthShortYY}
                     monthLabel26={monthShortYY}
