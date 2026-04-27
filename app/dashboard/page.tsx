@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DashboardHeader } from "./DashboardHeader";
 import { DashboardClient } from "./DashboardClient";
 import type { Territory, TerritoryKpi } from "@/components/dashboard/Sidebar";
+import { countBizDays } from "@/lib/business-days";
 
 const MONTH_NAMES_ES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -24,6 +25,7 @@ function emptyKpi(): TerritoryKpi {
     marginPct: 0,
     prevYear: { venta: 0, margen: 0, kg: 0 },
     acumByYear: {},
+    daily: { current: [], prevYear: [] },
   };
 }
 
@@ -64,26 +66,45 @@ export default async function DashboardPage() {
   const daysCurrent = now.getDate();
   // Día 0 del mes siguiente = último día del mes actual = días totales.
   const daysTotal = new Date(currentYear, currentMonth, 0).getDate();
+  // Días hábiles (L-S menos feriados LFT) — para Tracking Diario.
+  const elapsedBizDays = countBizDays(currentYear, currentMonth, daysCurrent);
+  const totalBizDays = countBizDays(currentYear, currentMonth, null);
 
-  // Pull en paralelo: vista mensual agregada (kpi_monthly_summary, una fila
-  // por anio/mes/territorio) + estados de territorios + presupuestos.
-  // La vista evita el limite default de 1000 filas que aplica a sales_rows
-  // directamente (un mes completo puede tener 8K+ rows).
-  const [{ data: monthlySummary }, { data: states }, { data: budgetRows }] =
-    await Promise.all([
-      supabase
-        .from("kpi_monthly_summary")
-        .select("anio, mes, territorio, total_venta, total_margen, total_kg"),
-      supabase
-        .from("territories_state")
-        .select("territory_name, is_active, reason")
-        .order("territory_name"),
-      supabase
-        .from("territory_budgets")
-        .select("territorio, venta_budget")
-        .eq("anio", currentYear)
-        .eq("mes", currentMonth),
-    ]);
+  // Pull en paralelo: vista mensual agregada + estados + presupuestos +
+  // vista diaria (current month + prev year same month, para Tracking Diario).
+  // Las vistas evitan el limite default de 1000 filas que aplica a sales_rows.
+  const [
+    { data: monthlySummary },
+    { data: states },
+    { data: budgetRows },
+    { data: dailyCurrent },
+    { data: dailyPrevYear },
+  ] = await Promise.all([
+    supabase
+      .from("kpi_monthly_summary")
+      .select("anio, mes, territorio, total_venta, total_margen, total_kg"),
+    supabase
+      .from("territories_state")
+      .select("territory_name, is_active, reason")
+      .order("territory_name"),
+    supabase
+      .from("territory_budgets")
+      .select("territorio, venta_budget")
+      .eq("anio", currentYear)
+      .eq("mes", currentMonth),
+    supabase
+      .from("kpi_daily_summary")
+      .select("fecha, territorio, total_venta, total_margen, total_kg")
+      .eq("anio", currentYear)
+      .eq("mes", currentMonth)
+      .order("fecha"),
+    supabase
+      .from("kpi_daily_summary")
+      .select("fecha, territorio, total_venta, total_margen, total_kg")
+      .eq("anio", currentYear - 1)
+      .eq("mes", currentMonth)
+      .order("fecha"),
+  ]);
 
   // states es la fuente de verdad para la lista completa de territorios.
   const uniqueNames = (states ?? []).map((s) => s.territory_name);
@@ -119,6 +140,30 @@ export default async function DashboardPage() {
       t.prevYear.kg += k;
     }
   }
+
+  // Daily breakdown — current month
+  for (const row of dailyCurrent ?? []) {
+    const t = ensureT(row.territorio);
+    const day = new Date(row.fecha + "T12:00:00").getDate();
+    t.daily.current.push({
+      d: day,
+      v: Number(row.total_venta) || 0,
+      m: Number(row.total_margen) || 0,
+      k: Number(row.total_kg) || 0,
+    });
+  }
+  // Daily breakdown — prev year same month
+  for (const row of dailyPrevYear ?? []) {
+    const t = ensureT(row.territorio);
+    const day = new Date(row.fecha + "T12:00:00").getDate();
+    t.daily.prevYear.push({
+      d: day,
+      v: Number(row.total_venta) || 0,
+      m: Number(row.total_margen) || 0,
+      k: Number(row.total_kg) || 0,
+    });
+  }
+
   for (const [name, k] of kpiByTerritory) {
     kpiByTerritory.set(name, withMarginPct(k));
   }
@@ -154,7 +199,27 @@ export default async function DashboardPage() {
     0
   );
 
-  // Total: suma de TODOS los territorios visibles (current month + prev year + acum).
+  // Total: suma de TODOS los territorios visibles (current month + prev year + acum + daily).
+  // Daily se agrega por día sumando todos los territorios para ese día.
+  const totalDailyCurrentMap = new Map<number, { v: number; m: number; k: number }>();
+  const totalDailyPrevMap = new Map<number, { v: number; m: number; k: number }>();
+  for (const k of kpiByTerritory.values()) {
+    for (const p of k.daily.current) {
+      const cur = totalDailyCurrentMap.get(p.d) ?? { v: 0, m: 0, k: 0 };
+      cur.v += p.v; cur.m += p.m; cur.k += p.k;
+      totalDailyCurrentMap.set(p.d, cur);
+    }
+    for (const p of k.daily.prevYear) {
+      const cur = totalDailyPrevMap.get(p.d) ?? { v: 0, m: 0, k: 0 };
+      cur.v += p.v; cur.m += p.m; cur.k += p.k;
+      totalDailyPrevMap.set(p.d, cur);
+    }
+  }
+  const sortedDays = (m: Map<number, { v: number; m: number; k: number }>) =>
+    Array.from(m.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([d, agg]) => ({ d, v: agg.v, m: agg.m, k: agg.k }));
+
   const totalRaw = Array.from(kpiByTerritory.values()).reduce<TerritoryKpi>(
     (acc, k) => {
       const acumByYear = { ...acc.acumByYear };
@@ -173,10 +238,13 @@ export default async function DashboardPage() {
           kg: acc.prevYear.kg + k.prevYear.kg,
         },
         acumByYear,
+        daily: { current: [], prevYear: [] }, // populamos abajo
       };
     },
     emptyKpi()
   );
+  totalRaw.daily.current = sortedDays(totalDailyCurrentMap);
+  totalRaw.daily.prevYear = sortedDays(totalDailyPrevMap);
   const totalKpi = withMarginPct(totalRaw);
 
   return (
@@ -204,6 +272,10 @@ export default async function DashboardPage() {
         acumYears={ACUM_YEARS}
         daysCurrent={daysCurrent}
         daysTotal={daysTotal}
+        elapsedBizDays={elapsedBizDays}
+        totalBizDays={totalBizDays}
+        currentYear={currentYear}
+        currentMonth={currentMonth}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import { Sidebar, type Territory, type TerritoryKpi } from "@/components/dashboa
 import { KpiCardsRow, type KpiData } from "@/components/dashboard/KpiCardsRow";
 import { DashboardTabs, TAB_LABELS, type TabKey } from "@/components/dashboard/DashboardTabs";
 import { PlaceholderTab } from "@/components/dashboard/PlaceholderTab";
+import { TrackingDiarioTab } from "@/components/dashboard/TrackingDiarioTab";
 import { AlertCircle } from "lucide-react";
 
 interface DashboardClientProps {
@@ -16,10 +17,14 @@ interface DashboardClientProps {
   monthShortYY: string; // "Abr 26"
   prevMonthShortYY: string; // "Abr 25"
   acumYears: number[]; // ej: [2024, 2025, 2026]
-  // Para Run-Rate: día actual y días totales del mes (computados server-side
-  // para coherencia con timezone México).
+  // Para Run-Rate (calendario): día actual y días totales del mes
   daysCurrent: number;
   daysTotal: number;
+  // Para Tracking Diario (días hábiles L-S menos feriados LFT)
+  elapsedBizDays: number;
+  totalBizDays: number;
+  currentYear: number;
+  currentMonth: number; // 1-12
 }
 
 /**
@@ -42,6 +47,10 @@ export function DashboardClient({
   acumYears,
   daysCurrent,
   daysTotal,
+  elapsedBizDays,
+  totalBizDays,
+  currentYear,
+  currentMonth,
 }: DashboardClientProps) {
   const [selectedTerritory, setSelectedTerritory] = useState<string>(""); // "" = Todos
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
@@ -161,10 +170,33 @@ export function DashboardClient({
 
           {/* Tabs */}
           <DashboardTabs active={activeTab} onChange={setActiveTab}>
-            <PlaceholderTab
-              title={TAB_LABELS[activeTab]}
-              note="Contenido en construcción. Llega en Fase 2d (Tracking Diario) y Fase 3 (resto de tabs con los 4 cambios funcionales pendientes)."
-            />
+            {activeTab === "tracking" ? (
+              <TrackingDiarioTab
+                kpi={
+                  effectiveSelected === ""
+                    ? totalKpi
+                    : territories.find((t) => t.name === effectiveSelected)
+                        ?.kpi ?? totalKpi
+                }
+                ventaBudget={
+                  effectiveSelected === ""
+                    ? totalVentaBudget
+                    : territories.find((t) => t.name === effectiveSelected)
+                        ?.ventaBudget ?? 0
+                }
+                currentYear={currentYear}
+                currentMonth={currentMonth}
+                monthShortYY={monthShortYY}
+                prevMonthShortYY={prevMonthShortYY}
+                elapsedBizDays={elapsedBizDays}
+                totalBizDays={totalBizDays}
+              />
+            ) : (
+              <PlaceholderTab
+                title={TAB_LABELS[activeTab]}
+                note="Contenido en construcción. Llega en Fase 3 (resto de tabs con los 4 cambios funcionales pendientes)."
+              />
+            )}
           </DashboardTabs>
         </div>
       </main>

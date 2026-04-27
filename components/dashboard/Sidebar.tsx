@@ -3,6 +3,13 @@
 import { Layers, AlertTriangle, Building2 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 
+export interface DailyPoint {
+  d: number; // día del mes 1-31
+  v: number; // venta
+  m: number; // margen
+  k: number; // kg
+}
+
 export interface TerritoryKpi {
   venta: number;
   margen: number;
@@ -13,6 +20,11 @@ export interface TerritoryKpi {
   // Acumulado de venta por año (YTD para año actual, full para pasados).
   // Map { 2024: 96500000, 2025: 107700000, 2026: 31700000 }
   acumByYear: Record<number, number>;
+  // Daily breakdown — usado por tab Tracking Diario.
+  daily: {
+    current: DailyPoint[];   // mes actual, ordenado por día
+    prevYear: DailyPoint[];  // mismo mes año anterior, ordenado por día
+  };
 }
 
 export interface Territory {
