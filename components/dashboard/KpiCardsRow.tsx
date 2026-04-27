@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, TrendingUp, Package, Zap } from "lucide-react";
+import { DollarSign, TrendingUp, Package, Zap, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 
 export interface KpiData {
@@ -9,9 +9,14 @@ export interface KpiData {
   kg: number;
   marginPct: number; // margen / venta * 100
   monthLabel: string; // ej: "Abril 2026"
+  monthShortYY: string; // ej: "Abr 26"
+  prevMonthShortYY: string; // ej: "Abr 25"
+  // Mismo mes año anterior — para YoY. Si prev=0, YoY se oculta.
+  prevYear: { venta: number; margen: number; kg: number };
+  // Acumulado por año (3 cards a la derecha)
+  acumByYear: Record<number, number>;
+  acumYears: number[]; // años a mostrar en orden (ej: [2024, 2025, 2026])
   // Run-Rate: proyección lineal por días calendario.
-  // ventaProyectada = venta * (daysTotal / daysCurrent).
-  // Si está null, no se muestra la fila (mes futuro o sin data).
   runRate?: {
     venta: number;
     margen: number;
@@ -20,8 +25,6 @@ export interface KpiData {
     daysTotal: number;
   } | null;
   // PTTO de venta del mes (0 = no configurado, no se muestra %).
-  // Solo aplica al card de Venta hoy. Margen y KG quedan preparados para
-  // cuando el editor exponga esos campos.
   ventaBudget?: number;
 }
 
@@ -45,6 +48,12 @@ function ptToneFromPct(pct: number): "success" | "warning" | "danger" {
   return "danger";
 }
 
+function yoyDelta(current: number, prev: number): { pct: number; tone: "success" | "danger" } | null {
+  if (prev <= 0) return null;
+  const pct = ((current - prev) / prev) * 100;
+  return { pct, tone: pct >= 0 ? "success" : "danger" };
+}
+
 export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
   const rr = data?.runRate ?? null;
   const ventaBudget = data?.ventaBudget ?? 0;
@@ -56,40 +65,108 @@ export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
           budget: ventaBudget,
         }
       : null;
+
+  const yoyV = data ? yoyDelta(data.venta, data.prevYear.venta) : null;
+  const yoyK = data ? yoyDelta(data.kg, data.prevYear.kg) : null;
+  const prevLabel = data?.prevMonthShortYY ?? "año anterior";
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <KpiCard
-        label="Venta"
-        value={data ? formatMoney(data.venta) : "—"}
-        sublabel={data?.monthLabel ?? "Mes actual"}
-        icon={<DollarSign size={18} />}
-        accent="accent"
-        loading={loading}
-        runRate={rr ? { value: formatMoney(rr.venta), days: rr } : null}
-        vsPtto={vsPttoVenta}
-      />
-      <KpiCard
-        label="Margen"
-        value={data ? formatMoney(data.margen) : "—"}
-        sublabel={
-          data
-            ? `${data.marginPct.toFixed(1)}% sobre venta`
-            : "Mes actual"
-        }
-        icon={<TrendingUp size={18} />}
-        accent="success"
-        loading={loading}
-        runRate={rr ? { value: formatMoney(rr.margen), days: rr } : null}
-      />
-      <KpiCard
-        label="Kilos"
-        value={data ? formatKg(data.kg) : "—"}
-        sublabel={data?.monthLabel ?? "Mes actual"}
-        icon={<Package size={18} />}
-        accent="warning"
-        loading={loading}
-        runRate={rr ? { value: formatKg(rr.kg), days: rr } : null}
-      />
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-9">
+      {/* 3 Main cards (col-span-2 on lg → 6 cols total) */}
+      <div className="lg:col-span-2">
+        <KpiCard
+          label={`Venta ${data?.monthShortYY ?? ""}`.trim()}
+          value={data ? formatMoney(data.venta) : "—"}
+          sublabel={
+            yoyV
+              ? { text: `${yoyV.pct >= 0 ? "+" : ""}${yoyV.pct.toFixed(1)}% vs ${prevLabel}`, tone: yoyV.tone }
+              : { text: data?.monthLabel ?? "Mes actual", tone: "neutral" }
+          }
+          icon={<DollarSign size={18} />}
+          accent="accent"
+          loading={loading}
+          runRate={rr ? { value: formatMoney(rr.venta), days: rr } : null}
+          vsPtto={vsPttoVenta}
+        />
+      </div>
+      <div className="lg:col-span-2">
+        <KpiCard
+          label={`Margen ${data?.monthShortYY ?? ""}`.trim()}
+          value={data ? formatMoney(data.margen) : "—"}
+          sublabel={{
+            text: data ? `${data.marginPct.toFixed(1)}% de venta` : "Mes actual",
+            tone: "neutral",
+          }}
+          icon={<TrendingUp size={18} />}
+          accent="success"
+          loading={loading}
+          runRate={rr ? { value: formatMoney(rr.margen), days: rr } : null}
+        />
+      </div>
+      <div className="lg:col-span-2">
+        <KpiCard
+          label={`KG ${data?.monthShortYY ?? ""}`.trim()}
+          value={data ? formatKg(data.kg) : "—"}
+          sublabel={
+            yoyK
+              ? { text: `${yoyK.pct >= 0 ? "+" : ""}${yoyK.pct.toFixed(1)}% vs ${prevLabel}`, tone: yoyK.tone }
+              : { text: data?.monthLabel ?? "Mes actual", tone: "neutral" }
+          }
+          icon={<Package size={18} />}
+          accent="warning"
+          loading={loading}
+          runRate={rr ? { value: formatKg(rr.kg), days: rr } : null}
+        />
+      </div>
+
+      {/* 3 Acum cards (col-span-1 on lg → 3 cols total) */}
+      {(data?.acumYears ?? []).map((year) => (
+        <div key={year} className="lg:col-span-1">
+          <AcumCard
+            year={year}
+            value={data?.acumByYear[year] ?? 0}
+            loading={loading}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AcumCard({
+  year,
+  value,
+  loading,
+}: {
+  year: number;
+  value: number;
+  loading: boolean;
+}) {
+  const hasData = value > 0;
+  return (
+    <div
+      className="flex h-full flex-col justify-center rounded-[var(--radius-lg)] border p-4"
+      style={{
+        background: "var(--bg-surface-muted)",
+        borderColor: "var(--border)",
+      }}
+    >
+      <div
+        className="text-[10px] font-medium uppercase tracking-wider"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        Acum {year}
+      </div>
+      <div
+        className="mt-1 text-base font-semibold tabular-nums"
+        style={{
+          color: hasData
+            ? "var(--text-primary)"
+            : "var(--text-muted)",
+        }}
+      >
+        {loading ? "…" : hasData ? formatMoney(value) : "—"}
+      </div>
     </div>
   );
 }
@@ -106,7 +183,7 @@ function KpiCard({
 }: {
   label: string;
   value: string;
-  sublabel: string;
+  sublabel: { text: string; tone: "neutral" | "success" | "danger" };
   icon: React.ReactNode;
   accent: "accent" | "success" | "warning";
   loading: boolean;
@@ -120,6 +197,12 @@ function KpiCard({
     budget: number;
   } | null;
 }) {
+  const sublabelColor =
+    sublabel.tone === "success"
+      ? "var(--success)"
+      : sublabel.tone === "danger"
+      ? "var(--danger)"
+      : "var(--text-muted)";
   const accentVar =
     accent === "accent"
       ? "var(--accent)"
@@ -153,10 +236,12 @@ function KpiCard({
         {loading ? "Cargando…" : value}
       </div>
       <div
-        className="mt-1 text-xs"
-        style={{ color: "var(--text-muted)" }}
+        className="mt-1 flex items-center gap-1 text-xs font-medium"
+        style={{ color: sublabelColor }}
       >
-        {sublabel}
+        {sublabel.tone === "success" && <ArrowUpRight size={12} />}
+        {sublabel.tone === "danger" && <ArrowDownRight size={12} />}
+        <span>{sublabel.text}</span>
       </div>
       {runRate && (
         <div

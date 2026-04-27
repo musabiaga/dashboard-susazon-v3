@@ -8,6 +8,11 @@ export interface TerritoryKpi {
   margen: number;
   kg: number;
   marginPct: number;
+  // Mismo mes del año anterior (para YoY). Si no hay data: ceros.
+  prevYear: { venta: number; margen: number; kg: number };
+  // Acumulado de venta por año (YTD para año actual, full para pasados).
+  // Map { 2024: 96500000, 2025: 107700000, 2026: 31700000 }
+  acumByYear: Record<number, number>;
 }
 
 export interface Territory {

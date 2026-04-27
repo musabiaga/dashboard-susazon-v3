@@ -13,6 +13,9 @@ interface DashboardClientProps {
   totalVentaBudget: number;
   // Nombre del mes actual ya formateado en el server, para evitar timezone issues
   currentMonthLabel: string;
+  monthShortYY: string; // "Abr 26"
+  prevMonthShortYY: string; // "Abr 25"
+  acumYears: number[]; // ej: [2024, 2025, 2026]
   // Para Run-Rate: día actual y días totales del mes (computados server-side
   // para coherencia con timezone México).
   daysCurrent: number;
@@ -34,6 +37,9 @@ export function DashboardClient({
   totalKpi,
   totalVentaBudget,
   currentMonthLabel,
+  monthShortYY,
+  prevMonthShortYY,
+  acumYears,
   daysCurrent,
   daysTotal,
 }: DashboardClientProps) {
@@ -70,6 +76,11 @@ export function DashboardClient({
       kg: kpi.kg,
       marginPct: kpi.marginPct,
       monthLabel: currentMonthLabel,
+      monthShortYY,
+      prevMonthShortYY,
+      prevYear: kpi.prevYear,
+      acumByYear: kpi.acumByYear,
+      acumYears,
       runRate: showRunRate
         ? {
             venta: kpi.venta * factor,
@@ -87,6 +98,9 @@ export function DashboardClient({
     totalKpi,
     totalVentaBudget,
     currentMonthLabel,
+    monthShortYY,
+    prevMonthShortYY,
+    acumYears,
     daysCurrent,
     daysTotal,
   ]);
