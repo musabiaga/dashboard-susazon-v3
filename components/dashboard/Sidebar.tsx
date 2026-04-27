@@ -10,6 +10,14 @@ export interface DailyPoint {
   k: number; // kg
 }
 
+export interface MonthlyPoint {
+  anio: number;
+  mes: number; // 1-12
+  venta: number;
+  margen: number;
+  kg: number;
+}
+
 export interface TerritoryKpi {
   venta: number;
   margen: number;
@@ -25,6 +33,9 @@ export interface TerritoryKpi {
     current: DailyPoint[];   // mes actual, ordenado por día
     prevYear: DailyPoint[];  // mismo mes año anterior, ordenado por día
   };
+  // Monthly breakdown todos los años — usado por tab Ventas.
+  // Cada entrada es (anio, mes, venta, margen, kg) sumando sobre territorio.
+  monthly: MonthlyPoint[];
 }
 
 export interface Territory {

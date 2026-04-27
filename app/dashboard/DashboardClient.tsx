@@ -6,6 +6,7 @@ import { KpiCardsRow, type KpiData } from "@/components/dashboard/KpiCardsRow";
 import { DashboardTabs, TAB_LABELS, type TabKey } from "@/components/dashboard/DashboardTabs";
 import { PlaceholderTab } from "@/components/dashboard/PlaceholderTab";
 import { TrackingDiarioTab } from "@/components/dashboard/TrackingDiarioTab";
+import { VentasTab } from "@/components/dashboard/VentasTab";
 import { AlertCircle } from "lucide-react";
 
 interface DashboardClientProps {
@@ -170,33 +171,48 @@ export function DashboardClient({
 
           {/* Tabs */}
           <DashboardTabs active={activeTab} onChange={setActiveTab}>
-            {activeTab === "tracking" ? (
-              <TrackingDiarioTab
-                kpi={
-                  effectiveSelected === ""
-                    ? totalKpi
-                    : territories.find((t) => t.name === effectiveSelected)
-                        ?.kpi ?? totalKpi
-                }
-                ventaBudget={
-                  effectiveSelected === ""
-                    ? totalVentaBudget
-                    : territories.find((t) => t.name === effectiveSelected)
-                        ?.ventaBudget ?? 0
-                }
-                currentYear={currentYear}
-                currentMonth={currentMonth}
-                monthShortYY={monthShortYY}
-                prevMonthShortYY={prevMonthShortYY}
-                elapsedBizDays={elapsedBizDays}
-                totalBizDays={totalBizDays}
-              />
-            ) : (
-              <PlaceholderTab
-                title={TAB_LABELS[activeTab]}
-                note="Contenido en construcción. Llega en Fase 3 (resto de tabs con los 4 cambios funcionales pendientes)."
-              />
-            )}
+            {(() => {
+              const activeKpi =
+                effectiveSelected === ""
+                  ? totalKpi
+                  : territories.find((t) => t.name === effectiveSelected)
+                      ?.kpi ?? totalKpi;
+              const activeBudget =
+                effectiveSelected === ""
+                  ? totalVentaBudget
+                  : territories.find((t) => t.name === effectiveSelected)
+                      ?.ventaBudget ?? 0;
+
+              if (activeTab === "tracking") {
+                return (
+                  <TrackingDiarioTab
+                    kpi={activeKpi}
+                    ventaBudget={activeBudget}
+                    currentYear={currentYear}
+                    currentMonth={currentMonth}
+                    monthShortYY={monthShortYY}
+                    prevMonthShortYY={prevMonthShortYY}
+                    elapsedBizDays={elapsedBizDays}
+                    totalBizDays={totalBizDays}
+                  />
+                );
+              }
+              if (activeTab === "ventas") {
+                return (
+                  <VentasTab
+                    kpi={activeKpi}
+                    cutoffYear={currentYear}
+                    cutoffMonth={currentMonth}
+                  />
+                );
+              }
+              return (
+                <PlaceholderTab
+                  title={TAB_LABELS[activeTab]}
+                  note="Contenido en construcción. Llega próximamente en Fase 3."
+                />
+              );
+            })()}
           </DashboardTabs>
         </div>
       </main>

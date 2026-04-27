@@ -2,7 +2,11 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DashboardHeader } from "./DashboardHeader";
 import { DashboardClient } from "./DashboardClient";
-import type { Territory, TerritoryKpi } from "@/components/dashboard/Sidebar";
+import type {
+  Territory,
+  TerritoryKpi,
+  MonthlyPoint,
+} from "@/components/dashboard/Sidebar";
 import { countBizDays } from "@/lib/business-days";
 
 const MONTH_NAMES_ES = [
@@ -26,6 +30,7 @@ function emptyKpi(): TerritoryKpi {
     prevYear: { venta: 0, margen: 0, kg: 0 },
     acumByYear: {},
     daily: { current: [], prevYear: [] },
+    monthly: [],
   };
 }
 
@@ -127,6 +132,15 @@ export default async function DashboardPage() {
     // Acum yearly (cualquier mes de cada año)
     t.acumByYear[row.anio] = (t.acumByYear[row.anio] ?? 0) + v;
 
+    // Monthly breakdown completo (para tab Ventas)
+    t.monthly.push({
+      anio: row.anio,
+      mes: row.mes,
+      venta: v,
+      margen: m,
+      kg: k,
+    });
+
     // Current month
     if (row.anio === currentYear && row.mes === currentMonth) {
       t.venta += v;
@@ -220,6 +234,28 @@ export default async function DashboardPage() {
       .sort(([a], [b]) => a - b)
       .map(([d, agg]) => ({ d, v: agg.v, m: agg.m, k: agg.k }));
 
+  // Monthly agregado para "Todos": sumar todos los territorios por (anio, mes).
+  const totalMonthlyMap = new Map<string, MonthlyPoint>();
+  for (const k of kpiByTerritory.values()) {
+    for (const p of k.monthly) {
+      const key = `${p.anio}-${p.mes}`;
+      const cur = totalMonthlyMap.get(key) ?? {
+        anio: p.anio,
+        mes: p.mes,
+        venta: 0,
+        margen: 0,
+        kg: 0,
+      };
+      cur.venta += p.venta;
+      cur.margen += p.margen;
+      cur.kg += p.kg;
+      totalMonthlyMap.set(key, cur);
+    }
+  }
+  const sortedMonthly = Array.from(totalMonthlyMap.values()).sort((a, b) =>
+    a.anio !== b.anio ? a.anio - b.anio : a.mes - b.mes
+  );
+
   const totalRaw = Array.from(kpiByTerritory.values()).reduce<TerritoryKpi>(
     (acc, k) => {
       const acumByYear = { ...acc.acumByYear };
@@ -239,12 +275,14 @@ export default async function DashboardPage() {
         },
         acumByYear,
         daily: { current: [], prevYear: [] }, // populamos abajo
+        monthly: [],
       };
     },
     emptyKpi()
   );
   totalRaw.daily.current = sortedDays(totalDailyCurrentMap);
   totalRaw.daily.prevYear = sortedDays(totalDailyPrevMap);
+  totalRaw.monthly = sortedMonthly;
   const totalKpi = withMarginPct(totalRaw);
 
   return (
