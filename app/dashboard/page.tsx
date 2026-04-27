@@ -51,6 +51,10 @@ export default async function DashboardPage() {
 
   // Pull en paralelo: rows del mes actual (para KPIs) + estados globales + presupuestos.
   // Las RLS filtran por permisos del usuario automáticamente en las 3.
+  // OJO: NO usamos distinct sobre sales_rows para la lista de territorios —
+  // Supabase limita SELECT a 1000 filas por default y eso oculta territorios.
+  // Usamos territories_state (auto-poblado por trigger) que tiene una fila
+  // por territorio único y no sufre del límite.
   const [{ data: monthRows }, { data: states }, { data: budgetRows }] =
     await Promise.all([
       supabase
@@ -60,7 +64,8 @@ export default async function DashboardPage() {
         .eq("mes", currentMonth),
       supabase
         .from("territories_state")
-        .select("territory_name, is_active, reason"),
+        .select("territory_name, is_active, reason")
+        .order("territory_name"),
       supabase
         .from("territory_budgets")
         .select("territorio, venta_budget")
@@ -68,14 +73,8 @@ export default async function DashboardPage() {
         .eq("mes", currentMonth),
     ]);
 
-  // También necesito la lista completa de territorios visibles (incluso los
-  // que no tienen data en el mes actual, para que aparezcan en sidebar).
-  const { data: allTerritoryRows } = await supabase
-    .from("sales_rows")
-    .select("territorio");
-  const uniqueNames = Array.from(
-    new Set((allTerritoryRows ?? []).map((r) => r.territorio).filter(Boolean))
-  ).sort((a, b) => a.localeCompare(b, "es"));
+  // states es la fuente de verdad para la lista completa de territorios.
+  const uniqueNames = (states ?? []).map((s) => s.territory_name);
 
   // Agrega KPIs del mes actual por territorio
   const kpiByTerritory = new Map<string, TerritoryKpi>();

@@ -33,6 +33,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 6. **Suve API es lenta** (SQL Express, ~60s/mes en producción). Timeouts: Suve 600s/página, Susazón 120s/página. Route `/api/data/refresh` con `export const maxDuration = 800` para Vercel Pro.
 7. **Refresh es idempotente:** antes de insertar (source, año, mes), borra lo existente para esa combo. Seguro de re-correr cualquier rango.
 8. **API field `empresa` viene como string descriptivo** (`"SUSAZON DEL CENTRO"`, `"SUVE DEL BAJIO"`, etc.) — no exacto. `normalizeRow()` cae al fallback basado en el endpoint llamado.
+9. **Supabase SELECT default limit = 1000 filas.** No usar `distinct` sobre `sales_rows` para listas de territorios — solo verás los primeros que entren en 1000. Usar `territories_state` (auto-poblada por trigger `upsert_territory_on_sales_insert`) que tiene una fila por territorio único.
 
 ## Datos clave
 
