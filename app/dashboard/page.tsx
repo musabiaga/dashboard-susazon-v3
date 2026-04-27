@@ -145,6 +145,10 @@ export default async function DashboardPage() {
             ? roleLabel(permissions.role)
             : "Sin permisos asignados"
         }
+        canEditData={
+          !!permissions &&
+          ["admin", "director"].includes(permissions.role)
+        }
       />
 
       <DashboardClient

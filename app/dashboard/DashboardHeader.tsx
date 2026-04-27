@@ -6,9 +6,14 @@ import { Header } from "@/components/layout/Header";
 interface DashboardHeaderProps {
   userName: string;
   userRole: string;
+  canEditData?: boolean;
 }
 
-export function DashboardHeader({ userName, userRole }: DashboardHeaderProps) {
+export function DashboardHeader({
+  userName,
+  userRole,
+  canEditData = false,
+}: DashboardHeaderProps) {
   const router = useRouter();
 
   async function handleLogout() {
@@ -17,5 +22,12 @@ export function DashboardHeader({ userName, userRole }: DashboardHeaderProps) {
     router.refresh();
   }
 
-  return <Header userName={userName} userRole={userRole} onLogout={handleLogout} />;
+  return (
+    <Header
+      userName={userName}
+      userRole={userRole}
+      onLogout={handleLogout}
+      canEditData={canEditData}
+    />
+  );
 }

@@ -88,6 +88,7 @@ export default async function CargarDatosPage({
       <DashboardHeader
         userName={perms.full_name}
         userRole={roleLabel(perms.role)}
+        canEditData={true}
       />
       <main className="flex-1 p-6">
         <div className="mx-auto max-w-6xl space-y-6">

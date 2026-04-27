@@ -1,6 +1,8 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { LogOut, BarChart3, Database } from "lucide-react";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
 import { SusazonLogo } from "@/components/brand/SusazonLogo";
 
@@ -9,9 +11,20 @@ interface HeaderProps {
   userRole?: string;
   onLogout?: () => void;
   showLogout?: boolean;
+  // Si true, muestra el link a /cargar-datos. Pasarlo desde la página
+  // según el rol (admin/director ven; otros no).
+  canEditData?: boolean;
 }
 
-export function Header({ userName, userRole, onLogout, showLogout = true }: HeaderProps) {
+export function Header({
+  userName,
+  userRole,
+  onLogout,
+  showLogout = true,
+  canEditData = false,
+}: HeaderProps) {
+  const pathname = usePathname();
+
   return (
     <header
       className="flex items-center justify-between border-b border-[var(--border)] px-6 py-3"
@@ -33,6 +46,25 @@ export function Header({ userName, userRole, onLogout, showLogout = true }: Head
             Grupo Susazón · V3.0
           </span>
         </div>
+
+        {userName && (
+          <nav className="ml-4 hidden items-center gap-1 sm:flex">
+            <NavLink
+              href="/dashboard"
+              icon={<BarChart3 size={14} />}
+              label="Dashboard"
+              active={pathname === "/dashboard" || pathname === "/"}
+            />
+            {canEditData && (
+              <NavLink
+                href="/cargar-datos"
+                icon={<Database size={14} />}
+                label="Cargar datos"
+                active={pathname?.startsWith("/cargar-datos") ?? false}
+              />
+            )}
+          </nav>
+        )}
       </div>
 
       <div className="flex items-center gap-3">
@@ -69,5 +101,33 @@ export function Header({ userName, userRole, onLogout, showLogout = true }: Head
         )}
       </div>
     </header>
+  );
+}
+
+function NavLink({
+  href,
+  icon,
+  label,
+  active,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors"
+      style={{
+        color: active
+          ? "var(--text-on-header)"
+          : "var(--text-on-header-muted)",
+        background: active ? "rgba(255,255,255,0.1)" : "transparent",
+      }}
+    >
+      {icon}
+      {label}
+    </Link>
   );
 }
