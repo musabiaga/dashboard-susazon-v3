@@ -7,7 +7,13 @@ import type {
   TerritoryKpi,
   MonthlyPoint,
 } from "@/components/dashboard/Sidebar";
+import type { DimensionRow } from "@/components/dashboard/GrupoProductoTab";
 import { countBizDays } from "@/lib/business-days";
+
+export interface DimensionDataset {
+  byTerritory: Record<string, DimensionRow[]>;
+  total: DimensionRow[];
+}
 
 const MONTH_NAMES_ES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -68,6 +74,7 @@ export default async function DashboardPage() {
   const currentMonthLabel = `${MONTH_NAMES_ES[now.getMonth()]} ${currentYear}`;
   const monthShortYY = `${MONTH_SHORT_ES[now.getMonth()]} ${currentYear % 100}`;
   const prevMonthShortYY = `${MONTH_SHORT_ES[now.getMonth()]} ${(currentYear - 1) % 100}`;
+  const prev2MonthShortYY = `${MONTH_SHORT_ES[now.getMonth()]} ${(currentYear - 2) % 100}`;
   const daysCurrent = now.getDate();
   // Día 0 del mes siguiente = último día del mes actual = días totales.
   const daysTotal = new Date(currentYear, currentMonth, 0).getDate();
@@ -110,6 +117,75 @@ export default async function DashboardPage() {
       .eq("mes", currentMonth)
       .order("fecha"),
   ]);
+
+  // Fetch grupo data en paralelo (3 queries por año para evitar limite de
+  // Supabase de 1000 filas: 25 grupos x 16 territorios = 400 por año).
+  const fetchGrupoYear = (year: number) =>
+    supabase
+      .from("kpi_grupo_summary")
+      .select("territorio, grupo, total_venta")
+      .eq("anio", year)
+      .eq("mes", currentMonth);
+  const [
+    { data: grupo24Rows },
+    { data: grupo25Rows },
+    { data: grupo26Rows },
+  ] = await Promise.all([
+    fetchGrupoYear(currentYear - 2),
+    fetchGrupoYear(currentYear - 1),
+    fetchGrupoYear(currentYear),
+  ]);
+
+  // Aggregar grupo data: por territorio + total agregado.
+  // Estructura intermedia: territorio → grupo → {v24, v25, v26}
+  const gruposByTerritoryMap = new Map<
+    string,
+    Map<string, { v24: number; v25: number; v26: number }>
+  >();
+  const ingestGrupoRow = (
+    rows: Array<{ territorio: string; grupo: string; total_venta: number }> | null,
+    yearKey: "v24" | "v25" | "v26"
+  ) => {
+    for (const row of rows ?? []) {
+      let terrMap = gruposByTerritoryMap.get(row.territorio);
+      if (!terrMap) {
+        terrMap = new Map();
+        gruposByTerritoryMap.set(row.territorio, terrMap);
+      }
+      const cur = terrMap.get(row.grupo) ?? { v24: 0, v25: 0, v26: 0 };
+      cur[yearKey] = Number(row.total_venta) || 0;
+      terrMap.set(row.grupo, cur);
+    }
+  };
+  ingestGrupoRow(grupo24Rows, "v24");
+  ingestGrupoRow(grupo25Rows, "v25");
+  ingestGrupoRow(grupo26Rows, "v26");
+
+  // Convertir a arrays + computar el "Total" sumando todos los territorios
+  const gruposByTerritory: Record<string, DimensionRow[]> = {};
+  const totalGruposMap = new Map<
+    string,
+    { v24: number; v25: number; v26: number }
+  >();
+  for (const [terr, grupoMap] of gruposByTerritoryMap) {
+    gruposByTerritory[terr] = Array.from(grupoMap.entries()).map(
+      ([name, data]) => ({ name, ...data })
+    );
+    for (const [name, data] of grupoMap) {
+      const cur = totalGruposMap.get(name) ?? { v24: 0, v25: 0, v26: 0 };
+      cur.v24 += data.v24;
+      cur.v25 += data.v25;
+      cur.v26 += data.v26;
+      totalGruposMap.set(name, cur);
+    }
+  }
+  const gruposTotal: DimensionRow[] = Array.from(
+    totalGruposMap.entries()
+  ).map(([name, data]) => ({ name, ...data }));
+  const grupos: DimensionDataset = {
+    byTerritory: gruposByTerritory,
+    total: gruposTotal,
+  };
 
   // states es la fuente de verdad para la lista completa de territorios.
   const uniqueNames = (states ?? []).map((s) => s.territory_name);
@@ -307,6 +383,7 @@ export default async function DashboardPage() {
         currentMonthLabel={currentMonthLabel}
         monthShortYY={monthShortYY}
         prevMonthShortYY={prevMonthShortYY}
+        prev2MonthShortYY={prev2MonthShortYY}
         acumYears={ACUM_YEARS}
         daysCurrent={daysCurrent}
         daysTotal={daysTotal}
@@ -314,6 +391,7 @@ export default async function DashboardPage() {
         totalBizDays={totalBizDays}
         currentYear={currentYear}
         currentMonth={currentMonth}
+        grupos={grupos}
       />
     </div>
   );

@@ -7,7 +7,16 @@ import { DashboardTabs, TAB_LABELS, type TabKey } from "@/components/dashboard/D
 import { PlaceholderTab } from "@/components/dashboard/PlaceholderTab";
 import { TrackingDiarioTab } from "@/components/dashboard/TrackingDiarioTab";
 import { VentasTab } from "@/components/dashboard/VentasTab";
+import {
+  GrupoProductoTab,
+  type DimensionRow,
+} from "@/components/dashboard/GrupoProductoTab";
 import { AlertCircle } from "lucide-react";
+
+interface DimensionDataset {
+  byTerritory: Record<string, DimensionRow[]>;
+  total: DimensionRow[];
+}
 
 interface DashboardClientProps {
   territories: Territory[];
@@ -17,6 +26,7 @@ interface DashboardClientProps {
   currentMonthLabel: string;
   monthShortYY: string; // "Abr 26"
   prevMonthShortYY: string; // "Abr 25"
+  prev2MonthShortYY: string; // "Abr 24"
   acumYears: number[]; // ej: [2024, 2025, 2026]
   // Para Run-Rate (calendario): día actual y días totales del mes
   daysCurrent: number;
@@ -26,6 +36,8 @@ interface DashboardClientProps {
   totalBizDays: number;
   currentYear: number;
   currentMonth: number; // 1-12
+  // Tab Grupo Producto
+  grupos: DimensionDataset;
 }
 
 /**
@@ -45,6 +57,7 @@ export function DashboardClient({
   currentMonthLabel,
   monthShortYY,
   prevMonthShortYY,
+  prev2MonthShortYY,
   acumYears,
   daysCurrent,
   daysTotal,
@@ -52,6 +65,7 @@ export function DashboardClient({
   totalBizDays,
   currentYear,
   currentMonth,
+  grupos,
 }: DashboardClientProps) {
   const [selectedTerritory, setSelectedTerritory] = useState<string>(""); // "" = Todos
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
@@ -203,6 +217,20 @@ export function DashboardClient({
                     kpi={activeKpi}
                     cutoffYear={currentYear}
                     cutoffMonth={currentMonth}
+                  />
+                );
+              }
+              if (activeTab === "grupo") {
+                const grupoRows =
+                  effectiveSelected === ""
+                    ? grupos.total
+                    : grupos.byTerritory[effectiveSelected] ?? [];
+                return (
+                  <GrupoProductoTab
+                    rows={grupoRows}
+                    monthLabel24={prev2MonthShortYY}
+                    monthLabel25={prevMonthShortYY}
+                    monthLabel26={monthShortYY}
                   />
                 );
               }
