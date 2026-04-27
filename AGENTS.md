@@ -10,10 +10,20 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Estado al last-touch
 
-- **Fase 0 (setup):** ✅ completa
-- **Fase 1 (auth):** ✅ completa — login real funciona end-to-end con Supabase
-- **Fase 2 (data pipeline):** ✅ COMPLETA. Refresh idempotente, source picker UI con checkboxes Susazón/Suve, ambas APIs validadas end-to-end. DB tiene **29,070 filas Feb-Abr 2026**. UI sincroniza el conteo real con DB vía `useEffect` sobre `initialTotalRows`.
-- **Próxima fase:** **2c — Dashboard real** (Sidebar con territorios + 3 KPI cards Venta/Margen/KG + layout para los 7 tabs).
+- **Fases 0, 1, 2:** ✅ completas
+- **Fase 2c (Dashboard real):** ✅ COMPLETA. Sidebar con 16 territorios reales + mini-KPIs por CEDI. 6 KPI cards (Venta/Margen/KG con YoY + Acum 2024/2025/2026). Run-Rate por card. vs PTTO en Venta. Editor de PTTO en `/cargar-datos` con grid año×territorio×12 meses + autosave. Nav links en header (Dashboard / Cargar datos).
+- **Fase 2d (Tab Tracking Diario):** ✅ COMPLETA. Replica del V2.2: 8 stats grid + progress bar (REZAGADO/AVANZADO) + chart compuesto Recharts (4 series: Acumulado/Ptto Linear/Año Anterior/Venta Diaria) + tabla diaria de 9 columnas con color tones en Vel. Necesaria.
+- **DB actual:** **337,398 filas** Ene 2024 - Abr 2026 (28 meses, ambas APIs). PTTO 2026 cargado para 14 territorios × 6 meses (Ene-Jun). Migraciones 005-007 aplicadas.
+- **Próxima fase:** **3 — los 6 tabs restantes** (Ventas, Grupo Producto, Productos, Clientes, Vendedores, Perdidos) con los 4 cambios funcionales del plan original (campo `grupo`, fix eje X "$0 $1 $2", chart doble eje en Productos).
+
+## Decisiones de mapeo PTTO confirmadas (Mauricio 2026-04-26)
+
+- **Intercompañias:** El PTTO va solo en la fila "Intercompañias" (Susazón). "Intercompañias Suve" queda en $0 — el dashboard suma ambas al agregar, así que el comparativo vs PTTO sigue cuadrando.
+- **Zurte-T Planta** (nombre en sheet de Mauricio) → **Zurt-t** (nombre en DB / API). Captura PTTO bajo "Zurt-t" — no renombrar la DB porque el próximo refresh del API volvería a meter "Zurt-t".
+
+## Territorios reales en DB (16, ordenados alfabéticamente)
+
+Cedis Bajio Celaya · Cedis Bajio Queretaro · Cedis Cancun · Cedis Leon · Cedis Mexico · Cedis Monterrey · Cedis Morelia · Cedis San Luis Potosi · Cuentas Directas Planta · Distribuidores · Intercompañias · Intercompañias Suve · Tiendas · Venta Detalle · Ventas Retail · Zurt-t
 
 ## Stack
 
@@ -33,7 +43,17 @@ This version has breaking changes — APIs, conventions, and file structure may 
 6. **Suve API es lenta** (SQL Express, ~60s/mes en producción). Timeouts: Suve 600s/página, Susazón 120s/página. Route `/api/data/refresh` con `export const maxDuration = 800` para Vercel Pro.
 7. **Refresh es idempotente:** antes de insertar (source, año, mes), borra lo existente para esa combo. Seguro de re-correr cualquier rango.
 8. **API field `empresa` viene como string descriptivo** (`"SUSAZON DEL CENTRO"`, `"SUVE DEL BAJIO"`, etc.) — no exacto. `normalizeRow()` cae al fallback basado en el endpoint llamado.
-9. **Supabase SELECT default limit = 1000 filas.** No usar `distinct` sobre `sales_rows` para listas de territorios — solo verás los primeros que entren en 1000. Usar `territories_state` (auto-poblada por trigger `upsert_territory_on_sales_insert`) que tiene una fila por territorio único.
+9. **Supabase SELECT default limit = 1000 filas.** No usar `distinct` sobre `sales_rows` para listas de territorios — solo verás los primeros que entren en 1000. Usar `territories_state` (auto-poblada por trigger) o las vistas `kpi_monthly_summary` / `kpi_daily_summary` (con `security_invoker = true` que respeta RLS del usuario).
+10. **Días hábiles = L-S (Lunes-Sábado), no L-V.** Solo Domingo es no-hábil, más feriados LFT. Helper en `lib/business-days.ts` con tabla hardcoded de feriados 2024-2027. Para abril 2026: 26 días hábiles totales (30 días - 4 domingos).
+11. **Tracking Diario fórmulas (verbatim del V2.2)**:
+    - `velOrig = ptto / totalBizDays`
+    - `velActual = acum / elapsedBizDays`
+    - `velNeces = (ptto - acum) / remainingBizDays`
+    - `runRate = velActual * totalBizDays`
+    - `daysWithInvoice` = días hábiles con venta > 0
+    - Color tones Vel.Necesaria: green ≤ velOrig, yellow ≤ velOrig×1.2, red mayor
+    - Brecha = alcancePct − tiempoPct; AVANZADO si ≥ 0, REZAGADO si negativo
+12. **Al replicar features del V2.2, NO eliminar elementos.** Mauricio quiere TODO lo que el V2.2 tiene + las mejoras del V3.0 como agregados. Si una mejora desplaza algo, está mal.
 
 ## Datos clave
 
