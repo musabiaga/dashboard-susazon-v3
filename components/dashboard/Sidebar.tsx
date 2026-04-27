@@ -15,6 +15,8 @@ export interface Territory {
   isActive: boolean;
   reason: string | null;
   kpi: TerritoryKpi;
+  // PTTO de venta del mes actual. 0 = no configurado (UI muestra "—").
+  ventaBudget: number;
 }
 
 interface SidebarProps {

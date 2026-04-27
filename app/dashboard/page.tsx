@@ -49,18 +49,24 @@ export default async function DashboardPage() {
   // Día 0 del mes siguiente = último día del mes actual = días totales.
   const daysTotal = new Date(currentYear, currentMonth, 0).getDate();
 
-  // Pull en paralelo: rows del mes actual (para KPIs) + estados globales.
-  // Las RLS filtran por permisos del usuario automáticamente.
-  const [{ data: monthRows }, { data: states }] = await Promise.all([
-    supabase
-      .from("sales_rows")
-      .select("territorio, venta, margen, kg")
-      .eq("anio", currentYear)
-      .eq("mes", currentMonth),
-    supabase
-      .from("territories_state")
-      .select("territory_name, is_active, reason"),
-  ]);
+  // Pull en paralelo: rows del mes actual (para KPIs) + estados globales + presupuestos.
+  // Las RLS filtran por permisos del usuario automáticamente en las 3.
+  const [{ data: monthRows }, { data: states }, { data: budgetRows }] =
+    await Promise.all([
+      supabase
+        .from("sales_rows")
+        .select("territorio, venta, margen, kg")
+        .eq("anio", currentYear)
+        .eq("mes", currentMonth),
+      supabase
+        .from("territories_state")
+        .select("territory_name, is_active, reason"),
+      supabase
+        .from("territory_budgets")
+        .select("territorio, venta_budget")
+        .eq("anio", currentYear)
+        .eq("mes", currentMonth),
+    ]);
 
   // También necesito la lista completa de territorios visibles (incluso los
   // que no tienen data en el mes actual, para que aparezcan en sidebar).
@@ -90,6 +96,15 @@ export default async function DashboardPage() {
     (states ?? []).map((s) => [s.territory_name, s])
   );
 
+  // Mapa de presupuestos del mes actual por territorio
+  const budgetByTerritory = new Map<string, number>();
+  for (const row of budgetRows ?? []) {
+    budgetByTerritory.set(
+      row.territorio,
+      Number(row.venta_budget) || 0
+    );
+  }
+
   const territories: Territory[] = uniqueNames.map((name) => {
     const s = stateByName.get(name);
     return {
@@ -97,8 +112,16 @@ export default async function DashboardPage() {
       isActive: s?.is_active ?? true,
       reason: s?.reason ?? null,
       kpi: kpiByTerritory.get(name) ?? emptyKpi(),
+      ventaBudget: budgetByTerritory.get(name) ?? 0,
     };
   });
+
+  // Total de PTTO de venta = suma de presupuestos de todos los territorios
+  // visibles del mes actual.
+  const totalVentaBudget = Array.from(budgetByTerritory.values()).reduce(
+    (a, b) => a + b,
+    0
+  );
 
   // Total: suma de TODOS los territorios visibles del mes actual.
   // Cuando el admin apaga un territorio, sigue contando para el "Todos" porque
@@ -128,6 +151,7 @@ export default async function DashboardPage() {
       <DashboardClient
         territories={territories}
         totalKpi={totalKpi}
+        totalVentaBudget={totalVentaBudget}
         currentMonthLabel={currentMonthLabel}
         daysCurrent={daysCurrent}
         daysTotal={daysTotal}

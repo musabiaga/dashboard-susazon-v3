@@ -19,6 +19,10 @@ export interface KpiData {
     daysCurrent: number;
     daysTotal: number;
   } | null;
+  // PTTO de venta del mes (0 = no configurado, no se muestra %).
+  // Solo aplica al card de Venta hoy. Margen y KG quedan preparados para
+  // cuando el editor exponga esos campos.
+  ventaBudget?: number;
 }
 
 interface KpiCardsRowProps {
@@ -35,8 +39,23 @@ function formatKg(value: number): string {
   return `${value.toLocaleString("es-MX", { maximumFractionDigits: 0 })} kg`;
 }
 
+function ptToneFromPct(pct: number): "success" | "warning" | "danger" {
+  if (pct >= 100) return "success";
+  if (pct >= 70) return "warning";
+  return "danger";
+}
+
 export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
   const rr = data?.runRate ?? null;
+  const ventaBudget = data?.ventaBudget ?? 0;
+  const vsPttoVenta =
+    data && ventaBudget > 0
+      ? {
+          pct: (data.venta / ventaBudget) * 100,
+          tone: ptToneFromPct((data.venta / ventaBudget) * 100),
+          budget: ventaBudget,
+        }
+      : null;
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <KpiCard
@@ -47,6 +66,7 @@ export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
         accent="accent"
         loading={loading}
         runRate={rr ? { value: formatMoney(rr.venta), days: rr } : null}
+        vsPtto={vsPttoVenta}
       />
       <KpiCard
         label="Margen"
@@ -82,6 +102,7 @@ function KpiCard({
   accent,
   loading,
   runRate,
+  vsPtto,
 }: {
   label: string;
   value: string;
@@ -92,6 +113,11 @@ function KpiCard({
   runRate: {
     value: string;
     days: { daysCurrent: number; daysTotal: number };
+  } | null;
+  vsPtto?: {
+    pct: number;
+    tone: "success" | "warning" | "danger";
+    budget: number;
   } | null;
 }) {
   const accentVar =
@@ -158,6 +184,33 @@ function KpiCard({
           style={{ color: "var(--text-muted)" }}
         >
           día {runRate.days.daysCurrent}/{runRate.days.daysTotal}
+        </div>
+      )}
+      {vsPtto && (
+        <div
+          className="mt-3 flex items-center justify-between border-t pt-3"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <span
+            className="text-[10px] font-medium uppercase tracking-wider"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            vs PTTO
+          </span>
+          <span
+            className="text-sm font-semibold tabular-nums"
+            style={{ color: `var(--${vsPtto.tone})` }}
+          >
+            {vsPtto.pct.toFixed(0)}%
+          </span>
+        </div>
+      )}
+      {vsPtto && (
+        <div
+          className="mt-1 text-right text-[10px]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          objetivo {formatMoney(vsPtto.budget)}
         </div>
       )}
     </div>

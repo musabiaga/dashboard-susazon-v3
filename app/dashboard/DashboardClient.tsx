@@ -10,6 +10,7 @@ import { AlertCircle } from "lucide-react";
 interface DashboardClientProps {
   territories: Territory[];
   totalKpi: TerritoryKpi;
+  totalVentaBudget: number;
   // Nombre del mes actual ya formateado en el server, para evitar timezone issues
   currentMonthLabel: string;
   // Para Run-Rate: día actual y días totales del mes (computados server-side
@@ -31,6 +32,7 @@ interface DashboardClientProps {
 export function DashboardClient({
   territories,
   totalKpi,
+  totalVentaBudget,
   currentMonthLabel,
   daysCurrent,
   daysTotal,
@@ -52,10 +54,12 @@ export function DashboardClient({
 
   // KPI activo según selección (Todos vs territorio específico)
   const activeKpiData: KpiData = useMemo(() => {
-    const kpi =
+    const territory = territories.find((t) => t.name === effectiveSelected);
+    const kpi = effectiveSelected === "" ? totalKpi : territory?.kpi ?? totalKpi;
+    const ventaBudget =
       effectiveSelected === ""
-        ? totalKpi
-        : territories.find((t) => t.name === effectiveSelected)?.kpi ?? totalKpi;
+        ? totalVentaBudget
+        : territory?.ventaBudget ?? 0;
     // Run-Rate: solo mostrar si daysCurrent >= 5 — antes hay muy poca data
     // para una proyección lineal confiable (varía mucho por día).
     const factor = daysTotal / Math.max(daysCurrent, 1);
@@ -75,11 +79,13 @@ export function DashboardClient({
             daysTotal,
           }
         : null,
+      ventaBudget,
     };
   }, [
     effectiveSelected,
     territories,
     totalKpi,
+    totalVentaBudget,
     currentMonthLabel,
     daysCurrent,
     daysTotal,
