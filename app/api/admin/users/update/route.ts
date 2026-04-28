@@ -1,0 +1,143 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireAdmin, isValidRole } from "@/lib/admin-guards";
+
+interface UpdateBody {
+  user_id: string;
+  full_name?: string;
+  role?: "admin" | "director" | "gerente_regional" | "vendedor";
+  allowed_territories?: string[] | null;
+  can_edit_ptto?: boolean;
+  is_active?: boolean;
+}
+
+/**
+ * POST /api/admin/users/update
+ * Actualiza campos editables del usuario. Email NO es editable (intencional).
+ * Acepta updates parciales (solo cambia los campos enviados).
+ */
+export async function POST(request: NextRequest) {
+  const guard = await requireAdmin();
+  if ("error" in guard) return guard.error;
+
+  const body = (await request.json().catch(() => null)) as Partial<UpdateBody> | null;
+  if (!body || typeof body.user_id !== "string" || body.user_id === "") {
+    return NextResponse.json(
+      { error: "Body inválido: requiere user_id" },
+      { status: 400 }
+    );
+  }
+
+  // Self-protection: admin no puede desactivarse a sí mismo, ni cambiarse el rol
+  if (body.user_id === guard.user.id) {
+    if (body.is_active === false) {
+      return NextResponse.json(
+        { error: "No puedes desactivarte a ti mismo." },
+        { status: 400 }
+      );
+    }
+    if (body.role && body.role !== "admin") {
+      return NextResponse.json(
+        { error: "No puedes cambiarte el rol a uno menor." },
+        { status: 400 }
+      );
+    }
+  }
+
+  const update: Record<string, unknown> = {};
+  if (typeof body.full_name === "string" && body.full_name.trim() !== "") {
+    update.full_name = body.full_name.trim();
+  }
+  if (body.role !== undefined) {
+    if (!isValidRole(body.role)) {
+      return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
+    }
+    update.role = body.role;
+  }
+  if (body.allowed_territories !== undefined) {
+    if (
+      !(
+        body.allowed_territories === null ||
+        (Array.isArray(body.allowed_territories) &&
+          body.allowed_territories.every((t) => typeof t === "string"))
+      )
+    ) {
+      return NextResponse.json(
+        { error: "allowed_territories inválido" },
+        { status: 400 }
+      );
+    }
+    update.allowed_territories =
+      body.allowed_territories === null
+        ? null
+        : Array.from(
+            new Set(body.allowed_territories.map((t) => t.trim()))
+          );
+  }
+  if (typeof body.can_edit_ptto === "boolean") {
+    update.can_edit_ptto = body.can_edit_ptto;
+  }
+  if (typeof body.is_active === "boolean") {
+    update.is_active = body.is_active;
+  }
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json(
+      { error: "Nada que actualizar." },
+      { status: 400 }
+    );
+  }
+
+  const admin = createSupabaseAdminClient();
+
+  // Snapshot previo (para audit log)
+  const { data: before } = await admin
+    .from("users_permissions")
+    .select(
+      "email, role, allowed_territories, can_edit_ptto, is_active, full_name"
+    )
+    .eq("user_id", body.user_id)
+    .single();
+
+  if (!before) {
+    return NextResponse.json(
+      { error: "Usuario no encontrado." },
+      { status: 404 }
+    );
+  }
+
+  const { data: updated, error: updErr } = await admin
+    .from("users_permissions")
+    .update(update)
+    .eq("user_id", body.user_id)
+    .select(
+      "user_id, email, full_name, role, allowed_territories, can_edit_ptto, is_active, last_login, created_at"
+    )
+    .single();
+
+  if (updErr || !updated) {
+    return NextResponse.json(
+      { error: `Error actualizando: ${updErr?.message ?? "desconocido"}` },
+      { status: 500 }
+    );
+  }
+
+  // Audit log
+  await admin.from("audit_log").insert({
+    user_id: guard.user.id,
+    user_email: guard.user.email ?? guard.perms.email ?? null,
+    action:
+      typeof body.is_active === "boolean" && body.is_active === false
+        ? "user_deleted"
+        : "user_updated",
+    details: {
+      target_user_id: body.user_id,
+      target_email: updated.email,
+      changed_fields: Object.keys(update),
+      before,
+      after: update,
+    },
+  });
+
+  return NextResponse.json({ user: updated });
+}
