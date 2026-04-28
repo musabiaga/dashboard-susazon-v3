@@ -89,6 +89,7 @@ export default async function CargarDatosPage({
         userName={perms.full_name}
         userRole={roleLabel(perms.role)}
         canEditData={true}
+        isAdmin={perms.role === "admin"}
       />
       <main className="flex-1 p-6">
         <div className="mx-auto max-w-6xl space-y-6">

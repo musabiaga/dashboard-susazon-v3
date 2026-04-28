@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, BarChart3, Database } from "lucide-react";
+import { LogOut, BarChart3, Database, Shield } from "lucide-react";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
 import { SusazonLogo } from "@/components/brand/SusazonLogo";
 
@@ -14,6 +14,8 @@ interface HeaderProps {
   // Si true, muestra el link a /cargar-datos. Pasarlo desde la página
   // según el rol (admin/director ven; otros no).
   canEditData?: boolean;
+  // Si true, muestra el link a /admin (solo rol admin).
+  isAdmin?: boolean;
 }
 
 export function Header({
@@ -22,6 +24,7 @@ export function Header({
   onLogout,
   showLogout = true,
   canEditData = false,
+  isAdmin = false,
 }: HeaderProps) {
   const pathname = usePathname();
 
@@ -61,6 +64,14 @@ export function Header({
                 icon={<Database size={14} />}
                 label="Cargar datos"
                 active={pathname?.startsWith("/cargar-datos") ?? false}
+              />
+            )}
+            {isAdmin && (
+              <NavLink
+                href="/admin"
+                icon={<Shield size={14} />}
+                label="Admin"
+                active={pathname?.startsWith("/admin") ?? false}
               />
             )}
           </nav>

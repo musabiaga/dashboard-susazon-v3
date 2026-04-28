@@ -7,12 +7,14 @@ interface DashboardHeaderProps {
   userName: string;
   userRole: string;
   canEditData?: boolean;
+  isAdmin?: boolean;
 }
 
 export function DashboardHeader({
   userName,
   userRole,
   canEditData = false,
+  isAdmin = false,
 }: DashboardHeaderProps) {
   const router = useRouter();
 
@@ -28,6 +30,7 @@ export function DashboardHeader({
       userRole={userRole}
       onLogout={handleLogout}
       canEditData={canEditData}
+      isAdmin={isAdmin}
     />
   );
 }

@@ -590,6 +590,7 @@ export default async function DashboardPage() {
           !!permissions &&
           ["admin", "director"].includes(permissions.role)
         }
+        isAdmin={permissions?.role === "admin"}
       />
 
       <DashboardClient
