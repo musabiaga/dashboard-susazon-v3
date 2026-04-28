@@ -8,11 +8,17 @@ import type {
   MonthlyPoint,
 } from "@/components/dashboard/Sidebar";
 import type { DimensionRow } from "@/components/dashboard/DimensionTab";
+import type { PerdidoRow } from "@/components/dashboard/PerdidosTab";
 import { countBizDays } from "@/lib/business-days";
 
 export interface DimensionDataset {
   byTerritory: Record<string, DimensionRow[]>;
   total: DimensionRow[];
+}
+
+export interface PerdidosDataset {
+  byTerritory: Record<string, PerdidoRow[]>;
+  total: PerdidoRow[];
 }
 
 const MONTH_NAMES_ES = [
@@ -199,6 +205,15 @@ export default async function DashboardPage() {
       .eq("mes", currentMonth),
   ]);
 
+  // Fetch cliente data para tab Perdidos via vista kpi_cliente_perdidos
+  // (pre-agregada con mes actual y YTD, ambas dimensiones venta+kg).
+  const { data: clientePerdidosRows } = await supabase
+    .from("kpi_cliente_perdidos")
+    .select(
+      "anio, no_cliente, cliente, vendedor, territorio, mes_venta, mes_kg, ytd_venta, ytd_kg"
+    )
+    .in("anio", [currentYear - 1, currentYear]);
+
   // Build datasets para grupos, clientes y vendedores via helper genérico
   const grupos = buildDimDataset(
     grupoRowsRaw,
@@ -226,6 +241,109 @@ export default async function DashboardPage() {
   const vendedores = {
     separados: vendedoresSeparados,
     unidos: vendedoresUnidos,
+  };
+
+  // ============ Perdidos (Tab Perdidos) ============
+  // Aggregate por (territorio, no_cliente) — 2 anios → 1 row con 8 numeros.
+  // Status (perdido/declive) se calcula en el componente segun la dimension
+  // seleccionada (mes vs YTD).
+  const cy = currentYear;
+  const py = currentYear - 1;
+
+  type ClienteAcc = {
+    cliente: string;
+    vendedor: string;
+    mes_venta_2025: number;
+    mes_venta_2026: number;
+    mes_kg_2025: number;
+    mes_kg_2026: number;
+    ytd_venta_2025: number;
+    ytd_venta_2026: number;
+    ytd_kg_2025: number;
+    ytd_kg_2026: number;
+  };
+
+  const emptyAcc = (cliente: string, vendedor: string): ClienteAcc => ({
+    cliente,
+    vendedor,
+    mes_venta_2025: 0,
+    mes_venta_2026: 0,
+    mes_kg_2025: 0,
+    mes_kg_2026: 0,
+    ytd_venta_2025: 0,
+    ytd_venta_2026: 0,
+    ytd_kg_2025: 0,
+    ytd_kg_2026: 0,
+  });
+
+  const perdidosByTerrCliente = new Map<string, Map<string, ClienteAcc>>();
+
+  for (const row of clientePerdidosRows ?? []) {
+    let terrMap = perdidosByTerrCliente.get(row.territorio);
+    if (!terrMap) {
+      terrMap = new Map();
+      perdidosByTerrCliente.set(row.territorio, terrMap);
+    }
+    const cur =
+      terrMap.get(row.no_cliente) ??
+      emptyAcc(row.cliente ?? row.no_cliente, row.vendedor ?? "(sin vendedor)");
+    const mv = Number(row.mes_venta) || 0;
+    const mk = Number(row.mes_kg) || 0;
+    const yv = Number(row.ytd_venta) || 0;
+    const yk = Number(row.ytd_kg) || 0;
+    if (row.anio === py) {
+      cur.mes_venta_2025 = mv;
+      cur.mes_kg_2025 = mk;
+      cur.ytd_venta_2025 = yv;
+      cur.ytd_kg_2025 = yk;
+    } else if (row.anio === cy) {
+      cur.mes_venta_2026 = mv;
+      cur.mes_kg_2026 = mk;
+      cur.ytd_venta_2026 = yv;
+      cur.ytd_kg_2026 = yk;
+    }
+    terrMap.set(row.no_cliente, cur);
+  }
+
+  const accToRow = (id: string, c: ClienteAcc): PerdidoRow => ({
+    no_cliente: id,
+    cliente: c.cliente,
+    vendedor: c.vendedor,
+    mes_venta_2025: c.mes_venta_2025,
+    mes_venta_2026: c.mes_venta_2026,
+    mes_kg_2025: c.mes_kg_2025,
+    mes_kg_2026: c.mes_kg_2026,
+    ytd_venta_2025: c.ytd_venta_2025,
+    ytd_venta_2026: c.ytd_venta_2026,
+    ytd_kg_2025: c.ytd_kg_2025,
+    ytd_kg_2026: c.ytd_kg_2026,
+  });
+
+  const perdidosByTerritory: Record<string, PerdidoRow[]> = {};
+  const totalCliente = new Map<string, ClienteAcc>();
+  for (const [terr, clienteMap] of perdidosByTerrCliente) {
+    perdidosByTerritory[terr] = Array.from(clienteMap.entries()).map(
+      ([id, c]) => accToRow(id, c)
+    );
+    for (const [id, c] of clienteMap) {
+      const cur = totalCliente.get(id) ?? emptyAcc(c.cliente, c.vendedor);
+      cur.mes_venta_2025 += c.mes_venta_2025;
+      cur.mes_venta_2026 += c.mes_venta_2026;
+      cur.mes_kg_2025 += c.mes_kg_2025;
+      cur.mes_kg_2026 += c.mes_kg_2026;
+      cur.ytd_venta_2025 += c.ytd_venta_2025;
+      cur.ytd_venta_2026 += c.ytd_venta_2026;
+      cur.ytd_kg_2025 += c.ytd_kg_2025;
+      cur.ytd_kg_2026 += c.ytd_kg_2026;
+      totalCliente.set(id, cur);
+    }
+  }
+  const perdidosTotal: PerdidoRow[] = Array.from(totalCliente.entries()).map(
+    ([id, c]) => accToRow(id, c)
+  );
+  const perdidos: PerdidosDataset = {
+    byTerritory: perdidosByTerritory,
+    total: perdidosTotal,
   };
 
   // ============ SKUs (Tab Productos) ============
@@ -493,6 +611,7 @@ export default async function DashboardPage() {
         skus={skus}
         clientes={clientes}
         vendedores={vendedores}
+        perdidos={perdidos}
       />
     </div>
   );

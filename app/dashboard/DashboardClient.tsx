@@ -13,6 +13,10 @@ import {
 } from "@/components/dashboard/DimensionTab";
 import { ProductosTab } from "@/components/dashboard/ProductosTab";
 import { VendedoresTab } from "@/components/dashboard/VendedoresTab";
+import {
+  PerdidosTab,
+  type PerdidoRow,
+} from "@/components/dashboard/PerdidosTab";
 import { AlertCircle } from "lucide-react";
 
 interface DimensionDataset {
@@ -49,6 +53,11 @@ interface DashboardClientProps {
     separados: DimensionDataset;
     unidos: DimensionDataset;
   };
+  // Tab Perdidos
+  perdidos: {
+    byTerritory: Record<string, PerdidoRow[]>;
+    total: PerdidoRow[];
+  };
 }
 
 /**
@@ -80,6 +89,7 @@ export function DashboardClient({
   skus,
   clientes,
   vendedores,
+  perdidos,
 }: DashboardClientProps) {
   const [selectedTerritory, setSelectedTerritory] = useState<string>(""); // "" = Todos
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
@@ -280,6 +290,19 @@ export function DashboardClient({
                     dimensionLabelPlural="Clientes"
                     topNChart={10}
                     topNTable={50}
+                  />
+                );
+              }
+              if (activeTab === "perdidos") {
+                const perdidoRows =
+                  effectiveSelected === ""
+                    ? perdidos.total
+                    : perdidos.byTerritory[effectiveSelected] ?? [];
+                return (
+                  <PerdidosTab
+                    rows={perdidoRows}
+                    monthShortYY={monthShortYY}
+                    prevMonthShortYY={prevMonthShortYY}
                   />
                 );
               }
