@@ -248,6 +248,105 @@
 }
 
 /* ============================================================================
+   THEME 6: LIQUID GLASS (Apple iOS 26 / visionOS / macOS Tahoe)
+   Aurora gradient blob animado de fondo + frosted glass surfaces.
+   Inspirado en el design language unificado de Apple WWDC 2025.
+   ============================================================================ */
+[data-theme="liquid-glass"] {
+  --bg-page: transparent;       /* Page deja ver el aurora del body::before */
+  --bg-surface: rgba(255, 255, 255, 0.06);    /* Frosted glass */
+  --bg-surface-muted: rgba(255, 255, 255, 0.03);
+  --bg-header: rgba(12, 10, 31, 0.7);         /* Header glass oscuro */
+  --bg-header-solid: rgba(12, 10, 31, 0.85);
+
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.72);
+  --text-muted: rgba(255, 255, 255, 0.45);
+  --text-on-header: #ffffff;
+  --text-on-header-muted: rgba(255, 255, 255, 0.7);
+
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+
+  --accent: #ff8a3b;             /* Naranja Susazón luminoso (sobre glass) */
+  --accent-hover: #ffa766;
+  --accent-soft: rgba(255, 138, 59, 0.2);
+
+  --success: #34d399;            /* Verde menta vibrante */
+  --success-soft: rgba(52, 211, 153, 0.18);
+  --danger: #fb7185;             /* Rosa coral */
+  --danger-soft: rgba(251, 113, 133, 0.18);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.18);
+
+  --chart-2024: rgba(255, 255, 255, 0.45);  /* Gris translúcido */
+  --chart-2025: #60a5fa;        /* Azul */
+  --chart-2026: #ff8a3b;        /* Naranja Susazón (año actual, glow) */
+
+  --font-display: var(--font-system);
+  --font-body: var(--font-system);
+
+  /* Bordes redondeados grandes (iOS-like) */
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 18px;
+
+  /* Shadows: glass refraction sutil + edge glow naranja al hover */
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 32px rgba(0, 0, 0, 0.18);
+  --shadow-card-hover: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 12px 40px rgba(255, 138, 59, 0.3), 0 0 0 1px rgba(255, 138, 59, 0.35);
+
+  --logo-filter: brightness(0) invert(1);
+}
+
+/* Body con aurora gradient blob — solo activo en theme liquid-glass */
+[data-theme="liquid-glass"] body {
+  background: #0c0a1f;          /* Negro azulado base */
+  position: relative;
+  overflow-x: hidden;
+}
+
+[data-theme="liquid-glass"] body::before {
+  content: "";
+  position: fixed;
+  inset: -25%;
+  background:
+    /* Naranja Susazón dominante (top-left, blob mayor) */
+    radial-gradient(circle at 22% 28%, #ed6808 0%, transparent 55%),
+    /* Naranja secundario (bottom-right) refuerza el feel cálido */
+    radial-gradient(circle at 78% 72%, #ff7e22 0%, transparent 42%),
+    /* Cyan (top-right) — contraste frío con el naranja */
+    radial-gradient(circle at 80% 18%, #06b6d4 0%, transparent 38%),
+    /* Rosa magenta (bottom-left) — pop de color */
+    radial-gradient(circle at 25% 85%, #ec4899 0%, transparent 38%),
+    /* Azul (centro) — base/depth */
+    radial-gradient(circle at 50% 55%, #3b82f6 0%, transparent 32%);
+  filter: blur(80px) saturate(1.3);
+  opacity: 0.55;
+  z-index: -1;
+  animation: aurora-shift 24s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes aurora-shift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(5%, -3%) scale(1.05); }
+  66%      { transform: translate(-3%, 4%) scale(0.95); }
+}
+
+/* Backdrop-blur en surfaces para look frosted glass real.
+   Solo aplica cuando theme es liquid-glass — los demás themes no se afectan
+   porque su --bg-surface es opaco y backdrop-filter no produce efecto visible. */
+[data-theme="liquid-glass"] .rounded-\[var\(--radius\)\],
+[data-theme="liquid-glass"] .rounded-\[var\(--radius-lg\)\],
+[data-theme="liquid-glass"] .rounded-\[var\(--radius-sm\)\],
+[data-theme="liquid-glass"] [class*="rounded-md"],
+[data-theme="liquid-glass"] [class*="rounded-lg"],
+[data-theme="liquid-glass"] [class*="rounded-full"] {
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+}
+
+/* ============================================================================
    TAILWIND THEME BRIDGE
    Expone los CSS vars como utilities Tailwind: bg-page, text-primary, etc.
    ============================================================================ */

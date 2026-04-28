@@ -3,7 +3,8 @@ export type ThemeId =
   | "editorial"
   | "warm-neo"
   | "supabase-orange"
-  | "stock-market";
+  | "stock-market"
+  | "liquid-glass";
 
 export interface ThemeMeta {
   id: ThemeId;
@@ -42,6 +43,12 @@ export const THEMES: ThemeMeta[] = [
     label: "Stock Market",
     description: "Trader desk · Azul nocturno + neón cyan/verde",
     preview: { bg: "#0a1124", surface: "#111a36", accent: "#00d9ff", header: "#060a18" },
+  },
+  {
+    id: "liquid-glass",
+    label: "Liquid Glass",
+    description: "Apple iOS 26 · Aurora naranja + frosted glass",
+    preview: { bg: "#0c0a1f", surface: "#ed6808", accent: "#ff8a3b", header: "#06b6d4" },
   },
 ];
 
