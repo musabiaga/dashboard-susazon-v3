@@ -1,4 +1,8 @@
-export type ThemeId = "clean" | "editorial" | "warm-neo";
+export type ThemeId =
+  | "clean"
+  | "editorial"
+  | "warm-neo"
+  | "supabase-orange";
 
 export interface ThemeMeta {
   id: ThemeId;
@@ -25,6 +29,12 @@ export const THEMES: ThemeMeta[] = [
     label: "Warm Neo-Editorial",
     description: "Crema + Coral · estilo Anthropic minimalista",
     preview: { bg: "#F5F0E8", surface: "#FFFFFF", accent: "#D97757", header: "#FFFFFF" },
+  },
+  {
+    id: "supabase-orange",
+    label: "Susazón Moderno",
+    description: "Dark back-office moderno · Naranja Susazón",
+    preview: { bg: "#0a0a0a", surface: "#171717", accent: "#ed6808", header: "#0a0a0a" },
   },
 ];
 

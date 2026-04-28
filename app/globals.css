@@ -145,6 +145,57 @@
 }
 
 /* ============================================================================
+   THEME 4: SUPABASE ORANGE
+   Look Supabase Studio (dark back-office) con accent naranja Susazón #ed6808
+   en lugar del verde característico (#3ecf8e queda como success).
+   ============================================================================ */
+[data-theme="supabase-orange"] {
+  --bg-page: #0a0a0a;          /* Negro profundo (Supabase studio) */
+  --bg-surface: #171717;
+  --bg-surface-muted: #1f1f1f;
+  --bg-header: #0a0a0a;
+  --bg-header-solid: #0a0a0a;
+
+  --text-primary: #ededed;
+  --text-secondary: #a3a3a3;
+  --text-muted: #737373;
+  --text-on-header: #ededed;
+  --text-on-header-muted: #a3a3a3;
+
+  --border: #262626;            /* Bordes muy sutiles */
+  --border-strong: #404040;
+
+  --accent: #ed6808;            /* Naranja Susazón */
+  --accent-hover: #ff7e22;
+  --accent-soft: rgba(237, 104, 8, 0.12);
+
+  --success: #3ecf8e;            /* Verde Supabase original */
+  --success-soft: rgba(62, 207, 142, 0.12);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.12);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.12);
+
+  --chart-2024: #525252;
+  --chart-2025: #a3a3a3;
+  --chart-2026: #ed6808;
+
+  --font-display: var(--font-system);
+  --font-body: var(--font-system);
+
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 10px;
+
+  /* Shadows en dark theme: muy sutiles + glow naranja en hover */
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-card-hover: 0 0 0 1px rgba(237, 104, 8, 0.4), 0 4px 16px rgba(237, 104, 8, 0.15);
+
+  /* Logo: invertir a blanco (logo oscuro original sobre fondo negro) */
+  --logo-filter: brightness(0) invert(1);
+}
+
+/* ============================================================================
    TAILWIND THEME BRIDGE
    Expone los CSS vars como utilities Tailwind: bg-page, text-primary, etc.
    ============================================================================ */

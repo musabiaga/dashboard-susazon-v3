@@ -15,7 +15,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null;
-    if (saved && (saved === "clean" || saved === "editorial" || saved === "warm-neo")) {
+    if (
+      saved &&
+      (saved === "clean" ||
+        saved === "editorial" ||
+        saved === "warm-neo" ||
+        saved === "supabase-orange")
+    ) {
       setThemeState(saved);
       document.documentElement.dataset.theme = saved;
     } else {
