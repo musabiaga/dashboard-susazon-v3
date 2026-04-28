@@ -20,7 +20,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       (saved === "clean" ||
         saved === "editorial" ||
         saved === "warm-neo" ||
-        saved === "supabase-orange")
+        saved === "supabase-orange" ||
+        saved === "stock-market")
     ) {
       setThemeState(saved);
       document.documentElement.dataset.theme = saved;

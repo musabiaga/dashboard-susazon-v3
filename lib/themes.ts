@@ -2,7 +2,8 @@ export type ThemeId =
   | "clean"
   | "editorial"
   | "warm-neo"
-  | "supabase-orange";
+  | "supabase-orange"
+  | "stock-market";
 
 export interface ThemeMeta {
   id: ThemeId;
@@ -35,6 +36,12 @@ export const THEMES: ThemeMeta[] = [
     label: "Susazón Moderno",
     description: "Dark back-office moderno · Naranja Susazón",
     preview: { bg: "#0a0a0a", surface: "#171717", accent: "#ed6808", header: "#0a0a0a" },
+  },
+  {
+    id: "stock-market",
+    label: "Stock Market",
+    description: "Trader desk · Azul nocturno + neón cyan/verde",
+    preview: { bg: "#0a1124", surface: "#111a36", accent: "#00d9ff", header: "#060a18" },
   },
 ];
 

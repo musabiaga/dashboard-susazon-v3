@@ -196,6 +196,58 @@
 }
 
 /* ============================================================================
+   THEME 5: STOCK MARKET
+   Trader desk inspired: azul nocturno profundo + acentos neón cyan/verde
+   estilo Bloomberg/TradingView. Glow sutil en hover de KPIs.
+   ============================================================================ */
+[data-theme="stock-market"] {
+  --bg-page: #0a1124;          /* Azul nocturno casi negro */
+  --bg-surface: #111a36;
+  --bg-surface-muted: #1a2548;
+  --bg-header: #060a18;        /* Más oscuro que bg para layered depth */
+  --bg-header-solid: #060a18;
+
+  --text-primary: #e6edf6;     /* Blanco azulado */
+  --text-secondary: #94a3c4;
+  --text-muted: #6b7aa1;
+  --text-on-header: #e6edf6;
+  --text-on-header-muted: #94a3c4;
+
+  --border: #1f2d52;
+  --border-strong: #2d3f6e;
+
+  --accent: #00d9ff;            /* Cyan neón */
+  --accent-hover: #33e1ff;
+  --accent-soft: rgba(0, 217, 255, 0.12);
+
+  --success: #10ff88;            /* Verde neón Bloomberg */
+  --success-soft: rgba(16, 255, 136, 0.12);
+  --danger: #ff3b6b;             /* Rosa neón fuerte */
+  --danger-soft: rgba(255, 59, 107, 0.12);
+  --warning: #ffae00;            /* Naranja eléctrico */
+  --warning-soft: rgba(255, 174, 0, 0.12);
+
+  --chart-2024: #6b7aa1;        /* Gris azulado mate (año viejo) */
+  --chart-2025: #00d9ff;        /* Cyan (año pasado) */
+  --chart-2026: #10ff88;        /* Verde neón (año actual, "live") */
+
+  --font-display: var(--font-system);
+  --font-body: var(--font-system);
+
+  /* Sharp edges para feel trader */
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+
+  /* Shadows: borde sutil + glow cyan en hover (KPI cards "live") */
+  --shadow-card: 0 0 0 1px rgba(0, 217, 255, 0.06), 0 1px 0 rgba(255, 255, 255, 0.02);
+  --shadow-card-hover: 0 0 0 1px rgba(0, 217, 255, 0.4), 0 0 20px rgba(0, 217, 255, 0.18);
+
+  /* Logo blanco sobre fondo oscuro */
+  --logo-filter: brightness(0) invert(1);
+}
+
+/* ============================================================================
    TAILWIND THEME BRIDGE
    Expone los CSS vars como utilities Tailwind: bg-page, text-primary, etc.
    ============================================================================ */
