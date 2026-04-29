@@ -40,7 +40,7 @@ El código vive en este mismo repo (`github.com/musabiaga/dashboard-susazon-v3`)
 
 ## Dónde está deployado
 
-- **URL prod:** `dashboard-susazon-v3-44sp-hw6gg0rwb-musabiagas-projects.vercel.app`
+- **URL prod:** `dashboard-susazon-v3-44sp.vercel.app`
 - **Hosting:** Vercel (plan Hobby)
 - **DB:** Supabase project `qfxyrpifntcixwpvnjpd` (region East US)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)

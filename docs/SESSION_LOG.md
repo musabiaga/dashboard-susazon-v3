@@ -8,7 +8,7 @@
 - **Cierre fase 1:** 2026-04-28 (deploy a producción)
 - **Versión actual:** 1.0.0 (en producción)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
-- **URL prod:** `dashboard-susazon-v3-44sp-hw6gg0rwb-musabiagas-projects.vercel.app`
+- **URL prod:** `dashboard-susazon-v3-44sp.vercel.app`
 
 ---
 

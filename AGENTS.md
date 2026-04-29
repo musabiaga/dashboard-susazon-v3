@@ -10,7 +10,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Estado actual
 
-**EN PRODUCCIÓN** — deployado en Vercel desde 2026-04-28. URL: `dashboard-susazon-v3-44sp-hw6gg0rwb-musabiagas-projects.vercel.app`. Repo privado: `github.com/musabiaga/dashboard-susazon-v3`.
+**EN PRODUCCIÓN** — deployado en Vercel desde 2026-04-28. URL: `dashboard-susazon-v3-44sp.vercel.app`. Repo privado: `github.com/musabiaga/dashboard-susazon-v3`.
 
 - ✅ Fases 0-3 completas (auth, RLS, dashboard 7 tabs, admin panel)
 - ✅ Fase 5 completa (admin panel: territorios + usuarios + audit log)
@@ -69,7 +69,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 - **Carpeta proyecto:** `~/Downloads/DASHBOARD SEMANAL VENTAS V3.0 [Claude Code]/`
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
-- **URL prod:** `dashboard-susazon-v3-44sp-hw6gg0rwb-musabiagas-projects.vercel.app`
+- **URL prod:** `dashboard-susazon-v3-44sp.vercel.app`
 - **Supabase project ID:** `qfxyrpifntcixwpvnjpd` — region East US (N. Virginia)
 - **Admin user:** `musabiagaz@susazon.com.mx` · UID `c787cd72-200a-469e-84a1-c0d3253b0b20`
 - **Predecesor V2.2** (vivo en paralelo, NO TOCAR): `~/Desktop/Downloads Seleccionados/DASHBOARD SEMANAL VTS. V2.2/index.html` → `https://dashboard-comercial-susazon.netlify.app/`
