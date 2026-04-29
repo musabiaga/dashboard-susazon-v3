@@ -11,6 +11,7 @@ interface Props {
   email: string;
   fullName: string | null;
   role: string | null;
+  flow: "invite" | "recovery";
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -20,7 +21,8 @@ const ROLE_LABELS: Record<string, string> = {
   vendedor: "Vendedor",
 };
 
-export function SetPasswordClient({ email, fullName, role }: Props) {
+export function SetPasswordClient({ email, fullName, role, flow }: Props) {
+  const isRecovery = flow === "recovery";
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -99,13 +101,17 @@ export function SetPasswordClient({ email, fullName, role }: Props) {
               className="mt-4 text-xl font-semibold"
               style={{ color: "var(--text-primary)" }}
             >
-              ¡Bienvenido{fullName ? `, ${fullName.split(" ")[0]}` : ""}!
+              {isRecovery
+                ? `Cambia tu contraseña${fullName ? `, ${fullName.split(" ")[0]}` : ""}`
+                : `¡Bienvenido${fullName ? `, ${fullName.split(" ")[0]}` : ""}!`}
             </h1>
             <p
               className="mt-1 text-sm"
               style={{ color: "var(--text-secondary)" }}
             >
-              Configura tu contraseña para acceder al Dashboard Comercial
+              {isRecovery
+                ? "Define una nueva contraseña para tu cuenta"
+                : "Configura tu contraseña para acceder al Dashboard Comercial"}
             </p>
           </div>
 
@@ -150,10 +156,12 @@ export function SetPasswordClient({ email, fullName, role }: Props) {
             >
               <ShieldCheck size={18} className="mt-0.5 shrink-0" />
               <div>
-                <strong>Contraseña configurada exitosamente.</strong>
-                <p className="mt-0.5 text-xs">
-                  Redirigiendo al dashboard...
-                </p>
+                <strong>
+                  {isRecovery
+                    ? "Contraseña actualizada exitosamente."
+                    : "Contraseña configurada exitosamente."}
+                </strong>
+                <p className="mt-0.5 text-xs">Redirigiendo al dashboard...</p>
               </div>
             </div>
           ) : (
@@ -285,12 +293,14 @@ export function SetPasswordClient({ email, fullName, role }: Props) {
                 {submitting ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    Configurando…
+                    {isRecovery ? "Actualizando…" : "Configurando…"}
                   </>
                 ) : (
                   <>
                     <ShieldCheck size={16} />
-                    Configurar contraseña y entrar
+                    {isRecovery
+                      ? "Actualizar contraseña y entrar"
+                      : "Configurar contraseña y entrar"}
                   </>
                 )}
               </button>

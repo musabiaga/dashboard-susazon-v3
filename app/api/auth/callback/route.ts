@@ -50,9 +50,12 @@ export async function GET(request: NextRequest) {
       token_hash: tokenHash,
     });
     if (!error) {
-      // Para invite, redirigimos siempre a /set-password aunque el `next`
-      // sea otro (forzamos el flow de fijar contraseña antes de entrar)
-      const redirect = type === "invite" ? "/set-password" : next;
+      // Para invite (primer login) y recovery (olvidé contraseña), forzamos
+      // el flow de /set-password para que el usuario fije su nueva contraseña
+      // explícitamente. Sin esto, recovery entraba directo al dashboard sin
+      // pedir nueva contraseña, lo que defeats el proposito del reset.
+      const needsPasswordSet = type === "invite" || type === "recovery";
+      const redirect = needsPasswordSet ? `/set-password?from=${type}` : next;
       return NextResponse.redirect(`${origin}${redirect}`);
     }
     return NextResponse.redirect(
