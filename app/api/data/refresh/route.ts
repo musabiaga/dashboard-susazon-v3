@@ -10,9 +10,10 @@ import {
 } from "@/lib/susazon-api";
 
 // Vercel: extiende el límite de ejecución de la función serverless.
-// Hobby plan: max 60s (no llega para Suve). Pro plan: max 800s (~13 min).
-// En dev local (Next.js) este flag no aplica, pero queda listo para deploy.
-export const maxDuration = 800;
+// Hobby plan: max 300s (5 min). Pro plan: max 900s (15 min).
+// Para Susazon+Suve completos puede tardar más — si timeout en Hobby:
+// (a) upgrade a Pro y subir a 900, o (b) partir refresh por meses/source.
+export const maxDuration = 300;
 
 /**
  * POST /api/data/refresh
