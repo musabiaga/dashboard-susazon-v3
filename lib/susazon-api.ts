@@ -73,21 +73,40 @@ const PAGE_SIZE = 50_000;
  * Lee de process.env — server-side only.
  */
 function getApiConfig(source: ApiSource): ApiConfig {
+  // Trim whitespace defensivo — Vercel UI a veces deja un espacio o newline
+  // pegado al copy/paste y causa "string did not match expected pattern"
+  // al construir el fetch.
+  const sanitize = (v: string | undefined) => v?.replace(/\s+/g, "").trim();
+  const validateUrl = (envName: string, raw: string | undefined): string => {
+    const v = sanitize(raw);
+    if (!v) {
+      throw new Error(`${envName} no está configurado en process.env`);
+    }
+    try {
+      new URL(v);
+    } catch {
+      throw new Error(
+        `${envName} malformada: "${v.slice(0, 80)}${v.length > 80 ? "..." : ""}". Esperado URL completa con https://`
+      );
+    }
+    return v;
+  };
+
   if (source === "susazon") {
-    const url = process.env.SUSAZON_API_URL;
-    const apiKey = process.env.SUSAZON_API_KEY;
-    if (!url || !apiKey) {
-      throw new Error("SUSAZON_API_URL y SUSAZON_API_KEY no están configurados");
+    const url = validateUrl("SUSAZON_API_URL", process.env.SUSAZON_API_URL);
+    const apiKey = sanitize(process.env.SUSAZON_API_KEY);
+    if (!apiKey) {
+      throw new Error("SUSAZON_API_KEY no está configurada en process.env");
     }
     return { url, apiKey, empresaCode: 0, timeoutMs: 120_000 }; // Susazón es SQL Enterprise — margen amplio
   }
 
   // suve
-  const url = process.env.SUVE_API_URL;
-  const apiKey = process.env.SUVE_API_KEY;
-  if (!url || !apiKey || apiKey.includes("PEGAR_AQUI")) {
+  const url = validateUrl("SUVE_API_URL", process.env.SUVE_API_URL);
+  const apiKey = sanitize(process.env.SUVE_API_KEY);
+  if (!apiKey || apiKey.includes("PEGAR_AQUI")) {
     throw new Error(
-      "SUVE_API_URL y SUVE_API_KEY no configurados — Suve sigue deshabilitado"
+      "SUVE_API_KEY no configurada en process.env — Suve sigue deshabilitado"
     );
   }
   return { url, apiKey, empresaCode: 1, timeoutMs: 600_000 }; // Suve es SQL Express — hasta 10 min por página
