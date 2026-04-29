@@ -64,7 +64,12 @@ export async function POST(request: NextRequest) {
   // para que funcione tanto en local (http://localhost:3000) como en prod
   // (https://*.vercel.app), sin depender del Site URL de Supabase.
   const origin = new URL(request.url).origin;
-  const redirectTo = `${origin}/set-password?from=invite`;
+  // redirectTo va al callback (Route Handler que SÍ puede setear cookies de
+  // sesión Supabase) con next apuntando a /set-password?from=invite. Server
+  // Components no pueden mutar cookies, por eso el exchange tiene que hacerse
+  // en el callback antes de llegar a /set-password.
+  const next = encodeURIComponent("/set-password?from=invite");
+  const redirectTo = `${origin}/api/auth/callback?next=${next}`;
 
   const { data: invited, error: inviteErr } =
     await admin.auth.admin.inviteUserByEmail(email, { redirectTo });

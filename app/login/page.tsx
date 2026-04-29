@@ -78,12 +78,13 @@ export default function LoginPage() {
     }
     try {
       const supabase = createSupabaseBrowserClient();
-      // El redirectTo apunta DIRECTO a /set-password (no al callback) — Supabase
-      // verifica el token internamente y crea la sesión antes de hacer el redirect
-      // final. Esto bypassa el callback handler que en algunos formatos de email
-      // no recibe los params correctos.
+      // redirectTo va al callback handler (Route Handler que SÍ puede setear
+      // cookies de sesión) con el `next` apuntando a /set-password?from=recovery.
+      // Server Components no pueden mutar cookies, por eso el exchange tiene que
+      // hacerse en el callback antes de llegar a /set-password.
+      const next = encodeURIComponent("/set-password?from=recovery");
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/set-password?from=recovery`,
+        redirectTo: `${window.location.origin}/api/auth/callback?next=${next}`,
       });
       if (resetError) {
         setError(resetError.message);
