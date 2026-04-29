@@ -335,15 +335,19 @@
 
 /* Backdrop-blur en surfaces para look frosted glass real.
    Solo aplica cuando theme es liquid-glass — los demás themes no se afectan
-   porque su --bg-surface es opaco y backdrop-filter no produce efecto visible. */
-[data-theme="liquid-glass"] .rounded-\[var\(--radius\)\],
-[data-theme="liquid-glass"] .rounded-\[var\(--radius-lg\)\],
-[data-theme="liquid-glass"] .rounded-\[var\(--radius-sm\)\],
-[data-theme="liquid-glass"] [class*="rounded-md"],
-[data-theme="liquid-glass"] [class*="rounded-lg"],
-[data-theme="liquid-glass"] [class*="rounded-full"] {
-  backdrop-filter: blur(20px) saturate(1.5);
+   porque su --bg-surface es opaco y backdrop-filter no produce efecto visible.
+
+   NOTA Safari: backdrop-filter requiere (a) -webkit-backdrop-filter ANTES del
+   estándar, (b) un stacking context propio (isolation: isolate) y (c) GPU
+   compositing forzado con transform: translateZ(0). Sin esto, Safari renderiza
+   las surfaces como bloques opacos coloreados (color del aurora directo) en vez
+   de frosted glass blureado. Chrome es más permisivo y no necesita estos hints. */
+[data-theme="liquid-glass"] [class*="rounded-"] {
   -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+  /* Safari: forzar GPU compositing + stacking context para que backdrop-filter aplique */
+  isolation: isolate;
+  transform: translateZ(0);
 }
 
 /* ============================================================================
