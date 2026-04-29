@@ -541,7 +541,7 @@ function Th({
   align = "left",
   width,
 }: {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   align?: "left" | "right" | "center";
   width?: string;
 }) {

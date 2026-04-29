@@ -111,8 +111,9 @@ export function GroupedBarChart({
 // Custom tooltip — dot, label, value tabular right-aligned
 // ============================================================
 interface TooltipItem {
-  name?: string;
-  value?: number | string;
+  name?: string | number;
+  // Recharts TooltipPayloadEntry tiene value: ValueType = string | number | (string|number)[]
+  value?: number | string | readonly (string | number)[];
   color?: string;
 }
 
@@ -123,8 +124,8 @@ function GroupedBarTooltip({
   yFormatter,
 }: {
   active?: boolean;
-  payload?: TooltipItem[];
-  label?: string;
+  payload?: readonly TooltipItem[];
+  label?: string | number;
   yFormatter: (value: number) => string;
 }) {
   if (!active || !payload || payload.length === 0) return null;

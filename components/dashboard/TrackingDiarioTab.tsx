@@ -361,7 +361,9 @@ export function TrackingDiarioTab({
                 }}
               />
               <Tooltip
-                formatter={(value: number) => formatMoney(value)}
+                formatter={(value) =>
+                  typeof value === "number" ? formatMoney(value) : String(value ?? "")
+                }
                 labelFormatter={(label) => `Día ${label}`}
                 contentStyle={{
                   background: "var(--bg-surface)",
