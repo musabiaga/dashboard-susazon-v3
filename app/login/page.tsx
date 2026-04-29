@@ -78,8 +78,12 @@ export default function LoginPage() {
     }
     try {
       const supabase = createSupabaseBrowserClient();
+      // El redirectTo apunta DIRECTO a /set-password (no al callback) — Supabase
+      // verifica el token internamente y crea la sesión antes de hacer el redirect
+      // final. Esto bypassa el callback handler que en algunos formatos de email
+      // no recibe los params correctos.
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/api/auth/callback`,
+        redirectTo: `${window.location.origin}/set-password?from=recovery`,
       });
       if (resetError) {
         setError(resetError.message);

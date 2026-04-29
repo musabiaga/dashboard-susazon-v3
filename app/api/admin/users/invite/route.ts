@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   // para que funcione tanto en local (http://localhost:3000) como en prod
   // (https://*.vercel.app), sin depender del Site URL de Supabase.
   const origin = new URL(request.url).origin;
-  const redirectTo = `${origin}/set-password`;
+  const redirectTo = `${origin}/set-password?from=invite`;
 
   const { data: invited, error: inviteErr } =
     await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
