@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructivo version="1.0" fecha="2026-04-28" idioma="es-MX">
+
+  <contexto>
+    <proyecto>Dashboard Comercial Susazón V3.0</proyecto>
+    <propietario>Mauricio Usabiaga, Director de Operaciones, Grupo Susazón</propietario>
+    <empresa>Grupo Susazón (incluye marca Susazón y marca Suve)</empresa>
+    <usuarios_finales>15 personas internas (admin, director, gerente regional, vendedor)</usuarios_finales>
+    <proposito>
+      Dashboard comercial semanal/mensual que reemplaza al V2.2 (single-page HTML 3,321 líneas
+      en Netlify). El V2.2 exponía la API Key de Susazón y credenciales Supabase en el HTML del
+      browser (visible desde DevTools), no tenía sistema de permisos, y arrastraba 4 bugs visuales
+      pendientes. El V3.0 mete una capa de servidor que oculta credenciales, RLS por territorio
+      en Postgres, panel admin para gestionar 15 usuarios, audit log inmutable, y 6 themes.
+    </proposito>
+    <predecesor>
+      V2.2 sigue vivo en https://dashboard-comercial-susazon.netlify.app/ — NO TOCAR mientras
+      el V3.0 esté siendo evaluado. Útil como referencia de fórmulas y lógica de negocio.
+    </predecesor>
+    <estado_actual>
+      EN PRODUCCIÓN. Deploy live en Vercel desde repo privado github.com/musabiaga/dashboard-susazon-v3.
+      32 commits totales, 10 migraciones Supabase, 337,398 filas de datos comerciales (Ene 2024 -
+      Abr 2026). Solo el admin (Mauricio) está creado en prod; los otros 14 usuarios pendientes
+      de invitar cuando esté la lista final.
+    </estado_actual>
+  </contexto>
+
+  <archivos>
+    <directorio nombre="app/" descripcion="Páginas Next.js 16 (App Router)">
+      <archivo path="app/layout.tsx" descripcion="Root layout con ThemeProvider + fonts" />
+      <archivo path="app/page.tsx" descripcion="Redirect a /dashboard si auth, /login si no" />
+      <archivo path="app/globals.css" descripcion="6 themes vía data-theme attribute + Tailwind 4 @theme bridge + animations" />
+      <archivo path="app/login/page.tsx" descripcion="Pantalla de login con Supabase signInWithPassword + reset password" />
+      <archivo path="app/dashboard/page.tsx" descripcion="Server component que pull data, calcula KPIs, hidrata DashboardClient" />
+      <archivo path="app/dashboard/DashboardClient.tsx" descripcion="Client component que orquesta sidebar + tabs + state" />
+      <archivo path="app/dashboard/DashboardHeader.tsx" descripcion="Header con logo + nav + user menu + theme selector" />
+      <archivo path="app/cargar-datos/page.tsx" descripcion="Loader + editor PTTO (gated admin/director)" />
+      <archivo path="app/cargar-datos/LoaderClient.tsx" descripcion="UI refresh APIs con warning timeout Hobby" />
+      <archivo path="app/cargar-datos/BudgetEditorClient.tsx" descripcion="Grid editable año×territorio×12 meses con autoguardado" />
+      <archivo path="app/admin/layout.tsx" descripcion="Guard server-side (rol admin) + tabs nav internas" />
+      <archivo path="app/admin/page.tsx" descripcion="Redirect a /admin/territorios" />
+      <archivo path="app/admin/AdminTabs.tsx" descripcion="Tabs internas Territorios / Usuarios / Audit Log" />
+      <archivo path="app/admin/territorios/page.tsx" descripcion="Server fetch + render TerritoriesClient" />
+      <archivo path="app/admin/territorios/TerritoriesClient.tsx" descripcion="Tabla 17 territorios con toggle inline + motivo" />
+      <archivo path="app/admin/usuarios/page.tsx" descripcion="Server fetch users + render UsuariosClient" />
+      <archivo path="app/admin/usuarios/UsuariosClient.tsx" descripcion="Tabla CRUD + modal Invitar/Editar usuario" />
+      <archivo path="app/admin/audit/page.tsx" descripcion="Server fetch primera página de eventos + render AuditClient" />
+      <archivo path="app/admin/audit/AuditClient.tsx" descripcion="Tabla paginada con filtros + expandir JSON inline" />
+    </directorio>
+
+    <directorio nombre="app/api/" descripcion="API routes server-side">
+      <archivo path="app/api/auth/callback/route.ts" descripcion="Callback OAuth Supabase" />
+      <archivo path="app/api/auth/signout/route.ts" descripcion="Logout + invalidate session + audit log" />
+      <archivo path="app/api/data/refresh/route.ts" descripcion="Pull APIs Susazón/Suve, idempotent. maxDuration 300s. Solo admin/director" />
+      <archivo path="app/api/data/snapshot/route.ts" descripcion="Snapshot rápido (RLS-filtered) — alternativa a queries completas" />
+      <archivo path="app/api/budgets/bulk/route.ts" descripcion="Upsert masivo PTTO (admin/director). Audit log + RLS" />
+      <archivo path="app/api/admin/territories/toggle/route.ts" descripcion="Apagar/prender territorios (admin only) + audit log" />
+      <archivo path="app/api/admin/users/invite/route.ts" descripcion="Invitar via Supabase Magic Link + audit log" />
+      <archivo path="app/api/admin/users/update/route.ts" descripcion="Update partial con before/after audit" />
+      <archivo path="app/api/admin/users/reset-password/route.ts" descripcion="Reset email de Supabase + audit log" />
+      <archivo path="app/api/admin/audit/route.ts" descripcion="GET paginado del audit_log con filtros" />
+    </directorio>
+
+    <directorio nombre="components/" descripcion="Componentes React reusables">
+      <archivo path="components/dashboard/Sidebar.tsx" descripcion="Sidebar con territorios, mini-KPIs, banner apagado" />
+      <archivo path="components/dashboard/KpiCardsRow.tsx" descripcion="6 KPI cards (Venta/Margen/KG + 3 Acum yearly)" />
+      <archivo path="components/dashboard/DashboardTabs.tsx" descripcion="Wrapper de los 7 tabs" />
+      <archivo path="components/dashboard/TrackingDiarioTab.tsx" descripcion="Tab Tracking — 8 stats + progress bar + composed chart 4 series + tabla diaria" />
+      <archivo path="components/dashboard/VentasTab.tsx" descripcion="Tab Ventas — 12 meses x 3 años con bars + lines (margen %)" />
+      <archivo path="components/dashboard/DimensionTab.tsx" descripcion="Genérico para Grupo Producto, Clientes, Vendedores (chart + tabla)" />
+      <archivo path="components/dashboard/ProductosTab.tsx" descripcion="Productos — chart doble eje (Pesos/Kilos) + tabla top 50" />
+      <archivo path="components/dashboard/VendedoresTab.tsx" descripcion="Vendedores — toggle Sus/Suve + Top 10/20/Todos" />
+      <archivo path="components/dashboard/PerdidosTab.tsx" descripcion="Perdidos — toggle Mes/YTD + 3 stats + tabla con status" />
+      <archivo path="components/dashboard/GroupedBarChart.tsx" descripcion="Reusable Recharts bar chart — fix V2.2 bug eje X" />
+      <archivo path="components/theme/ThemeProvider.tsx" descripcion="Context provider con localStorage persistence" />
+      <archivo path="components/theme/ThemeSelector.tsx" descripcion="Botón Tema → modal con 6 previews grandes" />
+      <archivo path="components/layout/Header.tsx" descripcion="Header con logo + nav + user info + theme + logout" />
+      <archivo path="components/brand/SusazonLogo.tsx" descripcion="Logo con auto-switch on-dark/on-light vía CSS filter" />
+    </directorio>
+
+    <directorio nombre="lib/" descripcion="Utilidades server + cliente">
+      <archivo path="lib/supabase/client.ts" descripcion="Browser Supabase client (anon key)" />
+      <archivo path="lib/supabase/server.ts" descripcion="Server Supabase client (cookies awaited)" />
+      <archivo path="lib/supabase/admin.ts" descripcion="Service role client (NUNCA usar en components)" />
+      <archivo path="lib/susazon-api.ts" descripcion="Wrapper APIs Susazón/Suve. fetchMonth + normalizeRow + filterValidRows. Sanitize whitespace en env vars" />
+      <archivo path="lib/format.ts" descripcion="formatMoney/Kilos/Date/etc. Portado verbatim del V2.2" />
+      <archivo path="lib/business-days.ts" descripcion="Días hábiles L-S menos LFT con tabla de feriados 2024-2027" />
+      <archivo path="lib/admin-guards.ts" descripcion="requireAdmin() helper para API routes" />
+      <archivo path="lib/themes.ts" descripcion="Definición de los 6 themes con preview swatches" />
+      <archivo path="lib/utils.ts" descripcion="cn() helper de shadcn" />
+    </directorio>
+
+    <directorio nombre="supabase/migrations/" descripcion="10 migraciones SQL aplicadas">
+      <archivo path="001_users_permissions.sql" descripcion="Tabla users_permissions con role + allowed_territories + helpers RLS" />
+      <archivo path="002_territories_state.sql" descripcion="Tabla territories_state + visible_territories_for_current_user()" />
+      <archivo path="003_audit_log.sql" descripcion="Tabla audit_log inmutable con 9 audit_actions enum" />
+      <archivo path="004_sales_rows.sql" descripcion="Tabla principal con RLS policy users_read_visible_territories" />
+      <archivo path="005_territory_budgets.sql" descripcion="PTTO mensual con compound PK (territorio, anio, mes)" />
+      <archivo path="006_kpi_views.sql" descripcion="Vistas kpi_monthly_summary y kpi_daily_summary con security_invoker=true" />
+      <archivo path="007_kpi_daily_summary.sql" descripcion="Vista kpi_daily_summary específica para Tracking Diario" />
+      <archivo path="008_kpi_dimension_views.sql" descripcion="5 vistas dimension (familia, grupo, sku, vendedor, cliente)" />
+      <archivo path="009_vendedor_with_empresa.sql" descripcion="Recreate kpi_vendedor_summary con empresa column para toggle Sus/Suve" />
+      <archivo path="010_kpi_cliente_perdidos.sql" descripcion="Vista kpi_cliente_perdidos para tab Perdidos (mes + YTD pre-agregados)" />
+    </directorio>
+
+    <archivo path="proxy.ts" descripcion="Middleware Next.js 16 — auth check + redirect" />
+    <archivo path=".env.local" descripcion="Secrets (NO commit). Ver SECRETS_DASHBOARD_V3.txt privado" />
+    <archivo path=".env.example" descripcion="Template público con variables esperadas" />
+    <archivo path="package.json" descripcion="Dependencies y scripts (build, dev, lint)" />
+    <archivo path="next.config.ts" descripcion="Config Next 16" />
+    <archivo path="AGENTS.md" descripcion="Auto-cargado al cd al proyecto. Contexto crítico para Claude" />
+    <archivo path="docs/" descripcion="Esta documentación completa" />
+  </archivos>
+
+  <entrada>
+    <fuente nombre="Susazón API REST" tipo="HTTP POST">
+      <url>https://sasweb.susazon.mx/susazon/api_ERPPyMEDashboard/</url>
+      <auth>X-API-KEY: API-DASH-CLAUDE-2026-$$1</auth>
+      <empresa_code>0</empresa_code>
+      <performance>SQL Enterprise. ~5 segundos por mes. ~6,000 filas/mes Abr 2026.</performance>
+      <body>
+        {
+          "page": 1,
+          "page_size": 50000,
+          "desde": "YYYY-MM-DD",
+          "hasta": "YYYY-MM-DD"
+        }
+      </body>
+    </fuente>
+    <fuente nombre="Suve API REST" tipo="HTTP POST">
+      <url>https://saswebsuve.susazon.mx/suve/api_ERPPyMEDashboard/</url>
+      <auth>X-API-KEY: API-DASH-CLAUDE-2026-$$1</auth>
+      <empresa_code>1</empresa_code>
+      <performance>SQL Express. ~60 segundos por mes (lento por diseño). ~2,500 filas/mes Abr 2026.</performance>
+      <body>Mismo formato que Susazón</body>
+      <nota>Mismo X-API-KEY que Susazón (TI lo configuró igual)</nota>
+    </fuente>
+    <fuente nombre="Sheet PTTO Mauricio" tipo="Excel">
+      <descripcion>
+        Sheet con presupuestos mensuales por territorio que Mauricio actualiza anualmente.
+        Se carga via /cargar-datos → grid editable → autosave a territory_budgets.
+      </descripcion>
+      <mapeo_decisiones>
+        <decision>Intercompañias: PTTO solo en fila Susazón, "Intercompañias Suve" queda en $0</decision>
+        <decision>Zurte-T Planta (sheet) → Zurt-t (DB/API) — usar nombre del API</decision>
+      </mapeo_decisiones>
+    </fuente>
+  </entrada>
+
+  <columnas>
+    <tabla nombre="sales_rows" descripcion="Tabla principal donde se persisten todas las filas del refresh">
+      <columna nombre="id" tipo="bigserial" pk="true" />
+      <columna nombre="empresa" tipo="smallint" check="0=Susazón, 1=Suve" />
+      <columna nombre="no_cliente" tipo="text" />
+      <columna nombre="cliente" tipo="text" />
+      <columna nombre="territorio" tipo="text" rls="filtrado por visible_territories_for_current_user()" />
+      <columna nombre="vendedor" tipo="text" />
+      <columna nombre="sku" tipo="text" />
+      <columna nombre="kg" tipo="numeric" filtro="kg > 0 al insertar" />
+      <columna nombre="fecha" tipo="date" />
+      <columna nombre="anio" tipo="smallint" />
+      <columna nombre="mes" tipo="smallint" />
+      <columna nombre="venta" tipo="numeric" />
+      <columna nombre="margen" tipo="numeric" />
+      <columna nombre="familia" tipo="text" />
+      <columna nombre="grupo" tipo="text" descripcion="Campo nuevo agregado por TI — usado en tab Grupo Producto" />
+      <columna nombre="created_at" tipo="timestamptz" default="now()" />
+    </tabla>
+    <tabla nombre="users_permissions" descripcion="Permisos por usuario">
+      <columna nombre="user_id" tipo="uuid" fk="auth.users(id)" pk="true" />
+      <columna nombre="email" tipo="text" />
+      <columna nombre="full_name" tipo="text" />
+      <columna nombre="role" tipo="user_role enum" valores="admin, director, gerente_regional, vendedor" />
+      <columna nombre="allowed_territories" tipo="text[]" descripcion="NULL=todos, []=ninguno" />
+      <columna nombre="can_edit_ptto" tipo="boolean" />
+      <columna nombre="theme_preference" tipo="theme_preference enum" />
+      <columna nombre="is_active" tipo="boolean" descripcion="false=desactivado (soft delete)" />
+    </tabla>
+    <tabla nombre="territories_state" descripcion="Toggle global on/off por territorio">
+      <columna nombre="territory_name" tipo="text" pk="true" />
+      <columna nombre="is_active" tipo="boolean" />
+      <columna nombre="disabled_by" tipo="uuid" fk="auth.users(id)" />
+      <columna nombre="disabled_at" tipo="timestamptz" />
+      <columna nombre="reason" tipo="text" />
+    </tabla>
+    <tabla nombre="territory_budgets" descripcion="PTTO mensual">
+      <columna nombre="territorio" tipo="text" pk="true" />
+      <columna nombre="anio" tipo="smallint" pk="true" />
+      <columna nombre="mes" tipo="smallint" pk="true" />
+      <columna nombre="venta_budget" tipo="numeric" />
+      <columna nombre="updated_by" tipo="uuid" />
+    </tabla>
+    <tabla nombre="audit_log" descripcion="Registro inmutable de eventos de seguridad">
+      <columna nombre="id" tipo="uuid" pk="true" default="gen_random_uuid()" />
+      <columna nombre="user_id" tipo="uuid" fk="auth.users(id)" />
+      <columna nombre="user_email" tipo="text" />
+      <columna nombre="action" tipo="audit_action enum" valores="login, login_failed, logout, territory_toggle, ptto_change, user_created, user_updated, user_deleted, data_refresh" />
+      <columna nombre="details" tipo="jsonb" descripcion="Payload con before/after snapshots, changed_fields, etc." />
+      <columna nombre="created_at" tipo="timestamptz" default="now()" />
+    </tabla>
+  </columnas>
+
+  <logica>
+    <bloque nombre="RLS — Visibilidad de territorios">
+      Función helper visible_territories_for_current_user() retorna la intersección de:
+        - allowed_territories del user (NULL = todos los activos)
+        - territory_name de territories_state donde is_active = true
+      Policy en sales_rows: territorio = ANY (visible_territories_for_current_user())
+      Las views KPI con security_invoker=true heredan automáticamente el filtro al consultar.
+    </bloque>
+
+    <bloque nombre="Tracking Diario — Fórmulas verbatim del V2.2">
+      velOrig = ptto / totalBizDays
+      velActual = acum / elapsedBizDays
+      velNeces = (ptto - acum) / remainingBizDays
+      runRate = velActual * totalBizDays
+      daysWithInvoice = días hábiles con venta &gt; 0
+      Color tones Vel.Necesaria: green ≤ velOrig, yellow ≤ velOrig×1.2, red mayor
+      Brecha = alcancePct − tiempoPct; AVANZADO si ≥ 0, REZAGADO si negativo
+      Días hábiles = L-S (Lunes a Sábado), no L-V. Solo Domingo es no-hábil + feriados LFT.
+      Tabla de feriados hardcoded 2024-2027 en lib/business-days.ts
+    </bloque>
+
+    <bloque nombre="Refresh idempotente">
+      Antes de insertar (source, año, mes), borrar lo existente para esa combo.
+      DELETE FROM sales_rows WHERE empresa = X AND anio = Y AND mes = Z
+      INSERT con filterValidRows(rows): solo kg &gt; 0 entran.
+      Seguro de re-correr cualquier rango — no produce duplicados.
+    </bloque>
+
+    <bloque nombre="Tab Perdidos — Status">
+      perdido: v25 &gt; 0 AND v26 = 0
+      declive: v25 &gt; 0 AND v26 &lt; v25 (strict, excluye perdidos)
+      declinePct = ((v25 - v26) / v25) * 100
+      Color $: rojo si declinePct ≥ 100 (perdido), rojo si &gt; 30, amarillo si &lt; 30.
+      Color kg: rojo si var ≤ -100, rojo si &lt; -30, amarillo si &lt; 0, verde si ≥ 0.
+      Toggle Mes/YTD: cambia v25/v26/k25/k26 a usar mes_* o ytd_* de kpi_cliente_perdidos.
+    </bloque>
+
+    <bloque nombre="Theme system">
+      6 themes: clean, editorial, warm-neo, supabase-orange, stock-market, liquid-glass.
+      Aplicación: data-theme attribute en <html> + CSS vars cascadean.
+      Persistence: localStorage key "dashboard-susazon-theme".
+      Liquid Glass requiere body::before con aurora gradient + backdrop-filter en cards.
+      Safari fix: isolation: isolate + transform: translateZ(0) en elementos rounded.
+    </bloque>
+
+    <bloque nombre="Audit log — qué se captura">
+      Eventos automáticos:
+        login: al confirmar signInWithPassword exitoso
+        login_failed: error de auth
+        logout: signOut
+        territory_toggle: apagar/prender desde admin
+        ptto_change: bulk upsert en territory_budgets
+        user_created/updated/deleted: CRUD admin
+        data_refresh: refresh APIs Susazón/Suve
+      Cada evento incluye user_email, details (jsonb con contexto), created_at.
+      Política RLS: solo admins pueden hacer SELECT del audit_log. INSERT permitido a cualquier
+      autenticado pero solo para SU PROPIO evento.
+    </bloque>
+  </logica>
+
+  <interfaz>
+    <pantalla path="/login" rol="público" descripcion="Email + password. Forgot password (envía reset email)." />
+    <pantalla path="/dashboard" rol="cualquier auth" descripcion="Dashboard principal con sidebar + 6 KPI cards + 7 tabs" />
+    <pantalla path="/dashboard tabs" rol="cualquier auth">
+      <tab nombre="Tracking Diario" descripcion="8 stats grid + progress bar + composed chart 4 series + tabla diaria 9 cols" />
+      <tab nombre="Ventas" descripcion="12 meses x 3 años, bars (venta) + lines (margen %), tooltip rico" />
+      <tab nombre="Grupo Producto" descripcion="Bar chart Top 10 grupos por año + tabla full" />
+      <tab nombre="Productos" descripcion="Composed chart Top 15 SKUs (Kilos bars + Pesos lines) + tabla Top 50" />
+      <tab nombre="Clientes" descripcion="Bar chart Top 10 + tabla Top 50 con Var %" />
+      <tab nombre="Vendedores" descripcion="Toggle Top 10/20/Todos + Toggle Sus/Suve. Bar chart + tabla" />
+      <tab nombre="Perdidos" descripcion="Toggle Mes/YTD. 3 stats + tabla 9 cols con status (Perdido/Declive)" />
+    </pantalla>
+    <pantalla path="/cargar-datos" rol="admin/director" descripcion="Refresh APIs (warning timeout) + grid PTTO editable" />
+    <pantalla path="/admin/territorios" rol="admin" descripcion="Tabla territorios con toggle inline + motivo" />
+    <pantalla path="/admin/usuarios" rol="admin" descripcion="Tabla CRUD + modal Invitar (Magic Link)" />
+    <pantalla path="/admin/audit" rol="admin" descripcion="Tabla paginada con 4 filtros + expandir JSON" />
+  </interfaz>
+
+  <dependencias>
+    <dependencia nombre="next" version="16.2.4" critica="true">
+      App Router + Turbopack. Breaking changes vs Next 14: middleware.ts → proxy.ts, cookies() async.
+    </dependencia>
+    <dependencia nombre="react" version="19.2.4" />
+    <dependencia nombre="typescript" version="5.x" />
+    <dependencia nombre="tailwindcss" version="4.x" critica="true">
+      CSS-first con @theme inline. Tailwind 3 NO funciona — sintaxis distinta.
+    </dependencia>
+    <dependencia nombre="@supabase/supabase-js" version="2.104+" />
+    <dependencia nombre="@supabase/ssr" version="0.10+" />
+    <dependencia nombre="recharts" version="3.8+" critica="true">
+      Recharts 3.x cambió tipos a readonly. NO compatible con código de Recharts 2.x sin ajustes.
+      NO Chart.js — es Recharts (React-native).
+    </dependencia>
+    <dependencia nombre="lucide-react" version="0.4+" />
+    <dependencia nombre="zod" version="3.x" />
+    <runtime nombre="Node.js" version="20.x+" />
+    <runtime nombre="Vercel" plan="Hobby" limite="300s/función serverless" />
+    <runtime nombre="Supabase" plan="Free" max_rows_bumpeado="50000" />
+  </dependencias>
+
+  <procedimiento>
+    <paso n="1">
+      Clonar repo: git clone https://github.com/musabiaga/dashboard-susazon-v3.git
+    </paso>
+    <paso n="2">
+      Pedirle a Mauricio el SECRETS_DASHBOARD_V3.txt (Apple Notes). Crear .env.local con:
+        NEXT_PUBLIC_SUPABASE_URL
+        NEXT_PUBLIC_SUPABASE_ANON_KEY
+        SUPABASE_SERVICE_ROLE_KEY
+        SUSAZON_API_URL
+        SUSAZON_API_KEY (escapar $$ como \$\$ en .env)
+        SUVE_API_URL
+        SUVE_API_KEY (escapar $$)
+    </paso>
+    <paso n="3">
+      Instalar deps: npm install
+    </paso>
+    <paso n="4">
+      Verificar tipos: npx tsc --noEmit (debe pasar limpio)
+    </paso>
+    <paso n="5">
+      Verificar build prod: npm run build (debe compilar las 19 rutas)
+    </paso>
+    <paso n="6">
+      Dev local: npm run dev
+    </paso>
+    <paso n="7">
+      Login con musabiagaz@susazon.com.mx — pedir password a Mauricio
+    </paso>
+    <paso n="8">
+      Verificar que /dashboard, /admin, /cargar-datos cargan correctamente
+    </paso>
+    <paso n="9">
+      Para deployar cambios: git add . &amp;&amp; git commit -m "..." &amp;&amp; git push
+      Vercel auto-deploya desde main branch.
+    </paso>
+  </procedimiento>
+
+  <errores_conocidos>
+    <error nombre="Turbopack cache CSS">
+      Síntoma: cambios en globals.css no aparecen tras restart del dev server.
+      Causa: Turbopack cachea CSS chunks en .next/dev/static/.
+      Fix: rm -rf .next &amp;&amp; restart dev server.
+    </error>
+    <error nombre="middleware.ts deprecated">
+      Síntoma: middleware no se ejecuta.
+      Causa: Next.js 16 lo renombró a proxy.ts.
+      Fix: usar export function proxy() en proxy.ts (sin "middleware" en el nombre).
+    </error>
+    <error nombre="cookies() sync deprecated">
+      Síntoma: warning "cookies() should be awaited"
+      Causa: en Next 16 cookies() es async.
+      Fix: const cookieStore = await cookies()
+    </error>
+    <error nombre="dotenv expand $$">
+      Síntoma: SUSAZON_API_KEY se lee como "API-DASH-CLAUDE-2026-1" (faltan $$)
+      Causa: dotenv-expand interpola $VAR como variable.
+      Fix: en .env.local escribir API-DASH-CLAUDE-2026-\$\$1 (escapado).
+      En Vercel UI: poner el valor literal sin escape (Vercel no interpola).
+    </error>
+    <error nombre="Supabase 1000-row limit">
+      Síntoma: lista de territorios muestra solo unos pocos.
+      Causa: SELECT default trunca a 1000 filas.
+      Fix: bumpear max-rows en Supabase Dashboard → Settings → API a 50000.
+    </error>
+    <error nombre="Vercel Hobby maxDuration">
+      Síntoma: build falla con "must have a maxDuration between 1 and 300 for plan hobby"
+      Causa: cualquier valor &gt; 300 en Hobby plan.
+      Fix: bajar export const maxDuration = 300 (o upgrade a Pro para 900s).
+    </error>
+    <error nombre="Recharts 3 readonly types">
+      Síntoma: TS error "TooltipPayload is readonly and cannot be assigned to mutable type"
+      Causa: Recharts 3.x cambió payload a readonly.
+      Fix: cambiar interface TooltipItem... a payload?: readonly TooltipItem[]
+    </error>
+    <error nombre="Safari backdrop-filter">
+      Síntoma: cards Liquid Glass se ven sólidas en Safari, blureadas en Chrome.
+      Causa: Safari requiere stacking context propio + GPU compositing.
+      Fix: agregar isolation: isolate + transform: translateZ(0) a las cards.
+    </error>
+  </errores_conocidos>
+
+  <configuracion>
+    <env_vars_publicas>
+      <var nombre="NEXT_PUBLIC_SUPABASE_URL" descripcion="URL del proyecto Supabase. OK exponer al browser." />
+      <var nombre="NEXT_PUBLIC_SUPABASE_ANON_KEY" descripcion="Anon key Supabase. OK exponer al browser (RLS protege)." />
+    </env_vars_publicas>
+    <env_vars_privadas>
+      <var nombre="SUPABASE_SERVICE_ROLE_KEY" descripcion="JAMÁS exponer. Solo en API routes server-side." />
+      <var nombre="SUSAZON_API_URL" descripcion="URL del endpoint REST" />
+      <var nombre="SUSAZON_API_KEY" descripcion="X-API-KEY header. Escapar $$ en .env.local" />
+      <var nombre="SUVE_API_URL" descripcion="URL del endpoint REST Suve" />
+      <var nombre="SUVE_API_KEY" descripcion="Misma key que Susazón. Escapar $$" />
+    </env_vars_privadas>
+  </configuracion>
+
+  <notas_futuras>
+    <nota>Considerar upgrade Vercel Pro ($20/mes) si el equipo crece o necesitan refresh largo.</nota>
+    <nota>Considerar Supabase Pro ($25/mes) si se requiere sandbox via Branches o backups automáticos.</nota>
+    <nota>CI/CD con GitHub Actions: tests + lint en cada PR. Pendiente.</nota>
+    <nota>Sentry o LogRocket para monitoreo de errores en runtime. Pendiente.</nota>
+    <nota>Themes bonus propuestos pero no implementados: Linear Eclipse + Bento Spatial.</nota>
+    <nota>Custom domain dashboard.susazon.mx — config DNS pendiente cuando Mauricio quiera.</nota>
+    <nota>Migración a Supabase realtime para Audit log live updates — no implementado.</nota>
+  </notas_futuras>
+
+</instructivo>
