@@ -58,9 +58,16 @@ export async function POST(request: NextRequest) {
 
   const admin = createSupabaseAdminClient();
 
-  // 1. Invitar via auth admin API — manda email con magic link
+  // 1. Invitar via auth admin API — manda email con magic link.
+  // El redirectTo apunta a /set-password donde el invitado fija su contraseña
+  // antes de poder usar la app. Construimos la URL desde el origin del request
+  // para que funcione tanto en local (http://localhost:3000) como en prod
+  // (https://*.vercel.app), sin depender del Site URL de Supabase.
+  const origin = new URL(request.url).origin;
+  const redirectTo = `${origin}/set-password`;
+
   const { data: invited, error: inviteErr } =
-    await admin.auth.admin.inviteUserByEmail(email);
+    await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
 
   if (inviteErr || !invited?.user) {
     // Si el user ya existe en auth, devolver error claro
