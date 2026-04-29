@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   RefreshCw,
@@ -10,6 +10,7 @@ import {
   Loader2,
   Calendar,
   ArrowRight,
+  AlertTriangle,
 } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 
@@ -66,6 +67,32 @@ export function LoaderClient({ initialLastSync, initialTotalRows }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState(initialLastSync);
   const [totalRows, setTotalRows] = useState(initialTotalRows);
+
+  // Estimación de tiempo del refresh basado en costos observados:
+  //   Susazón (SQL Enterprise): ~5 s/mes
+  //   Suve (SQL Express, lento): ~60 s/mes
+  // Vercel Hobby plan: 300 s de límite por función (5 min). Pro = 900 s.
+  const estimate = useMemo(() => {
+    const months = monthsBetween(dateFrom, dateTo);
+    const COST_PER_MONTH: Record<ApiSource, number> = {
+      susazon: 5,
+      suve: 60,
+    };
+    const perMonthSec = enabledSources.reduce(
+      (sum, s) => sum + COST_PER_MONTH[s],
+      0
+    );
+    const totalSec = months * perMonthSec;
+    const VERCEL_HOBBY_LIMIT = 300;
+    return {
+      months,
+      totalSec,
+      totalMin: totalSec / 60,
+      // Warning si supera 280s (deja un buffer de 20s antes del límite real)
+      excedeLimite: totalSec > VERCEL_HOBBY_LIMIT - 20,
+      limite: VERCEL_HOBBY_LIMIT,
+    };
+  }, [dateFrom, dateTo, enabledSources]);
 
   // Sincroniza con el server después de router.refresh() — la cuenta real
   // viene del Server Component (count exacto en Supabase), no de un cálculo
@@ -227,6 +254,95 @@ export function LoaderClient({ initialLastSync, initialTotalRows }: Props) {
             />
           </div>
         </div>
+
+        {/* Estimación de tiempo + warning si supera el límite del plan Hobby */}
+        {enabledSources.length > 0 && !running && (
+          <div className="mt-4">
+            {estimate.excedeLimite ? (
+              <div
+                className="flex items-start gap-2 rounded-[var(--radius)] border px-3 py-2.5 text-xs"
+                style={{
+                  background: "var(--warning-soft)",
+                  borderColor: "var(--warning)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                <AlertTriangle
+                  size={16}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: "var(--warning)" }}
+                />
+                <div className="flex-1 leading-relaxed">
+                  <strong style={{ color: "var(--warning)" }}>
+                    Ojo:
+                  </strong>{" "}
+                  este rango va a tardar aproximadamente{" "}
+                  <strong>
+                    {estimate.totalMin >= 1
+                      ? `${estimate.totalMin.toFixed(1)} min`
+                      : `${estimate.totalSec}s`}
+                  </strong>{" "}
+                  ({estimate.months} mes(es) ×{" "}
+                  {enabledSources.length} fuente(s)) y{" "}
+                  <strong>excede el límite de 5 minutos</strong> del plan
+                  gratuito de Vercel. La función va a cortar a los 300
+                  segundos y vas a perder lo procesado.
+                  <br />
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    Recomendaciones para Latam:
+                  </span>
+                  <ul className="mt-1 ml-4 list-disc space-y-0.5">
+                    <li>
+                      Reduce el rango a máximo{" "}
+                      <strong>
+                        {Math.max(
+                          1,
+                          Math.floor(
+                            (estimate.limite - 20) /
+                              Math.max(
+                                1,
+                                enabledSources.reduce(
+                                  (s, src) =>
+                                    s + (src === "susazon" ? 5 : 60),
+                                  0
+                                )
+                              )
+                          )
+                        )}{" "}
+                        meses
+                      </strong>{" "}
+                      con la(s) fuente(s) marcada(s).
+                    </li>
+                    <li>
+                      O desmarca <strong>Suve</strong> (es la lenta) y
+                      refresca solo Susazón —{" "}
+                      <strong>aguanta hasta 50+ meses</strong>.
+                    </li>
+                    <li>
+                      Sube tu plan de Vercel a Pro ($20 USD/mes) para
+                      tener 15 minutos de límite.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-2 text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
+                <Calendar size={12} />
+                Estimado:{" "}
+                <strong style={{ color: "var(--text-secondary)" }}>
+                  {estimate.totalSec < 60
+                    ? `${estimate.totalSec}s`
+                    : `${estimate.totalMin.toFixed(1)} min`}
+                </strong>{" "}
+                · {estimate.months} mes(es) ×{" "}
+                {enabledSources.length} fuente(s)
+              </div>
+            )}
+          </div>
+        )}
 
         <button
           type="button"
