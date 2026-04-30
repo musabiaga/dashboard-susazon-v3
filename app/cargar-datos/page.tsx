@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getMexicoCityDateParts } from "@/lib/business-days";
 import { DashboardHeader } from "../dashboard/DashboardHeader";
 import { LoaderClient } from "./LoaderClient";
 import {
@@ -39,11 +40,12 @@ export default async function CargarDatosPage({
   }
 
   const sp = await searchParams;
-  const editorYear =
-    parseInt(sp.year ?? "", 10) || new Date().getFullYear();
+  // Año actual en CDMX (UTC-6). Server corre en UTC, ver lib/business-days.ts.
+  const currentYearMx = getMexicoCityDateParts().year;
+  const editorYear = parseInt(sp.year ?? "", 10) || currentYearMx;
   const safeEditorYear = AVAILABLE_YEARS.includes(editorYear)
     ? editorYear
-    : new Date().getFullYear();
+    : currentYearMx;
 
   // Pull en paralelo: última sync, conteo total, lista territorios, presupuestos
   // del año seleccionado.

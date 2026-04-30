@@ -9,7 +9,7 @@ import type {
 } from "@/components/dashboard/Sidebar";
 import type { DimensionRow } from "@/components/dashboard/DimensionTab";
 import type { PerdidoRow } from "@/components/dashboard/PerdidosTab";
-import { countBizDays } from "@/lib/business-days";
+import { countBizDays, getMexicoCityDateParts } from "@/lib/business-days";
 
 export interface DimensionDataset {
   byTerritory: Record<string, DimensionRow[]>;
@@ -125,14 +125,17 @@ export default async function DashboardPage() {
     .eq("user_id", user.id)
     .single();
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  const currentMonthLabel = `${MONTH_NAMES_ES[now.getMonth()]} ${currentYear}`;
-  const monthShortYY = `${MONTH_SHORT_ES[now.getMonth()]} ${currentYear % 100}`;
-  const prevMonthShortYY = `${MONTH_SHORT_ES[now.getMonth()]} ${(currentYear - 1) % 100}`;
-  const prev2MonthShortYY = `${MONTH_SHORT_ES[now.getMonth()]} ${(currentYear - 2) % 100}`;
-  const daysCurrent = now.getDate();
+  // "Hoy" normalizado a zona horaria CDMX (UTC-6). Vercel corre en UTC,
+  // entonces si usamos `new Date()` directo, después de las 6pm CDMX el
+  // server ya cree que es el día siguiente y rompe los KPIs (run-rate,
+  // tracking diario, % tiempo transcurrido). Ver lib/business-days.ts.
+  const { year: currentYear, month: currentMonth, day: daysCurrent } =
+    getMexicoCityDateParts();
+  const monthIdx = currentMonth - 1; // 0-11 para indexar arrays MONTH_*
+  const currentMonthLabel = `${MONTH_NAMES_ES[monthIdx]} ${currentYear}`;
+  const monthShortYY = `${MONTH_SHORT_ES[monthIdx]} ${currentYear % 100}`;
+  const prevMonthShortYY = `${MONTH_SHORT_ES[monthIdx]} ${(currentYear - 1) % 100}`;
+  const prev2MonthShortYY = `${MONTH_SHORT_ES[monthIdx]} ${(currentYear - 2) % 100}`;
   // Día 0 del mes siguiente = último día del mes actual = días totales.
   const daysTotal = new Date(currentYear, currentMonth, 0).getDate();
   // Días hábiles (L-S menos feriados LFT) — para Tracking Diario.

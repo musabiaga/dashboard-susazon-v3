@@ -74,3 +74,35 @@ export function listBizDays(year: number, month: number): number[] {
   }
   return out;
 }
+
+/**
+ * Devuelve año/mes/día actual en zona horaria America/Mexico_City (UTC-6).
+ *
+ * IMPORTANTE: Vercel corre los Server Components en UTC. Si usamos
+ * `new Date().getDate()` directamente, después de las 6pm CDMX el server
+ * ya cree que es el día siguiente (porque UTC ya pasó la medianoche).
+ * Eso rompía el dashboard mostrando "Día 26/26 · 100%" cuando en realidad
+ * todavía falta el último día laboral.
+ *
+ * Este helper normaliza usando Intl.DateTimeFormat con timeZone explícito,
+ * que es resiliente a la TZ del proceso/servidor.
+ *
+ * @returns {year, month (1-12), day (1-31)} de "hoy" en CDMX.
+ */
+export function getMexicoCityDateParts(): {
+  year: number;
+  month: number;
+  day: number;
+} {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = fmt.formatToParts(new Date());
+  const year = parseInt(parts.find((p) => p.type === "year")!.value, 10);
+  const month = parseInt(parts.find((p) => p.type === "month")!.value, 10);
+  const day = parseInt(parts.find((p) => p.type === "day")!.value, 10);
+  return { year, month, day };
+}

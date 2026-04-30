@@ -8,6 +8,7 @@ import {
   monthsBetween,
   type ApiSource,
 } from "@/lib/susazon-api";
+import { getMexicoCityDateParts } from "@/lib/business-days";
 
 // Vercel: extiende el límite de ejecución de la función serverless.
 // Hobby plan: max 300s (5 min). Pro plan: max 900s (15 min).
@@ -54,13 +55,22 @@ export async function POST(request: NextRequest) {
 
   // 2. Parsear body. Default: últimos 3 meses, solo Susazón
   const body = await request.json().catch(() => ({}));
-  const now = new Date();
-  const defaultFrom = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+  // "Hoy" en CDMX (UTC-6). Server corre en UTC, ver lib/business-days.ts.
+  const today = getMexicoCityDateParts();
+  // defaultFrom = mes actual - 2 meses, manejando wrap de año.
+  // Ej: today = abril 2026 → defaultFrom = febrero 2026.
+  // Ej: today = enero 2026 → defaultFrom = noviembre 2025.
+  let defaultFromMonth0 = today.month - 1 - 2; // 0-11
+  let defaultFromYear = today.year;
+  while (defaultFromMonth0 < 0) {
+    defaultFromMonth0 += 12;
+    defaultFromYear -= 1;
+  }
   const dateFrom: string =
     body.dateFrom ??
-    `${defaultFrom.getFullYear()}-${String(defaultFrom.getMonth() + 1).padStart(2, "0")}`;
+    `${defaultFromYear}-${String(defaultFromMonth0 + 1).padStart(2, "0")}`;
   const dateTo: string =
-    body.dateTo ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    body.dateTo ?? `${today.year}-${String(today.month).padStart(2, "0")}`;
   const sources: ApiSource[] = Array.isArray(body.sources) && body.sources.length > 0
     ? (body.sources.filter((s: unknown) => s === "susazon" || s === "suve") as ApiSource[])
     : ["susazon"];
