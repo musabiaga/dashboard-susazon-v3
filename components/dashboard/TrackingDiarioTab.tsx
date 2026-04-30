@@ -361,15 +361,16 @@ export function TrackingDiarioTab({
                 }}
               />
               <Tooltip
-                formatter={(value) =>
-                  typeof value === "number" ? formatMoney(value) : String(value ?? "")
+                content={
+                  <TrackingDiarioTooltip
+                    currentMonthIdx={currentMonth - 1}
+                    prevMonthShortYY={prevMonthShortYY}
+                  />
                 }
-                labelFormatter={(label) => `Día ${label}`}
-                contentStyle={{
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius)",
-                  fontSize: 12,
+                cursor={{
+                  stroke: "var(--text-muted)",
+                  strokeWidth: 1,
+                  strokeDasharray: "3 3",
                 }}
               />
               <Legend
@@ -577,5 +578,135 @@ function Td({
     >
       {children}
     </td>
+  );
+}
+
+// ============================================================
+// TrackingDiarioTooltip — alineado al UI moderno del tab Ventas
+// ============================================================
+// Header: "DÍA X — D MMM" + delta YoY del acumulado (▲/▼ vs Día X mes año ant.)
+// Cuerpo: Row por cada serie del chart con bullet color + label + valor.
+// Datos: vienen del payload de Recharts (chartData), respetando misma info
+// que ya se mostraba; solo cambia presentación.
+interface TooltipPayloadItem {
+  name?: string;
+  value?: number | null;
+  color?: string;
+  dataKey?: string;
+}
+
+function TrackingDiarioTooltip({
+  active,
+  payload,
+  label,
+  currentMonthIdx,
+  prevMonthShortYY,
+}: {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  label?: string | number;
+  currentMonthIdx: number;
+  prevMonthShortYY: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const dayNum = typeof label === "number" ? label : Number(label);
+  const monthLower = MONTH_SHORT_LOWER[currentMonthIdx] ?? "";
+
+  // Buscar acumulado actual y año anterior para el delta YoY
+  const acumActual = payload.find((p) => p.dataKey === "acumulado")?.value;
+  const acumPrev = payload.find((p) => p.dataKey === "anoAnterior")?.value;
+  const yoyDelta =
+    typeof acumActual === "number" &&
+    typeof acumPrev === "number" &&
+    acumPrev > 0
+      ? ((acumActual - acumPrev) / acumPrev) * 100
+      : null;
+
+  // Mantener orden visual: Venta Diaria, Acumulado, Ptto Linear, Año Anterior
+  const orderedKeys = ["ventaDiaria", "acumulado", "pttoLinear", "anoAnterior"];
+  const ordered = orderedKeys
+    .map((k) => payload.find((p) => p.dataKey === k))
+    .filter((p): p is TooltipPayloadItem => p != null);
+
+  return (
+    <div
+      className="overflow-hidden rounded-[var(--radius)] border text-xs tabular-nums shadow-lg"
+      style={{
+        background: "var(--bg-surface)",
+        borderColor: "var(--border-strong)",
+        minWidth: 240,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-baseline justify-between gap-3 px-3 py-2"
+        style={{
+          background: "var(--bg-surface-muted)",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <span
+          className="text-[11px] font-bold uppercase tracking-wider"
+          style={{ color: "var(--text-primary)" }}
+        >
+          Día {dayNum} — {dayNum} {monthLower}
+        </span>
+        {yoyDelta != null && (
+          <span
+            className="text-[10px] font-semibold whitespace-nowrap"
+            style={{
+              color: yoyDelta >= 0 ? "var(--success)" : "var(--danger)",
+            }}
+          >
+            {yoyDelta >= 0 ? "▲" : "▼"} {Math.abs(yoyDelta).toFixed(1)}% vs Día{" "}
+            {dayNum} {prevMonthShortYY}
+          </span>
+        )}
+      </div>
+
+      {/* Cuerpo: una sola sección con todas las series */}
+      <div className="px-3 py-2">
+        {ordered.map((p) => (
+          <TtRow
+            key={p.dataKey}
+            color={p.color}
+            label={p.name ?? ""}
+            value={
+              typeof p.value === "number" ? formatMoney(p.value) : "—"
+            }
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TtRow({
+  color,
+  label,
+  value,
+}: {
+  color: string | undefined;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-0.5">
+      <span className="flex items-center gap-2">
+        <span
+          className="inline-block h-2.5 w-2.5 rounded-full"
+          style={{ background: color ?? "var(--text-muted)" }}
+        />
+        <span style={{ color: "var(--text-secondary)" }}>{label}</span>
+      </span>
+      <span
+        className="font-semibold"
+        style={{ color: "var(--text-primary)" }}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

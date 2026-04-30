@@ -350,6 +350,17 @@
   transform: translateZ(0);
 }
 
+/* OVERRIDE: items dentro del sidebar (botones de territorio) NO deben tener
+   frosted glass — quedaban con apariencia de "todos seleccionados" porque
+   cada item se volvía un mini-card glass individual. Solo queremos el glass
+   en cards GRANDES (KPIs, charts, tooltips), no en items pequeños listados. */
+[data-theme="liquid-glass"] aside button[class*="rounded-"] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  isolation: auto;
+  transform: none;
+}
+
 /* ============================================================================
    TAILWIND THEME BRIDGE
    Expone los CSS vars como utilities Tailwind: bg-page, text-primary, etc.

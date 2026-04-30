@@ -1,6 +1,12 @@
 "use client";
 
-import { Layers, AlertTriangle, Building2 } from "lucide-react";
+import {
+  Layers,
+  AlertTriangle,
+  Building2,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
 import { formatMoney } from "@/lib/format";
 
 export interface DailyPoint {
@@ -52,45 +58,96 @@ interface SidebarProps {
   selected: string; // "" = "Todos"
   onSelect: (name: string) => void;
   totalKpi: TerritoryKpi;
+  // Estado controlado desde el padre (DashboardClient persiste en localStorage)
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
 /**
  * Sidebar de territorios — lista filtrada por permisos vía RLS.
  * Click en un territorio cambia el contexto del dashboard a ese.
  * Click en "Todos" agrega todos los territorios visibles.
+ *
+ * Soporta modo `collapsed`: cuando está cerrado se reduce a una mini-tira de
+ * 44px con solo el botón para reabrir. La preferencia se persiste en
+ * localStorage desde el componente padre.
  */
-export function Sidebar({ territories, selected, onSelect, totalKpi }: SidebarProps) {
+export function Sidebar({
+  territories,
+  selected,
+  onSelect,
+  totalKpi,
+  collapsed,
+  onToggleCollapsed,
+}: SidebarProps) {
   const total = territories.length;
   const disabledCount = territories.filter((t) => !t.isActive).length;
 
+  // ===== Modo colapsado: mini-tira con botón =====
+  if (collapsed) {
+    return (
+      <aside
+        className="flex w-11 shrink-0 flex-col items-center border-r py-3 transition-all duration-200"
+        style={{
+          background: "var(--bg-surface)",
+          borderColor: "var(--border)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-label="Mostrar territorios"
+          title="Mostrar territorios"
+          className="flex h-9 w-9 items-center justify-center rounded-[var(--radius)] transition-colors hover:bg-[var(--bg-surface-muted)]"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          <PanelLeftOpen size={18} />
+        </button>
+      </aside>
+    );
+  }
+
+  // ===== Modo expandido: lista completa =====
   return (
     <aside
-      className="flex w-64 shrink-0 flex-col border-r"
+      className="flex w-64 shrink-0 flex-col border-r transition-all duration-200"
       style={{
         background: "var(--bg-surface)",
         borderColor: "var(--border)",
       }}
     >
       <div
-        className="border-b px-5 py-4"
+        className="flex items-start justify-between gap-2 border-b px-5 py-4"
         style={{ borderColor: "var(--border)" }}
       >
-        <div className="flex items-center gap-2">
-          <Building2 size={16} style={{ color: "var(--accent)" }} />
-          <h2
-            className="text-xs font-semibold uppercase tracking-wider"
-            style={{ color: "var(--text-secondary)" }}
+        <div>
+          <div className="flex items-center gap-2">
+            <Building2 size={16} style={{ color: "var(--accent)" }} />
+            <h2
+              className="text-xs font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Territorios
+            </h2>
+          </div>
+          <p
+            className="mt-1 text-[11px]"
+            style={{ color: "var(--text-muted)" }}
           >
-            Territorios
-          </h2>
+            {total} visible{total === 1 ? "" : "s"}
+            {disabledCount > 0 && ` · ${disabledCount} apagado${disabledCount === 1 ? "" : "s"}`}
+          </p>
         </div>
-        <p
-          className="mt-1 text-[11px]"
-          style={{ color: "var(--text-muted)" }}
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-label="Ocultar territorios"
+          title="Ocultar territorios"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-sm)] transition-colors hover:bg-[var(--bg-surface-muted)]"
+          style={{ color: "var(--text-secondary)" }}
         >
-          {total} visible{total === 1 ? "" : "s"}
-          {disabledCount > 0 && ` · ${disabledCount} apagado${disabledCount === 1 ? "" : "s"}`}
-        </p>
+          <PanelLeftClose size={16} />
+        </button>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">

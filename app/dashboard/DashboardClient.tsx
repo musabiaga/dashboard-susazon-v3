@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Sidebar, type Territory, type TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { KpiCardsRow, type KpiData } from "@/components/dashboard/KpiCardsRow";
 import { DashboardTabs, TAB_LABELS, type TabKey } from "@/components/dashboard/DashboardTabs";
@@ -94,6 +94,33 @@ export function DashboardClient({
   const [selectedTerritory, setSelectedTerritory] = useState<string>(""); // "" = Todos
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
 
+  // Estado de sidebar collapsible. Default = abierto.
+  // Se persiste en localStorage para que recuerde la preferencia del usuario
+  // entre sesiones. Lectura via useEffect (no SSR) para evitar mismatch hidratación.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("dashboard-sidebar-collapsed");
+      if (saved === "true") setSidebarCollapsed(true);
+    } catch {
+      // localStorage no disponible (modo incognito estricto, etc.) — usar default
+    }
+  }, []);
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(
+          "dashboard-sidebar-collapsed",
+          next ? "true" : "false"
+        );
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
   const disabledTerritories = territories.filter((t) => !t.isActive);
 
   // Si seleccionado actual está apagado, fallback a Todos
@@ -160,6 +187,8 @@ export function DashboardClient({
         selected={effectiveSelected}
         onSelect={setSelectedTerritory}
         totalKpi={totalKpi}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={toggleSidebar}
       />
 
       <main className="flex-1 overflow-x-hidden p-6">
