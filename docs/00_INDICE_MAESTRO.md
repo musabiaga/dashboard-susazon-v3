@@ -24,6 +24,7 @@
 | 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | 1.3 | 2026-05-01 |
 | 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | **Contexto compacto para retomar el proyecto en otra sesión Claude** sin tener que releer todos los docs | 1.0 | 2026-04-30 |
 | 11 | `Instructivo_Usuario_Visual.pdf` | PDF | Instructivo visual estilo Liquid Glass para usuarios finales — explica pantalla principal y cada KPI | 1.0 | 2026-04-30 |
+| 12 | `AUTH_FLOWS.md` | Markdown | **Documentación técnica del sistema de auth.** Diagramas de los 3 flows (login, invite, recovery), config Resend SMTP, backup de los 4 templates HTML, troubleshooting checklist, plan de migración SMTP | 1.0 | 2026-05-01 |
 
 ## Documentos NO en el repo (privados)
 
@@ -57,6 +58,7 @@ El código vive en este mismo repo (`github.com/musabiaga/dashboard-susazon-v3`)
 | **Usuario final** (gerente, vendedor) | `Instructivo_Usuario_Visual.pdf` (PDF compacto y visual) o `04_Manual_Usuario.docx` (más detallado) |
 | **Ingeniero TI / DevOps** que va a deployar/mantener | `05_Guia_TI_Despliegue.docx` + `01_Arquitectura_Tecnica.docx` |
 | **Desarrollador** que va a implementar features | `01_Arquitectura_Tecnica.docx` + `02_Diccionario_Datos.docx` + `06_Guia_Reconstruccion.docx` |
+| **Desarrollador tocando auth/SMTP/templates** | `AUTH_FLOWS.md` (paso a paso de los 3 flows + backup de templates + troubleshooting) |
 | **Claude / Agente AI** continuando el proyecto | **`CONTINUACION_NUEVA_CONVERSACION.md`** (PRIMERO) + `INSTRUCTIVO_AGENTE.xml` + `SESSION_LOG.md` + el `AGENTS.md` raíz |
 | **Mauricio** (futuro) revisando qué pasó | `SESSION_LOG.md` + `03_ChangeLog_Release_Notes.docx` |
 | **Auditor / Director** evaluando seguridad | `01_Arquitectura_Tecnica.docx` (sección Seguridad) |

@@ -49,6 +49,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 |---|---|
 | **Empezar (cualquier rol)** | `docs/00_INDICE_MAESTRO.md` |
 | **CONTINUAR EN OTRA SESIÓN CLAUDE — leer primero** | `docs/CONTINUACION_NUEVA_CONVERSACION.md` |
+| **TOCAR AUTH / SMTP / templates email** | `docs/AUTH_FLOWS.md` (flows + config Resend + backup templates + troubleshooting) |
 | **Decisiones tomadas + bugs resueltos** | `docs/SESSION_LOG.md` |
 | **Contexto técnico estructurado para agentes** | `docs/INSTRUCTIVO_AGENTE.xml` |
 | **Diseño del sistema** | `docs/01_Arquitectura_Tecnica.docx` |
