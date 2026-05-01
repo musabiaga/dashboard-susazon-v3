@@ -1061,9 +1061,12 @@
     </p>
     <h4>Run-Rate</h4>
     <p style="margin-bottom: 8px;">
-      Proyección automática: <span class="formula" style="font-family: var(--font-mono); font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">venta_actual ÷ días_transcurridos × días_totales</span>.
-      Te dice cuánto vas a cerrar el mes si mantienes este ritmo. <em>"día 26/30"</em>
-      significa que llevas 26 días del mes (días calendario, no laborables).
+      Proyección automática: <span class="formula" style="font-family: var(--font-mono); font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">venta_actual ÷ días_hábiles_transcurridos × días_hábiles_totales</span>.
+      Te dice cuánto vas a cerrar el mes si mantienes este ritmo de venta.
+      <em>"día hábil 25/26"</em> significa que llevas 25 días hábiles del mes
+      (Lunes a Sábado, descontando feriados oficiales LFT como 1 de mayo,
+      16 de septiembre, etc.). El Run-Rate <strong>no cuenta domingos ni feriados</strong>
+      porque en esos días el negocio no opera.
     </p>
     <h4>vs PTTO</h4>
     <p style="margin-bottom: 0;">

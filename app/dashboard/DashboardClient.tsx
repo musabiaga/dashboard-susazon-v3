@@ -141,10 +141,17 @@ export function DashboardClient({
       effectiveSelected === ""
         ? totalVentaBudget
         : territory?.ventaBudget ?? 0;
-    // Run-Rate: solo mostrar si daysCurrent >= 5 — antes hay muy poca data
-    // para una proyección lineal confiable (varía mucho por día).
-    const factor = daysTotal / Math.max(daysCurrent, 1);
-    const showRunRate = daysCurrent >= 5 && kpi.venta > 0;
+    // Run-Rate: usa días HÁBILES (L-S menos feriados LFT), NO calendario.
+    // Antes usaba días calendario, lo que subestimaba la velocidad real porque
+    // dividía la venta por días que el negocio no opera (domingos + feriados).
+    // Ejemplo: si llevas $25M en día calendario 7 (= día hábil 5), proyección:
+    //   - Calendario: 25/7 × 30 = $107M (subestimado, divide por días no
+    //     vendidos)
+    //   - Hábil:      25/5 × 26 = $130M (real, refleja ritmo de venta)
+    // Mostrar Run-Rate solo si elapsedBizDays >= 4 (suficiente data para
+    // proyección lineal confiable; antes usábamos 5 días calendario ≈ 4 hábiles).
+    const factor = totalBizDays / Math.max(elapsedBizDays, 1);
+    const showRunRate = elapsedBizDays >= 4 && kpi.venta > 0;
     return {
       venta: kpi.venta,
       margen: kpi.margen,
@@ -161,8 +168,9 @@ export function DashboardClient({
             venta: kpi.venta * factor,
             margen: kpi.margen * factor,
             kg: kpi.kg * factor,
-            daysCurrent,
-            daysTotal,
+            // Días hábiles transcurridos / totales (NO calendario)
+            daysCurrent: elapsedBizDays,
+            daysTotal: totalBizDays,
           }
         : null,
       ventaBudget,
@@ -176,8 +184,8 @@ export function DashboardClient({
     monthShortYY,
     prevMonthShortYY,
     acumYears,
-    daysCurrent,
-    daysTotal,
+    elapsedBizDays,
+    totalBizDays,
   ]);
 
   return (

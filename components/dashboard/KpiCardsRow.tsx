@@ -322,7 +322,7 @@ function KpiCard({
           className="mt-1 text-right text-[10px]"
           style={{ color: "var(--text-muted)" }}
         >
-          día {runRate.days.daysCurrent}/{runRate.days.daysTotal}
+          día hábil {runRate.days.daysCurrent}/{runRate.days.daysTotal}
         </div>
       )}
       {vsPtto && (
