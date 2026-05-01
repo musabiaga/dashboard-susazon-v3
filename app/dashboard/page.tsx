@@ -101,7 +101,11 @@ function buildDimDataset<
   return { byTerritory, total: Array.from(totalMap.values()) };
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string; month?: string }>;
+}) {
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL.includes("PEGAR_AQUI")
@@ -125,20 +129,47 @@ export default async function DashboardPage() {
     .eq("user_id", user.id)
     .single();
 
-  // "Hoy" normalizado a zona horaria CDMX (UTC-6). Vercel corre en UTC,
-  // entonces si usamos `new Date()` directo, después de las 6pm CDMX el
-  // server ya cree que es el día siguiente y rompe los KPIs (run-rate,
-  // tracking diario, % tiempo transcurrido). Ver lib/business-days.ts.
-  const { year: currentYear, month: currentMonth, day: daysCurrent } =
-    getMexicoCityDateParts();
+  // "Hoy" en zona horaria CDMX (UTC-6). Vercel corre en UTC, entonces si
+  // usamos `new Date()` directo, después de las 6pm CDMX el server ya cree
+  // que es el día siguiente y rompe los KPIs. Ver lib/business-days.ts.
+  const today = getMexicoCityDateParts();
+
+  // Soporte de selector de mes/año via searchParams (?year=2026&month=4).
+  // Si no vienen, default = mes actual CDMX.
+  // Validamos rangos para evitar que el usuario meta valores inválidos en URL.
+  const sp = await searchParams;
+  const yearParam = parseInt(sp.year ?? "", 10);
+  const monthParam = parseInt(sp.month ?? "", 10);
+  const isValidYearMonth =
+    Number.isFinite(yearParam) &&
+    Number.isFinite(monthParam) &&
+    yearParam >= 2024 &&
+    yearParam <= today.year + 1 &&
+    monthParam >= 1 &&
+    monthParam <= 12;
+
+  const currentYear = isValidYearMonth ? yearParam : today.year;
+  const currentMonth = isValidYearMonth ? monthParam : today.month;
+
+  // ¿Estamos viendo el mes actual o un histórico?
+  const isHistorical =
+    currentYear !== today.year || currentMonth !== today.month;
+
+  // Día actual: si estamos en el mes en curso, usa hoy. Si es histórico,
+  // asume mes completo (último día del mes) — relevante para Run-Rate y
+  // para "días con factura" en Tracking Diario.
   const monthIdx = currentMonth - 1; // 0-11 para indexar arrays MONTH_*
+  // Día 0 del mes siguiente = último día del mes actual = días totales.
+  const daysTotal = new Date(currentYear, currentMonth, 0).getDate();
+  const daysCurrent = isHistorical
+    ? daysTotal // mes pasado: día actual = último día del mes (mes cerrado)
+    : today.day;
+
   const currentMonthLabel = `${MONTH_NAMES_ES[monthIdx]} ${currentYear}`;
   const monthShortYY = `${MONTH_SHORT_ES[monthIdx]} ${currentYear % 100}`;
   const prevMonthShortYY = `${MONTH_SHORT_ES[monthIdx]} ${(currentYear - 1) % 100}`;
   const prev2MonthShortYY = `${MONTH_SHORT_ES[monthIdx]} ${(currentYear - 2) % 100}`;
-  // Día 0 del mes siguiente = último día del mes actual = días totales.
-  const daysTotal = new Date(currentYear, currentMonth, 0).getDate();
-  // Días hábiles (L-S menos feriados LFT) — para Tracking Diario.
+  // Días hábiles (L-S menos feriados LFT) — para Tracking Diario y Run-Rate.
   const elapsedBizDays = countBizDays(currentYear, currentMonth, daysCurrent);
   const totalBizDays = countBizDays(currentYear, currentMonth, null);
 
@@ -616,6 +647,9 @@ export default async function DashboardPage() {
         clientes={clientes}
         vendedores={vendedores}
         perdidos={perdidos}
+        isHistorical={isHistorical}
+        todayYear={today.year}
+        todayMonth={today.month}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Sidebar, type Territory, type TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { KpiCardsRow, type KpiData } from "@/components/dashboard/KpiCardsRow";
@@ -17,7 +18,8 @@ import {
   PerdidosTab,
   type PerdidoRow,
 } from "@/components/dashboard/PerdidosTab";
-import { AlertCircle } from "lucide-react";
+import { MonthSelector } from "@/components/dashboard/MonthSelector";
+import { AlertCircle, Clock } from "lucide-react";
 
 interface DimensionDataset {
   byTerritory: Record<string, DimensionRow[]>;
@@ -58,6 +60,12 @@ interface DashboardClientProps {
     byTerritory: Record<string, PerdidoRow[]>;
     total: PerdidoRow[];
   };
+  /** True si el mes seleccionado NO es el mes actual (vista histórica). */
+  isHistorical: boolean;
+  /** Año "hoy" CDMX (para el MonthSelector). */
+  todayYear: number;
+  /** Mes "hoy" CDMX 1-12 (para el MonthSelector). */
+  todayMonth: number;
 }
 
 /**
@@ -90,6 +98,9 @@ export function DashboardClient({
   clientes,
   vendedores,
   perdidos,
+  isHistorical,
+  todayYear,
+  todayMonth,
 }: DashboardClientProps) {
   const [selectedTerritory, setSelectedTerritory] = useState<string>(""); // "" = Todos
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
@@ -201,6 +212,42 @@ export function DashboardClient({
 
       <main className="flex-1 overflow-x-hidden p-6">
         <div className="mx-auto max-w-7xl space-y-4">
+          {/* Banner cuando se está viendo un mes histórico (no el actual) */}
+          {isHistorical && (
+            <div
+              className="flex items-center justify-between gap-2 rounded-[var(--radius)] border px-4 py-3 text-xs"
+              style={{
+                background: "var(--warning-soft)",
+                borderColor: "var(--warning)",
+                color: "var(--text-primary)",
+              }}
+            >
+              <div className="flex items-start gap-2">
+                <Clock
+                  size={14}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: "var(--warning)" }}
+                />
+                <span>
+                  <strong>Estás viendo un mes histórico</strong>
+                  {" — "}
+                  <strong>{currentMonthLabel}</strong>. Los datos son de un
+                  período cerrado y pueden no reflejar la operación actual.
+                </span>
+              </div>
+              <Link
+                href="/dashboard"
+                className="rounded-[var(--radius-sm)] border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors hover:bg-[var(--warning)] hover:text-white"
+                style={{
+                  borderColor: "var(--warning)",
+                  color: "var(--warning)",
+                }}
+              >
+                Volver al mes actual
+              </Link>
+            </div>
+          )}
+
           {disabledTerritories.length > 0 && (
             <div
               className="flex items-start gap-2 rounded-[var(--radius)] border px-4 py-3 text-xs"
@@ -225,20 +272,21 @@ export function DashboardClient({
             </div>
           )}
 
-          {/* Contexto actual */}
-          <div className="flex items-baseline justify-between gap-3">
+          {/* Contexto actual + selector de mes */}
+          <div className="flex items-center justify-between gap-3">
             <h1
               className="text-xl font-semibold"
               style={{ color: "var(--text-primary)" }}
             >
               {contextLabel}
             </h1>
-            <span
-              className="text-xs"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {currentMonthLabel}
-            </span>
+            <MonthSelector
+              currentYear={currentYear}
+              currentMonth={currentMonth}
+              todayYear={todayYear}
+              todayMonth={todayMonth}
+              monthsBack={24}
+            />
           </div>
 
           {/* KPIs del mes actual — Todos o del territorio seleccionado */}

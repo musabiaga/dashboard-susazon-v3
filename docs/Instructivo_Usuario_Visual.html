@@ -1385,12 +1385,41 @@
       </div>
     </div>
     <div class="kpi-card">
+      <div class="kpi-card-label">📅 Selector de mes</div>
+      <div class="kpi-card-value" style="font-size: 18px;">Ver meses pasados</div>
+      <div class="kpi-card-detail">
+        Dropdown <span class="pill">📅 Mayo 2026 ▼</span> al lado del título del territorio.
+        Click → lista de los últimos 24 meses. Selecciona un mes pasado para ver
+        ese período. Al volver al mes actual desaparece la etiqueta de "histórico".
+      </div>
+    </div>
+    <div class="kpi-card">
       <div class="kpi-card-label">💾 Tu preferencia se queda</div>
       <div class="kpi-card-value" style="font-size: 18px;">Memoria automática</div>
       <div class="kpi-card-detail">
         El dashboard recuerda tus elecciones (tema, sidebar abierto/cerrado, vista pesos/kilos)
         entre sesiones. No necesitas volver a configurar.
       </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="annotation-icon">📅</span>
+    <div class="annotation-text">
+      <strong>Cuando estás viendo un mes histórico</strong>, aparece un banner amarillo
+      arriba del dashboard avisándote (con un botón "Volver al mes actual"). El selector
+      de mes muestra una etiqueta <span class="pill">Histórico</span> al lado del nombre
+      del mes para que no te confundas con datos en curso.
+    </div>
+  </div>
+
+  <div class="annotation" style="background: rgba(234, 179, 8, 0.12); border-color: rgba(234, 179, 8, 0.4);">
+    <span class="annotation-icon">⚠️</span>
+    <div class="annotation-text">
+      <strong style="color: #fde047;">Limitación importante:</strong> los presupuestos (PTTO)
+      están guardados solo para el año en curso. Si seleccionas un mes histórico antes del
+      año actual, los stats de "Alcance Ptto" y "vs Ptto" pueden aparecer en cero — es
+      esperado, no es bug.
     </div>
   </div>
 </section>
