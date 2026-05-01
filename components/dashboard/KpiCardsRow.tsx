@@ -42,6 +42,18 @@ function formatKg(value: number): string {
   return `${value.toLocaleString("es-MX", { maximumFractionDigits: 0 })} kg`;
 }
 
+/**
+ * Delta KG corto con signo. Ej: 101455 → "+101K", -456000 → "-456K".
+ * Útil para mostrar diferencia absoluta junto al % YoY sin alargar la línea.
+ */
+function formatKgDeltaShort(value: number): string {
+  const sign = value >= 0 ? "+" : "-";
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}${Math.round(abs / 1_000)}K`;
+  return `${sign}${Math.round(abs)}`;
+}
+
 function ptToneFromPct(pct: number): "success" | "warning" | "danger" {
   if (pct >= 100) return "success";
   if (pct >= 70) return "warning";
@@ -108,8 +120,13 @@ export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
           label={`KG ${data?.monthShortYY ?? ""}`.trim()}
           value={data ? formatKg(data.kg) : "—"}
           sublabel={
-            yoyK
-              ? { text: `${yoyK.pct >= 0 ? "+" : ""}${yoyK.pct.toFixed(1)}% vs ${prevLabel}`, tone: yoyK.tone }
+            yoyK && data
+              ? {
+                  // Formato A (aprobado): "↘ -17.7% (-101K) vs Abr 25"
+                  // El delta absoluto va en paréntesis entre el % y "vs ..."
+                  text: `${yoyK.pct >= 0 ? "+" : ""}${yoyK.pct.toFixed(1)}% (${formatKgDeltaShort(data.kg - data.prevYear.kg)}) vs ${prevLabel}`,
+                  tone: yoyK.tone,
+                }
               : { text: data?.monthLabel ?? "Mes actual", tone: "neutral" }
           }
           icon={<Package size={18} />}

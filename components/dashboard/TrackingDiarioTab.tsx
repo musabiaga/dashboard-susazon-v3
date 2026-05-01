@@ -102,10 +102,18 @@ export function TrackingDiarioTab({
   // días hábiles del mes). Si no hay data 2025, queda en 0.
   const pace2025 = totalBizDays > 0 ? prevYearKg / totalBizDays : 0;
   const velActualKg = elapsedBizDays > 0 ? acumKg / elapsedBizDays : 0;
-  // Falta para igualar el cierre 2025 (KG/día): si ya estamos arriba, 0.
+  // Estados claros para "comparar vs cierre 2025":
+  //   - ySuperaste: ya rebasamos el cierre 2025 (incluso si quedan días)
+  //   - mesCerradoSinSuperar: ya no quedan días Y no rebasamos 2025 (= NO se logró)
+  //   - quedanDiasParaIgualar: aún se puede pelear, requiere X kg/día
+  const ySuperaste = prevYearKg > 0 && acumKg >= prevYearKg;
+  const kgGapAbs = Math.max(0, prevYearKg - acumKg); // KG faltantes en absoluto
+  const mesCerradoSinSuperar =
+    prevYearKg > 0 && remainingBizDays === 0 && !ySuperaste;
+  // Solo tiene sentido si quedan días Y no superaste todavía
   const faltaIgualarKg =
-    remainingBizDays > 0
-      ? Math.max(0, (prevYearKg - acumKg) / remainingBizDays)
+    remainingBizDays > 0 && !ySuperaste
+      ? kgGapAbs / remainingBizDays
       : 0;
   const runRateKg = velActualKg * totalBizDays;
   // % de cierre 2025: para la progress bar en vista KG.
@@ -420,22 +428,32 @@ export function TrackingDiarioTab({
             <Stat
               label="Falta para igualar 2025"
               value={
-                hasPrev
-                  ? faltaIgualarKg > 0
-                    ? formatKilos(faltaIgualarKg)
-                    : "✓ Ya superaste"
-                  : "—"
+                !hasPrev
+                  ? "—"
+                  : ySuperaste
+                    ? "✓ Ya superaste"
+                    : mesCerradoSinSuperar
+                      ? "✗ No alcanzado"
+                      : formatKilos(faltaIgualarKg)
               }
               valueTone={
-                hasPrev
-                  ? faltaIgualarKg <= 0
+                !hasPrev
+                  ? "neutral"
+                  : ySuperaste
                     ? "success"
-                    : faltaIgualarKg <= pace2025 * 1.2
-                      ? "warning"
-                      : "danger"
-                  : "neutral"
+                    : mesCerradoSinSuperar
+                      ? "danger"
+                      : faltaIgualarKg <= pace2025
+                        ? "warning"
+                        : "danger"
               }
-              sub="kg/día"
+              sub={
+                !hasPrev
+                  ? "Sin data año ant."
+                  : mesCerradoSinSuperar
+                    ? `-${formatKilos(kgGapAbs)} vs 2025`
+                    : "kg/día"
+              }
             />
             <Stat
               label="Run Rate KG"
@@ -600,20 +618,26 @@ export function TrackingDiarioTab({
               </span>
               <span style={{ color: "var(--text-secondary)" }}>
                 {remainingBizDays} día(s) restante(s) · Para igualar:{" "}
-                <strong
-                  style={{
-                    color:
-                      faltaIgualarKg <= 0
-                        ? "var(--success)"
-                        : faltaIgualarKg <= pace2025 * 1.2
+                {ySuperaste ? (
+                  <strong style={{ color: "var(--success)" }}>
+                    ✓ Ya superaste
+                  </strong>
+                ) : mesCerradoSinSuperar ? (
+                  <strong style={{ color: "var(--danger)" }}>
+                    ✗ -{formatKilos(kgGapAbs)} vs 2025
+                  </strong>
+                ) : (
+                  <strong
+                    style={{
+                      color:
+                        faltaIgualarKg <= pace2025
                           ? "var(--warning)"
                           : "var(--danger)",
-                  }}
-                >
-                  {faltaIgualarKg > 0
-                    ? `${formatKilos(faltaIgualarKg)}/día`
-                    : "✓ Ya superaste"}
-                </strong>
+                    }}
+                  >
+                    {formatKilos(faltaIgualarKg)}/día
+                  </strong>
+                )}
               </span>
             </div>
           </div>
