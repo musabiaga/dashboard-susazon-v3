@@ -3,9 +3,9 @@
 **Proyecto:** Dashboard Comercial Susazón V3.0
 **Empresa:** Grupo Susazón (Susazón + Suve)
 **Owner:** Mauricio Usabiaga (Director de Operaciones)
-**Estado:** En producción (versión 1.2.0)
+**Estado:** En producción (versión 1.3.0)
 **URL canonical:** `https://www.dashboardcomercialsusazon.com`
-**Última actualización:** 2026-04-30
+**Última actualización:** 2026-05-01
 
 ---
 
@@ -13,15 +13,15 @@
 
 | # | Archivo | Tipo | Propósito | Versión | Última actualización |
 |---|---------|------|-----------|---------|---------------------|
-| 1 | `01_Arquitectura_Tecnica.docx` | Word | Diseño del sistema, stack tecnológico, flujo de información, decisiones arquitectónicas | 1.2 | 2026-04-30 |
-| 2 | `02_Diccionario_Datos.docx` | Word | Schemas de DB, contratos de APIs, estructura de objetos internos, mapeo de columnas | 1.2 | 2026-04-30 |
-| 3 | `03_ChangeLog_Release_Notes.docx` | Word | Evolución V2.2 → V3.0, historial de commits, fixes y features por versión | 1.2 | 2026-04-30 |
-| 4 | `04_Manual_Usuario.docx` | Word | Manual no-técnico para los 15 usuarios finales (admin, director, gerente, vendedor) | 1.2 | 2026-04-30 |
-| 5 | `05_Guia_TI_Despliegue.docx` | Word | Guía para ingeniero de TI: despliegue, env vars, troubleshooting, monitoreo | 1.2 | 2026-04-30 |
-| 6 | `06_Guia_Reconstruccion.docx` | Word | Reconstrucción desde cero: paso a paso, algoritmos, dependencias, verificación | 1.2 | 2026-04-30 |
-| 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude que continúen el proyecto | 1.2 | 2026-04-30 |
-| 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones, bugs, backlog, contexto histórico | 1.2 | 2026-04-30 |
-| 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | 1.2 | 2026-04-30 |
+| 1 | `01_Arquitectura_Tecnica.docx` | Word | Diseño del sistema, stack tecnológico, flujo de información, decisiones arquitectónicas | 1.3 | 2026-05-01 |
+| 2 | `02_Diccionario_Datos.docx` | Word | Schemas de DB, contratos de APIs, estructura de objetos internos, mapeo de columnas | 1.3 | 2026-05-01 |
+| 3 | `03_ChangeLog_Release_Notes.docx` | Word | Evolución V2.2 → V3.0, historial de commits, fixes y features por versión | 1.3 | 2026-05-01 |
+| 4 | `04_Manual_Usuario.docx` | Word | Manual no-técnico para los 15 usuarios finales (admin, director, gerente, vendedor) | 1.3 | 2026-05-01 |
+| 5 | `05_Guia_TI_Despliegue.docx` | Word | Guía para ingeniero de TI: despliegue, env vars, troubleshooting, monitoreo | 1.3 | 2026-05-01 |
+| 6 | `06_Guia_Reconstruccion.docx` | Word | Reconstrucción desde cero: paso a paso, algoritmos, dependencias, verificación | 1.3 | 2026-05-01 |
+| 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude que continúen el proyecto | 1.3 | 2026-05-01 |
+| 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones, bugs, backlog, contexto histórico | 1.3 | 2026-05-01 |
+| 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | 1.3 | 2026-05-01 |
 | 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | **Contexto compacto para retomar el proyecto en otra sesión Claude** sin tener que releer todos los docs | 1.0 | 2026-04-30 |
 | 11 | `Instructivo_Usuario_Visual.pdf` | PDF | Instructivo visual estilo Liquid Glass para usuarios finales — explica pantalla principal y cada KPI | 1.0 | 2026-04-30 |
 

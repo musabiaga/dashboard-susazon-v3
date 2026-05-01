@@ -32,7 +32,7 @@ from docx.oxml import OxmlElement
 PROYECTO = "Dashboard Comercial Susazón V3.0"
 EMPRESA = "Grupo Susazón (Susazón + Suve)"
 OWNER = "Mauricio Usabiaga, Director de Operaciones"
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 FECHA = date.today().strftime("%Y-%m-%d")
 REPO = "github.com/musabiaga/dashboard-susazon-v3"
 URL_PROD = "www.dashboardcomercialsusazon.com"

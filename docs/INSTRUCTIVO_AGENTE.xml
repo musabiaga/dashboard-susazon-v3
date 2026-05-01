@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<instructivo version="1.2" fecha="2026-04-30" idioma="es-MX">
+<instructivo version="1.3" fecha="2026-05-01" idioma="es-MX">
 
   <contexto>
-    <proyecto>Dashboard Comercial Susazón V3.0 (versión 1.2.0)</proyecto>
+    <proyecto>Dashboard Comercial Susazón V3.0 (versión 1.3.0)</proyecto>
     <propietario>Mauricio Usabiaga, Director de Operaciones, Grupo Susazón</propietario>
     <empresa>Grupo Susazón (incluye marca Susazón y marca Suve)</empresa>
     <usuarios_finales>15 personas internas (admin, director, gerente regional, vendedor)</usuarios_finales>
@@ -18,18 +18,19 @@
       el V3.0 esté siendo evaluado. Útil como referencia de fórmulas y lógica de negocio.
     </predecesor>
     <estado_actual>
-      EN PRODUCCIÓN versión 1.2.0. Deploy live en Vercel desde repo privado
+      EN PRODUCCIÓN versión 1.3.0. Deploy live en Vercel desde repo privado
       github.com/musabiaga/dashboard-susazon-v3. URL canonical:
       https://www.dashboardcomercialsusazon.com (custom domain GoDaddy → Vercel).
       Fallback: https://dashboard-susazon-v3-44sp.vercel.app.
 
-      ~50 commits totales tras la fase 2, 10 migraciones Supabase, 337,398 filas de datos
-      comerciales (Ene 2024 - Abr 2026). Solo el admin (Mauricio) está creado en prod; los
+      ~55 commits totales tras la fase 3, 10 migraciones Supabase, 337,398 filas de datos
+      comerciales (Ene 2024 - May 2026). Solo el admin (Mauricio) está creado en prod; los
       otros 14 usuarios pendientes de invitar cuando esté la lista final.
 
       Stack actualizado: Custom SMTP via Resend (free 3,000/mes) bypasseando rate limit del
       email default de Supabase. Helper getMexicoCityDateParts() en lib/business-days.ts
-      normaliza "hoy" a TZ CDMX (Vercel corre en UTC).
+      normaliza "hoy" a TZ CDMX (Vercel corre en UTC). Run-Rate ahora unificado a días
+      hábiles. Selector de mes en dashboard permite consultar hasta 24 meses pasados.
     </estado_actual>
     <urls>
       <url tipo="canonical">https://www.dashboardcomercialsusazon.com</url>
@@ -96,6 +97,46 @@
       </cambio>
     </cambios>
   </fase_2>
+
+  <fase_3 fecha="2026-05-01">
+    <descripcion>
+      Iteracion final post-cierre fase 2. Mauricio detecto 2 issues durante el uso real
+      del dashboard que requirieron cambios: (1) inconsistencia entre Run-Rate del header
+      (calendario) y Run-Rate del Tracking Diario (habiles), (2) imposibilidad de ver datos
+      de meses pasados desde la UI.
+    </descripcion>
+    <cambios>
+      <cambio commit="41355ee" tipo="bugfix">
+        Run-Rate unificado a dias HABILES en todo el dashboard.
+        Antes: header (KPI cards grandes) usaba `factor = daysTotal / daysCurrent`
+        (calendario), Tracking Diario usaba `velActual * totalBizDays` (habiles).
+        Ahora ambos usan habiles: factor = totalBizDays / elapsedBizDays.
+        Texto de la card cambia de "dia 30/30" a "dia habil 26/26".
+        showRunRate cuando elapsedBizDays >= 4 (era daysCurrent >= 5).
+        Razon de negocio: para una empresa que no opera domingos ni feriados,
+        dividir por dias calendario subestima la velocidad real (ej: $25M en
+        dia calendario 7 = dia habil 5: cal proyecta $107M, habil proyecta $130M
+        que es lo correcto).
+      </cambio>
+      <cambio commit="a3a825f" tipo="feature">
+        Selector de mes/año en dashboard.
+        Componente nuevo: components/dashboard/MonthSelector.tsx — dropdown con
+        los ultimos 24 meses (configurable via prop monthsBack), navega a
+        /dashboard?year=Y&amp;month=M al seleccionar.
+        Server-side: app/dashboard/page.tsx ahora recibe searchParams: { year?, month? }
+        con validacion (year >= 2024, month 1-12). Si vienen, usa esos; si no,
+        default = "hoy" CDMX. isHistorical = currentYear/Month != today.year/month.
+        Cuando histórico: daysCurrent = daysTotal (mes cerrado), factor = 1 → Run-Rate
+        coincide con venta total real.
+        UX:
+          - Banner amarillo con icono Clock + boton "Volver al mes actual" cuando isHistorical.
+          - Etiqueta "Histórico" en el dropdown trigger cuando se ve mes pasado.
+          - Etiqueta "Actual" verde en el item del mes en curso dentro del dropdown.
+        Limitacion documentada: PTTOs en territory_budgets cargados solo para 2026
+        → meses anteriores no tienen "Alcance Ptto" calculable (esperado, no es bug).
+      </cambio>
+    </cambios>
+  </fase_3>
 
   <archivos>
     <directorio nombre="app/" descripcion="Páginas Next.js 16 (App Router)">

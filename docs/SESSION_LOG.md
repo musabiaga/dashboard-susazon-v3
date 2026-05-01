@@ -7,11 +7,12 @@
 - **Inicio:** 2026-04-26
 - **Cierre fase 1:** 2026-04-28 (deploy a producción)
 - **Cierre fase 2:** 2026-04-30 (custom domain + UI polish + feature toggle Pesos/KG)
-- **Versión actual:** 1.2.0 (en producción)
+- **Cierre fase 3:** 2026-05-01 (Run-Rate hábiles + selector de mes histórico)
+- **Versión actual:** 1.3.0 (en producción)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
 - **URL prod canonical:** `https://www.dashboardcomercialsusazon.com`
 - **URL prod fallback:** `https://dashboard-susazon-v3-44sp.vercel.app`
-- **Última actualización:** 2026-04-30
+- **Última actualización:** 2026-05-01
 
 ---
 
@@ -150,6 +151,30 @@
 **Razón:** Bug claro de mi lógica original (`faltaIgualarKg = days > 0 ? gap/days : 0` caía en 0 y daba "ya superaste" cuando no había días). El fix separa el estado "superaste" del estado "ya no quedan días para intentar".
 **Estado:** Vigente. Commit `96a0f79`.
 
+### D017 — 2026-05-01 | Run-Rate unificado a días HÁBILES (eliminar inconsistencia)
+**Contexto:** El dashboard tenía DOS Run-Rates calculados con lógicas diferentes: el del KPI card grande (header) usaba **días calendario** ("día 30/30") mientras que el del Tracking Diario usaba **días hábiles** ("Día 26 de 26"). Mauricio detectó la inconsistencia: para un negocio que no opera domingos ni feriados, dividir por días calendario subestima la velocidad real. Si llevas $25M en día calendario 7 (= día hábil 5), proyección calendario = $107M (subestima por dividir por 2 días no vendidos), proyección hábil = $130M (real, refleja ritmo de venta).
+**Decisión:** Unificar TODOS los Run-Rates a días hábiles (L-S menos feriados LFT). En `app/dashboard/DashboardClient.tsx`, cambiar `factor = daysTotal / daysCurrent` a `factor = totalBizDays / elapsedBizDays`, ajustar `showRunRate >= 4 días hábiles` (era `>= 5 calendario`), y pasar `daysCurrent/Total` ya como hábiles. En `KpiCardsRow.tsx`, cambiar el texto "día X/Y" a "día hábil X/Y" para clarificar al usuario.
+**Razón:** Coherencia con el comportamiento esperado de un dashboard comercial. Run-Rate sobre día hábil es la convención estándar en B2B donde el negocio no opera todos los días.
+**Estado:** Vigente. Commit `41355ee`. Manual de usuario actualizado en mismo commit.
+
+### D018 — 2026-05-01 | Selector de mes/año en dashboard (ver históricos)
+**Contexto:** El dashboard solo mostraba el mes actual (CDMX). Si Mauricio estaba en mayo y quería revisar abril 2026 (o abril 2025), no podía — no había forma de cambiar de mes. Los datos sí están en DB (sales_rows tiene 28 meses de Ene 2024 a hoy), pero no había UI para consultarlos.
+**Decisión:** Implementar un dropdown `MonthSelector` al lado del título del territorio, listando los últimos 24 meses. Al seleccionar un mes pasado, navega a `/dashboard?year=Y&month=M` y todo el dashboard recarga con esos parámetros. Tres elementos visuales adicionales:
+  1. **Banner amarillo** arriba del dashboard cuando `isHistorical = true`, con botón "Volver al mes actual" (link a `/dashboard` sin params).
+  2. **Etiqueta "Histórico"** dentro del dropdown trigger cuando se está viendo un mes pasado.
+  3. **Etiqueta "Actual"** dentro del dropdown list al lado del mes en curso.
+
+Implementación:
+  - `app/dashboard/page.tsx` ahora recibe `searchParams: { year?, month? }` con validación (year >= 2024, month 1-12). Si vienen, usa esos; si no, default = mes actual CDMX.
+  - `isHistorical` calculado server-side y pasado a `DashboardClient`.
+  - Cuando histórico, `daysCurrent = daysTotal` (mes cerrado): el Run-Rate matemáticamente coincide con la venta real (factor = 1).
+  - TODOS los queries (monthlySummary, dailyCurrent, dailyPrevYear, grupos, skus, clientes, vendedores, perdidos, budgetRows) ya estaban parametrizados con currentYear/currentMonth → ningún cambio adicional necesario.
+
+**Limitación documentada en el manual:** los PTTOs (`territory_budgets`) están cargados solo para el año en curso. Meses históricos antes de 2026 no tendrán "Alcance Ptto" calculable — esperado, no es bug.
+
+**Razón:** Necesidad real del director: revisar cierre de meses pasados para juntas, revisiones operativas, comparativos retrospectivos. El gap era evidente.
+**Estado:** Vigente. Commit `a3a825f`. Manual y PDF actualizados.
+
 ---
 
 ## Bugs Resueltos
@@ -175,6 +200,8 @@
 | 17 | 2026-04-30 | Tooltip default de Recharts en Tracking Diario se veía obsoleto | El tooltip usaba `contentStyle` simple. El tab Ventas ya tenía un componente custom moderno. | Crear `TrackingDiarioTooltip` con header oscuro + delta YoY + bullets por serie. Misma info, UI moderno. | `08a1f2a` |
 | 18 | 2026-04-29 | Email "rate limit exceeded" pese a Supabase Pro | El servicio email default tiene rate limit (3-4/hora) en TODOS los planes Supabase. Pro no lo quita. | Configurar SMTP custom de Resend en Supabase Dashboard → Auth → SMTP Settings. Free tier de Resend: 3,000 emails/mes. | (config Supabase) |
 | 19 | 2026-04-30 | "✓ Ya superaste" salía cuando NO se había superado 2025 (mes cerrado) | Lógica `faltaIgualarKg = days > 0 ? gap/days : 0` caía en `0` cuando no quedaban días, y se interpretaba como "ya superaste". | Reformular a 3 estados claros: ySuperaste, mesCerradoSinSuperar, en marcha. Aplicado en stat #7 y progress bar. | `96a0f79` |
+| 20 | 2026-05-01 | Run-Rate del header inconsistente con Run-Rate del Tracking Diario (calendario vs hábiles) | El KPI card grande del header usaba `factor = daysTotal/daysCurrent` (días calendario), mientras Tracking Diario ya usaba hábiles. | Unificar a días hábiles en `DashboardClient.tsx`: `factor = totalBizDays/elapsedBizDays`. Texto de la card cambia de "día X/Y" a "día hábil X/Y". | `41355ee` |
+| 21 | 2026-05-01 | No había forma de ver datos de meses pasados desde el dashboard | El dashboard estaba hardcodeado al mes actual CDMX en `app/dashboard/page.tsx`. Sin selector de mes/año en UI. | Componente `MonthSelector` con dropdown 24 meses + searchParams `year`/`month` en `/dashboard` + banner amarillo cuando `isHistorical`. | `a3a825f` |
 
 ---
 
@@ -197,6 +224,12 @@
 - [x] **Toggle Pesos/Kilos** en Tracking Diario (D014).
 - [x] **KPI cards con delta absoluto** (KG y Margen) + subInline (D015).
 - [x] **Fix bug "Ya superaste"** — lógica de 3 estados (D016).
+
+### Completados en fase 3 (2026-05-01)
+
+- [x] **Run-Rate unificado a días hábiles** — eliminar inconsistencia calendario vs hábil entre header y Tracking Diario (D017).
+- [x] **Selector de mes/año en dashboard** — dropdown 24 meses con banner histórico (D018).
+- [x] **Manual de usuario actualizado** con corrección de Run-Rate y nueva sección sobre selector de mes (PDF regenerado).
 
 ### Mejoras opcionales (sin prisa)
 

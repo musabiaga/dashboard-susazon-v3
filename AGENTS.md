@@ -10,7 +10,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Estado actual
 
-**EN PRODUCCIÓN — versión 1.2.0** — deployado desde 2026-04-28. Última versión: 2026-04-30.
+**EN PRODUCCIÓN — versión 1.3.0** — deployado desde 2026-04-28. Última versión: 2026-05-01.
 
 - **URL canonical:** `https://www.dashboardcomercialsusazon.com` (custom domain en GoDaddy)
 - **URL fallback:** `https://dashboard-susazon-v3-44sp.vercel.app`
@@ -19,7 +19,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - ✅ Fases 0-3 completas (auth, RLS, dashboard 7 tabs, admin panel)
 - ✅ Fase 5 completa (admin panel: territorios + usuarios + audit log)
 - ✅ 6 themes (Clean, Editorial, Warm Neo, Susazón Moderno, Stock Market, Liquid Glass) + selector modal
-- ✅ Deploy a Vercel + 9 hotfixes post-deploy aplicados (bugs 5-13 en SESSION_LOG)
+- ✅ Deploy a Vercel + 11 hotfixes post-deploy aplicados (bugs 5-21 en SESSION_LOG)
+
+**Fase 2 (2026-04-29 / 2026-04-30):**
 - ✅ **Custom domain** `dashboardcomercialsusazon.com` configurado (GoDaddy + Vercel + Supabase Site URL)
 - ✅ **Custom SMTP Resend** — bypassea rate limit del email default de Supabase
 - ✅ **3 templates HTML de email** (invite, recovery, magic link) con branding Editorial Susazón
@@ -29,7 +31,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - ✅ **Toggle Pesos/Kilos** en Tracking Diario — todo el tab cambia (8 stats + chart 4 series + progress bar + tabla con TOTAL)
 - ✅ **KPI cards mejorados** — KG y Margen con delta absoluto + subInline
 - ✅ **Fix bug "Ya superaste"** — lógica de 3 estados (ySuperaste, mesCerradoSinSuperar, en marcha)
-- ✅ Documentación completa actualizada en `/docs/` — leer ANTES de tocar nada
+
+**Fase 3 (2026-05-01):**
+- ✅ **Run-Rate unificado a días hábiles** — eliminar inconsistencia entre header (calendario) y Tracking Diario (hábiles). Ahora ambos usan L-S menos LFT.
+- ✅ **Selector de mes/año** — dropdown de 24 meses al lado del título del territorio. Banner amarillo cuando se ve un mes histórico. URL: `/dashboard?year=Y&month=M`.
+- ✅ Documentación completa actualizada en `/docs/` (incluye Instructivo Usuario PDF estilo Liquid Glass) — leer ANTES de tocar nada
 
 ## ⚡ Pendientes inmediatos (Mauricio)
 
@@ -89,6 +95,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
     - `dashboard-sidebar-collapsed` → "true"/"false" (sidebar abierto/cerrado)
     - `tracking-diario-mode` → "pesos"/"kg" (vista del tab Tracking Diario)
     - `dashboard-theme` → uno de los 6 themes
+22. **Selector de mes/año (D018)** — `app/dashboard/page.tsx` lee `searchParams.year` y `searchParams.month`. Si vienen, usa ese mes; si no, default = "hoy" CDMX. Validación: year >= 2024, month 1-12. Cuando es histórico, `daysCurrent = daysTotal` (mes cerrado) y `factor = 1` para Run-Rate. **Limitación:** PTTOs (`territory_budgets`) cargados solo para año en curso → meses históricos antes de 2026 no tienen "Alcance Ptto" calculable (esperado, no es bug).
+23. **Run-Rate = HÁBILES siempre (D017)** — desde 2026-05-01, todos los Run-Rates del dashboard usan días hábiles (L-S menos LFT). Antes había inconsistencia: header calendario, Tracking Diario hábiles. Si ves cálculos divergentes, verificar que estés usando `elapsedBizDays` y `totalBizDays` (NO `daysCurrent`/`daysTotal` que son calendario y se mantienen para otros usos).
 
 ## Datos clave (no secretos)
 

@@ -13,7 +13,7 @@
 
 **Stack:** Next.js 16 + Supabase Postgres + Vercel. Frontend React 19, Tailwind 4 CSS-first, Recharts 3.x.
 
-**Estado:** EN PRODUCCIÓN versión 1.2.0 (deploy 2026-04-28, fase 2 cerrada 2026-04-30).
+**Estado:** EN PRODUCCIÓN versión 1.3.0 (deploy 2026-04-28, fase 3 cerrada 2026-05-01).
 
 **URL canonical:** `https://www.dashboardcomercialsusazon.com`
 
@@ -27,7 +27,7 @@
 |------|---------|----------|
 | 1 | `AGENTS.md` (raíz del repo) | Auto-cargado al `cd`. Stack, gotchas críticos, reglas absolutas. **21 gotchas** ya documentados. |
 | 2 | Este archivo (`CONTINUACION_NUEVA_CONVERSACION.md`) | Estás aquí. Contexto compacto. |
-| 3 | `docs/SESSION_LOG.md` | **Todas** las decisiones (D001-D016) + bugs resueltos (1-19) con fix y commit. Lee si vas a tocar algo relacionado. |
+| 3 | `docs/SESSION_LOG.md` | **Todas** las decisiones (D001-D018) + bugs resueltos (1-21) con fix y commit. Lee si vas a tocar algo relacionado. |
 | 4 | `docs/INSTRUCTIVO_AGENTE.xml` | Inventario estructurado de archivos, contratos APIs, configuración. Lee si vas a hacer cambios estructurales. |
 | 5 | `docs/01_Arquitectura_Tecnica.docx` | Diseño del sistema y por qué decisiones arquitectónicas. |
 | 6 | `~/Downloads/SECRETS_DASHBOARD_V3.txt` | Tokens, API keys, credenciales (privado, no en repo). |
@@ -136,12 +136,14 @@ DASHBOARD SEMANAL VENTAS V3.0 [Claude Code]/
 9. **Recharts 3.x:** tipos `readonly`. Si tocas tooltips, payload va con `readonly TooltipItem[]`.
 
 10. **Safari + backdrop-filter:** requiere `isolation: isolate` + `transform: translateZ(0)`. Ya aplicado en theme `liquid-glass`.
+11. **Run-Rate = HÁBILES siempre** (desde D017, 2026-05-01). Todos los Run-Rates del dashboard usan días hábiles L-S menos LFT, NO calendario. Si ves cálculos divergentes, verificar que estés usando `elapsedBizDays`/`totalBizDays`.
+12. **Selector de mes/año** (desde D018, 2026-05-01). El dashboard puede mostrar meses pasados via `?year=Y&month=M`. Server-side validation en `app/dashboard/page.tsx`. Cuando es histórico, `daysCurrent = daysTotal` (mes cerrado). PTTOs solo cargados para 2026 → meses anteriores no tienen "Alcance Ptto".
 
-**Lista completa: `AGENTS.md` sección "Gotchas críticos" (21 gotchas).**
+**Lista completa: `AGENTS.md` sección "Gotchas críticos" (23 gotchas).**
 
 ---
 
-## 📊 Estado del backlog (al 2026-04-30)
+## 📊 Estado del backlog (al 2026-05-01)
 
 ### Pendientes inmediatos (Mauricio, no Claude)
 
@@ -305,4 +307,4 @@ python3 scripts/gen_docs.py
 
 ---
 
-**Última actualización de este doc:** 2026-04-30 (cierre de fase 2)
+**Última actualización de este doc:** 2026-05-01 (cierre de fase 3 — Run-Rate hábiles + selector de mes)
