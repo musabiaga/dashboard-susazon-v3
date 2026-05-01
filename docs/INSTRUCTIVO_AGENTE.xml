@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<instructivo version="1.0" fecha="2026-04-28" idioma="es-MX">
+<instructivo version="1.2" fecha="2026-04-30" idioma="es-MX">
 
   <contexto>
-    <proyecto>Dashboard Comercial Susazón V3.0</proyecto>
+    <proyecto>Dashboard Comercial Susazón V3.0 (versión 1.2.0)</proyecto>
     <propietario>Mauricio Usabiaga, Director de Operaciones, Grupo Susazón</propietario>
     <empresa>Grupo Susazón (incluye marca Susazón y marca Suve)</empresa>
     <usuarios_finales>15 personas internas (admin, director, gerente regional, vendedor)</usuarios_finales>
@@ -18,12 +18,84 @@
       el V3.0 esté siendo evaluado. Útil como referencia de fórmulas y lógica de negocio.
     </predecesor>
     <estado_actual>
-      EN PRODUCCIÓN. Deploy live en Vercel desde repo privado github.com/musabiaga/dashboard-susazon-v3.
-      32 commits totales, 10 migraciones Supabase, 337,398 filas de datos comerciales (Ene 2024 -
-      Abr 2026). Solo el admin (Mauricio) está creado en prod; los otros 14 usuarios pendientes
-      de invitar cuando esté la lista final.
+      EN PRODUCCIÓN versión 1.2.0. Deploy live en Vercel desde repo privado
+      github.com/musabiaga/dashboard-susazon-v3. URL canonical:
+      https://www.dashboardcomercialsusazon.com (custom domain GoDaddy → Vercel).
+      Fallback: https://dashboard-susazon-v3-44sp.vercel.app.
+
+      ~50 commits totales tras la fase 2, 10 migraciones Supabase, 337,398 filas de datos
+      comerciales (Ene 2024 - Abr 2026). Solo el admin (Mauricio) está creado en prod; los
+      otros 14 usuarios pendientes de invitar cuando esté la lista final.
+
+      Stack actualizado: Custom SMTP via Resend (free 3,000/mes) bypasseando rate limit del
+      email default de Supabase. Helper getMexicoCityDateParts() en lib/business-days.ts
+      normaliza "hoy" a TZ CDMX (Vercel corre en UTC).
     </estado_actual>
+    <urls>
+      <url tipo="canonical">https://www.dashboardcomercialsusazon.com</url>
+      <url tipo="apex_redirect_308">https://dashboardcomercialsusazon.com</url>
+      <url tipo="vercel_fallback">https://dashboard-susazon-v3-44sp.vercel.app</url>
+      <url tipo="repo">https://github.com/musabiaga/dashboard-susazon-v3</url>
+      <url tipo="vercel_dashboard">https://vercel.com/musabiagas-projects/dashboard-susazon-v3-44sp</url>
+      <url tipo="supabase_dashboard">https://supabase.com/dashboard/project/qfxyrpifntcixwpvnjpd</url>
+    </urls>
   </contexto>
+
+  <fase_2 fecha="2026-04-29 al 2026-04-30">
+    <descripcion>
+      Cierre del proyecto con custom domain, custom SMTP, fix de timezone CDMX, mejoras UX
+      (sidebar collapsible, tooltip moderno) y feature toggle Pesos/Kilos en Tracking Diario.
+    </descripcion>
+    <cambios>
+      <cambio commit="7aca319" tipo="bugfix">
+        Fix timezone CDMX. Vercel corre Server Components en UTC; después de 6pm CDMX (UTC-6)
+        el server retornaba el día siguiente en `new Date().getDate()`. Bug visible:
+        "Día 26/26 · Tiempo 100%" cuando todavía faltaba el último día laboral.
+        Solución: helper getMexicoCityDateParts() en lib/business-days.ts usando
+        Intl.DateTimeFormat con timeZone "America/Mexico_City". Aplicado en
+        app/dashboard/page.tsx, app/api/data/refresh/route.ts, app/cargar-datos/page.tsx.
+      </cambio>
+      <cambio commit="08a1f2a" tipo="ux">
+        UI polish: (a) Fix Liquid Glass theme — items del sidebar ya no se ven como
+        "todos seleccionados" (CSS override aside button[class*="rounded-"] sin backdrop-filter).
+        (b) Sidebar collapsible con botones PanelLeftClose/PanelLeftOpen y persistencia en
+        localStorage (key: dashboard-sidebar-collapsed). (c) Tooltip custom TrackingDiarioTooltip
+        alineado al UI moderno del tab Ventas, con header oscuro + delta YoY + bullets por serie.
+      </cambio>
+      <cambio commit="d941d56" tipo="feature">
+        Toggle Pesos/Kilos en Tracking Diario. Segmented control "Pesos | Kilos" arriba de las
+        8 stats. Persistencia en localStorage (key: tracking-diario-mode), default "pesos".
+        Vista KG reformula 8 stats (sin kgBudget en sistema, todo vs cierre 2025), progress bar
+        vs 2025, chart con 4 series (Venta KG diaria + Acum 2026 + Acum 2025 + Pace 2025),
+        tabla con columnas distintas. Ambas vistas ahora tienen row TOTAL al final.
+      </cambio>
+      <cambio commit="96a0f79" tipo="bugfix+feature">
+        (a) KPI card KG arriba: agregar delta absoluto al lado del % YoY. Formato
+        "↘ -17.7% (-101K) vs Abr 25". (b) Fix bug "Ya superaste" — la lógica original tenía
+        2 estados (faltaIgualarKg = days > 0 ? gap/days : 0) y caía en 0 cuando no quedaban
+        días, mostrando "✓ Ya superaste" aunque NO se hubiera superado. Reformular a 3 estados:
+        ySuperaste (verde), mesCerradoSinSuperar (rojo), en marcha (warning/danger).
+      </cambio>
+      <cambio commit="d076030" tipo="ux">
+        KPI card Margen: agregar comparativo YoY igual que KG card. Nueva prop valueInline
+        en KpiCard que renderiza secundario en gris al lado del valor principal (estilo
+        subInline). Resultado: "$19.1M  13.8%" + sublabel "↘ -2.5% (-$0.5M) vs Abr 25".
+        Patrón "opción A" aprobado por Mauricio.
+      </cambio>
+      <cambio config="Supabase Dashboard" tipo="config">
+        Custom SMTP via Resend configurado en Supabase Dashboard → Auth → SMTP Settings.
+        El email service default de Supabase tiene rate limit (3-4/hora) en TODOS los planes
+        incluyendo Pro. Resend free tier (3,000/mes) suficiente para 15 usuarios.
+        3 templates HTML (invite, recovery, magic link) con branding Editorial Susazón.
+      </cambio>
+      <cambio config="GoDaddy + Vercel + Supabase" tipo="config">
+        Custom domain dashboardcomercialsusazon.com configurado. DNS en GoDaddy:
+        A @ → 76.76.21.21, CNAME www → cname.vercel-dns.com. Apex hace redirect 308 → www.
+        Site URL de Supabase actualizada a https://www.dashboardcomercialsusazon.com.
+        SSL emitido automáticamente por Vercel (Let's Encrypt).
+      </cambio>
+    </cambios>
+  </fase_2>
 
   <archivos>
     <directorio nombre="app/" descripcion="Páginas Next.js 16 (App Router)">

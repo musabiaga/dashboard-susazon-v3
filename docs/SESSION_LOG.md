@@ -6,9 +6,12 @@
 - **Empresa/Usuario:** Grupo Susazón (Susazón + Suve) — Mauricio Usabiaga, Director de Operaciones
 - **Inicio:** 2026-04-26
 - **Cierre fase 1:** 2026-04-28 (deploy a producción)
-- **Versión actual:** 1.0.0 (en producción)
+- **Cierre fase 2:** 2026-04-30 (custom domain + UI polish + feature toggle Pesos/KG)
+- **Versión actual:** 1.2.0 (en producción)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
-- **URL prod:** `dashboard-susazon-v3-44sp.vercel.app`
+- **URL prod canonical:** `https://www.dashboardcomercialsusazon.com`
+- **URL prod fallback:** `https://dashboard-susazon-v3-44sp.vercel.app`
+- **Última actualización:** 2026-04-30
 
 ---
 
@@ -99,6 +102,54 @@
 **Razón:** Safari requiere stacking context propio + GPU compositing forzado para que `backdrop-filter` aplique. Chrome no necesita estos hints (engine más permisivo).
 **Estado:** Vigente. Commit `b81f182`.
 
+### D009 — 2026-04-29 | Custom SMTP (Resend) para emails de auth
+**Contexto:** El servicio de email default de Supabase tiene rate limit (3-4 emails/hora) que aplica incluso en plan Pro. Imposible invitar 14 usuarios desde admin panel sin caer en el límite.
+**Decisión:** Configurar Resend como SMTP custom en Supabase Dashboard → Authentication → SMTP Settings. Plan free de Resend da 3,000 emails/mes y 100/día — suficiente para los 15 usuarios.
+**Razón:** Resend es el SMTP recomendado por Supabase (DX excelente, integración trivial). Alternativas (SendGrid, Postmark, AWS SES) requieren más setup. Plan free cubre 100% del uso real.
+**Estado:** Vigente. Mauricio configuró 3 templates HTML (invite, recovery, magic link) con branding Editorial Susazón.
+
+### D010 — 2026-04-29 | Custom domain dashboardcomercialsusazon.com
+**Contexto:** Usar `dashboard-susazon-v3-44sp.vercel.app` no es profesional para usuarios externos a TI. Mauricio compró el dominio `dashboardcomercialsusazon.com` en GoDaddy.
+**Decisión:** Configurar Vercel + GoDaddy con `www.` como canonical, apex con redirect 308 → www. DNS records: `A @ → 76.76.21.21` y `CNAME www → cname.vercel-dns.com`. Site URL de Supabase actualizada al dominio nuevo.
+**Razón:** El patrón apex → www es estándar SEO/HTTPS. Vercel emite SSL gratis automáticamente vía Let's Encrypt. La URL canonical pasa a `https://www.dashboardcomercialsusazon.com` y la antigua sigue funcionando como fallback (no romper bookmarks de prueba).
+**Estado:** Vigente. DNS resuelve correctamente, SSL emitido, dashboard carga.
+
+### D011 — 2026-04-30 | Helper `getMexicoCityDateParts()` para timezone CDMX
+**Contexto:** Vercel corre Server Components en UTC (no en hora de México). Después de las 6pm CDMX (= medianoche UTC), `new Date().getDate()` en server retornaba el día siguiente. El dashboard mostraba "Día 26/26 · Tiempo 100%" cuando todavía faltaba el último día laboral. Bug visible cada noche para todos los usuarios.
+**Decisión:** Crear helper `getMexicoCityDateParts()` en `lib/business-days.ts` usando `Intl.DateTimeFormat` con `timeZone: "America/Mexico_City"`. Aplicar en 3 puntos: `app/dashboard/page.tsx`, `app/api/data/refresh/route.ts`, `app/cargar-datos/page.tsx`. Todos los demás `new Date()` quedan OK porque construyen fechas explícitas (deterministas).
+**Razón:** El helper es resiliente a la TZ del proceso (UTC en Vercel, local en dev) — siempre devuelve año/mes/día CDMX. Solución quirúrgica sin tocar lógica de negocio.
+**Estado:** Vigente. Commit `7aca319`. Verificado en producción (incognito + hora ~7pm CDMX).
+
+### D012 — 2026-04-30 | Sidebar collapsible
+**Contexto:** El sidebar de territorios ocupa 256px fijos. Con 17 territorios visibles, en laptops de 13" comprime mucho el chart principal del dashboard.
+**Decisión:** Hacer el sidebar collapsible con botón ícono (`PanelLeftClose` / `PanelLeftOpen` de lucide-react). Persistencia en `localStorage` (key: `dashboard-sidebar-collapsed`). Default abierto. Cuando colapsado: tira de 44px con solo el botón para reabrir. Transición de 200ms.
+**Razón:** Patrón estándar en dashboards modernos (VS Code, Notion, Linear). Beneficio claro (~280px liberados horizontal) sin riesgo (no toca DB ni lógica).
+**Estado:** Vigente. Commit `08a1f2a`.
+
+### D013 — 2026-04-30 | Tooltip custom en Tracking Diario alineado al UI moderno
+**Contexto:** El tooltip default de Recharts en el chart de Tracking Diario se veía con UI antigua (sólido, sin estilo coherente). El tab Ventas ya tenía un `VentasTooltip` custom moderno con header oscuro + bullets de color.
+**Decisión:** Crear `TrackingDiarioTooltip` análogo: header oscuro con "Día X — D MMM" + delta YoY del acumulado + bullets de color por serie. Misma información que el tooltip default, solo cambia presentación. Cursor del chart con línea punteada gris (era sólido por default).
+**Razón:** Consistencia visual entre tooltips de todo el dashboard. La info no cambia, solo el "container".
+**Estado:** Vigente. Commit `08a1f2a`.
+
+### D014 — 2026-04-30 | Toggle Pesos/Kilos en Tracking Diario
+**Contexto:** Mauricio (director) frecuentemente piensa tanto en pesos como en kilos. Tener que abrir Excel para ver "¿cuántos kg vendí vs el año pasado?" es fricción innecesaria. El sistema NO maneja `kgBudget` (solo `ventaBudget`), así que en vista KG todo se compara vs cierre 2025.
+**Decisión:** Toggle "Pesos | Kilos" como segmented control arriba de las 8 stats. Persistencia en `localStorage` (key: `tracking-diario-mode`), default = pesos. Vista KG reformula las 8 stats (KG del Mes, vs 2025, Margen $ que no aplica al toggle, vs Mismo Mes Año Ant. KG, Pace 2025, Vel. Actual KG, Falta para igualar 2025, Run Rate KG), progress bar (vs cierre 2025), chart con 4 series (Venta KG diaria + Acumulado 2026 + Acumulado 2025 + Pace 2025), tabla con columnas distintas. Ambas vistas tienen row TOTAL al final de la tabla.
+**Razón:** Beneficio alto para el rol de director, trabajo medio (~3 hrs), riesgo bajo (no toca DB ni otros tabs). Datos KG ya existen en `kpi.daily.current[].k` y `kpi.daily.prevYear[].k`.
+**Estado:** Vigente. Commit `d941d56`.
+
+### D015 — 2026-04-30 | KPI cards (KG y Margen) con delta absoluto + subInline
+**Contexto:** El KPI card de KG arriba mostraba solo `↘ -17.7% vs Abr 25` — el director quería también el delta absoluto en kilos. Margen card similar: solo `13.8% de venta` sin YoY ni delta absoluto en pesos.
+**Decisión:** (a) Helper `formatKgDeltaShort()` y `formatMoneyDeltaShort()` para comprimir K/M con signo. (b) KG card: `↘ -17.7% (-101K) vs Abr 25` (formato A inline con paréntesis). (c) Margen card: nueva prop `valueInline` en `KpiCard` que muestra el `% margen` en gris al lado del valor principal, y el sublabel pasa a ser el YoY con delta abs (`↘ -2.5% (-$0.5M) vs Abr 25`).
+**Razón:** El director necesita ver tanto el % YoY como la magnitud absoluta del delta para tomar decisiones. El `subInline` mantiene la card a la misma altura sin perder información.
+**Estado:** Vigente. Commits `96a0f79` + `d076030`.
+
+### D016 — 2026-04-30 | Fix lógica "Ya superaste" — 3 estados claros
+**Contexto:** En vista KG, el progress bar y la stat #7 mostraban "✓ Ya superaste" cuando el mes ya estaba cerrado, **incluso si NO se había superado el cierre 2025**. Bug visible: KG mes al 82% del cierre 2025 mostraba mensaje de éxito en verde.
+**Decisión:** Reformular lógica de 2 estados a 3 estados claros: (1) `ySuperaste = acumKg >= prevYearKg` → "✓ Ya superaste" verde, (2) `mesCerradoSinSuperar = remainingBizDays === 0 && !ySuperaste` → "✗ No alcanzado · -101K vs 2025" rojo, (3) en marcha → "X kg/día" con tone warning/danger según pace 2025.
+**Razón:** Bug claro de mi lógica original (`faltaIgualarKg = days > 0 ? gap/days : 0` caía en 0 y daba "ya superaste" cuando no había días). El fix separa el estado "superaste" del estado "ya no quedan días para intentar".
+**Estado:** Vigente. Commit `96a0f79`.
+
 ---
 
 ## Bugs Resueltos
@@ -114,6 +165,16 @@
 | 7 | 2026-04-28 | Refresh APIs error "did not match expected pattern" | URL fetch fallaba porque env var tenía whitespace al pegar | `sanitize()` con `replace(/\s+/g, "").trim()` + `validateUrl()` con `new URL()` defensivo | `e00b51d` |
 | 8 | 2026-04-28 | Safari Liquid Glass: cards sólidos sin blur | Falta GPU compositing + stacking context para `backdrop-filter` | `isolation: isolate` + `transform: translateZ(0)` + selector más permisivo | `b81f182` |
 | 9 | 2026-04-28 | Vercel timeout 504 al pedir 28 meses x 2 APIs | 28 × 60s = 28 min, excede el límite Hobby de 300s | Warning UI calcula tiempo estimado y avisa antes de ejecutar | `f9a3eb6` |
+| 10 | 2026-04-29 | Email magic link "Otp expired" al hacer click | Site URL de Supabase apuntaba a `localhost:3000` (default dev). | Mauricio actualizó Site URL a la URL de prod en Supabase Dashboard → Auth → URL Configuration. | (config Supabase) |
+| 11 | 2026-04-29 | Loop `/set-password` ↔ `/login` en flow recovery | `proxy.ts` no tenía `/set-password` en public routes; sin sesión activa redirige a login → loop. | Agregar `pathname === "/set-password"` a `isPublicRoute`. | `6d87c2a` |
+| 12 | 2026-04-29 | "Auth session missing!" al fijar password desde formulario | El exchange de code estaba en Server Component (`/set-password/page.tsx`), pero Server Components no pueden persist cookies de sesión al browser — server veía sesión, cliente no. | Mover el exchange al Route Handler `/api/auth/callback` (sí puede mutar cookies). Server Component solo verifica `getUser()`. | `9dd712c` |
+| 13 | 2026-04-29 | Recovery flow iba directo a dashboard sin pedir password | Callback solo redirigía a `/set-password` cuando `type === "invite"`. Para `type === "recovery"` iba a `/`. | Cambiar a `needsPasswordSet = type === "invite" \|\| type === "recovery"`. | `94a5366` |
+| 14 | 2026-04-29 | Production URL incorrecta en docs y SECRETS | Mauricio había estado usando un Deployment URL específico (con hash) que se vuelve stale. URL correcta es la Production URL estable. | Reemplazar en AGENTS.md, docs/, scripts/gen_docs.py, SECRETS, regenerar `.docx`. | `8bde5d1` |
+| 15 | 2026-04-30 | Dashboard mostraba "Día 26/26 · Tiempo 100%" desde 6pm CDMX | Vercel corre Server Components en UTC. Después de 6pm CDMX = medianoche UTC, server cree que es el día siguiente. Bug visible cada noche para todos los usuarios. | Helper `getMexicoCityDateParts()` con `Intl.DateTimeFormat` + `timeZone: "America/Mexico_City"`. Aplicado en 3 archivos. | `7aca319` |
+| 16 | 2026-04-30 | Liquid Glass theme: items del sidebar se veían como "todos seleccionados" | Selector CSS `[class*="rounded-"]` aplicaba backdrop-filter a TODO elemento con `rounded-*`, incluyendo cada botón del sidebar. | Override `aside button[class*="rounded-"]` con `backdrop-filter: none`. Solo afecta items del sidebar; cards grandes mantienen el frosted glass. | `08a1f2a` |
+| 17 | 2026-04-30 | Tooltip default de Recharts en Tracking Diario se veía obsoleto | El tooltip usaba `contentStyle` simple. El tab Ventas ya tenía un componente custom moderno. | Crear `TrackingDiarioTooltip` con header oscuro + delta YoY + bullets por serie. Misma info, UI moderno. | `08a1f2a` |
+| 18 | 2026-04-29 | Email "rate limit exceeded" pese a Supabase Pro | El servicio email default tiene rate limit (3-4/hora) en TODOS los planes Supabase. Pro no lo quita. | Configurar SMTP custom de Resend en Supabase Dashboard → Auth → SMTP Settings. Free tier de Resend: 3,000 emails/mes. | (config Supabase) |
+| 19 | 2026-04-30 | "✓ Ya superaste" salía cuando NO se había superado 2025 (mes cerrado) | Lógica `faltaIgualarKg = days > 0 ? gap/days : 0` caía en `0` cuando no quedaban días, y se interpretaba como "ya superaste". | Reformular a 3 estados claros: ySuperaste, mesCerradoSinSuperar, en marcha. Aplicado en stat #7 y progress bar. | `96a0f79` |
 
 ---
 
@@ -125,20 +186,34 @@
 - [ ] **Invitar los 14 usuarios prod restantes** desde `/admin/usuarios` cuando tengas la lista (email + nombre + rol + territorios).
 - [ ] **Mover `~/Downloads/SECRETS_DASHBOARD_V3.txt`** a Apple Notes (privado, encriptado).
 
+### Completados en fase 2 (2026-04-29 al 2026-04-30)
+
+- [x] **Custom domain** — `dashboardcomercialsusazon.com` configurado en GoDaddy + Vercel + Supabase Site URL actualizada (D010).
+- [x] **Custom SMTP Resend** — para evitar rate limit de email de Supabase (D009).
+- [x] **3 templates HTML de email** (invite, recovery, magic link) con branding Editorial Susazón.
+- [x] **Fix timezone CDMX** — bug "Día 26/26 desde 6pm" resuelto (D011).
+- [x] **Sidebar collapsible** con localStorage (D012).
+- [x] **Tooltip custom Tracking Diario** alineado al UI moderno (D013).
+- [x] **Toggle Pesos/Kilos** en Tracking Diario (D014).
+- [x] **KPI cards con delta absoluto** (KG y Margen) + subInline (D015).
+- [x] **Fix bug "Ya superaste"** — lógica de 3 estados (D016).
+
 ### Mejoras opcionales (sin prisa)
 
-- [ ] **Custom domain** `dashboard.susazon.mx` desde el panel DNS de Susazón → Vercel (5 min).
 - [ ] **Themes bonus:** Linear Eclipse + Bento Spatial (si querés más opciones visuales — propuestos pero no implementados).
 - [ ] **Upgrade a Vercel Pro** ($20/mes) si necesitás refresh de rangos largos (>5 meses con ambas APIs).
 - [ ] **Sentry o Logging tool** para monitoreo de errores en runtime.
 - [ ] **CI/CD con GitHub Actions** — tests + lint en cada PR.
 - [ ] **Documentar el flujo de PTTO** para futuras cargas anuales.
+- [ ] **`kgBudget`** opcional en `territory_budgets` si en futuro se quiere meta de kilos también (afectaría stats #2 y #5/#7 de la vista KG en Tracking Diario).
 
 ### Aprendizajes para próximos proyectos
 
 - [ ] Correr `npm run build` LOCAL antes del primer push a Vercel (cacha errores TS strict).
 - [ ] Probar en mínimo 2 browsers antes de cerrar features con efectos avanzados (CSS modern).
 - [ ] Setup de staging environment (Vercel branch `develop`) para próxima iteración mayor.
+- [ ] **Cuando uses `new Date()` en server-side code que dependa de fecha local**, normalizar a la TZ del usuario explícitamente (`Intl.DateTimeFormat` con `timeZone`). Vercel siempre corre en UTC.
+- [ ] **Server Components NO pueden mutar cookies**. Para flows de auth con `exchangeCodeForSession`, usar Route Handler.
 
 ---
 

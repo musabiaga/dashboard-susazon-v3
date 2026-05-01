@@ -32,10 +32,11 @@ from docx.oxml import OxmlElement
 PROYECTO = "Dashboard Comercial Susazón V3.0"
 EMPRESA = "Grupo Susazón (Susazón + Suve)"
 OWNER = "Mauricio Usabiaga, Director de Operaciones"
-VERSION = "1.0.0"
+VERSION = "1.2.0"
 FECHA = date.today().strftime("%Y-%m-%d")
 REPO = "github.com/musabiaga/dashboard-susazon-v3"
-URL_PROD = "dashboard-susazon-v3-44sp.vercel.app"
+URL_PROD = "www.dashboardcomercialsusazon.com"
+URL_FALLBACK = "dashboard-susazon-v3-44sp.vercel.app"
 
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 DOCS_DIR.mkdir(exist_ok=True)
