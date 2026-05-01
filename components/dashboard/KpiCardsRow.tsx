@@ -54,6 +54,17 @@ function formatKgDeltaShort(value: number): string {
   return `${sign}${Math.round(abs)}`;
 }
 
+/**
+ * Delta de dinero corto con signo. Ej: 545000 → "+$0.5M", -200 → "-$200".
+ */
+function formatMoneyDeltaShort(value: number): string {
+  const sign = value >= 0 ? "+" : "-";
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}K`;
+  return `${sign}$${Math.round(abs)}`;
+}
+
 function ptToneFromPct(pct: number): "success" | "warning" | "danger" {
   if (pct >= 100) return "success";
   if (pct >= 70) return "warning";
@@ -79,6 +90,7 @@ export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
       : null;
 
   const yoyV = data ? yoyDelta(data.venta, data.prevYear.venta) : null;
+  const yoyM = data ? yoyDelta(data.margen, data.prevYear.margen) : null;
   const yoyK = data ? yoyDelta(data.kg, data.prevYear.kg) : null;
   const prevLabel = data?.prevMonthShortYY ?? "año anterior";
 
@@ -105,10 +117,22 @@ export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
         <KpiCard
           label={`Margen ${data?.monthShortYY ?? ""}`.trim()}
           value={data ? formatMoney(data.margen) : "—"}
-          sublabel={{
-            text: data ? `${data.marginPct.toFixed(1)}% de venta` : "Mes actual",
-            tone: "neutral",
-          }}
+          // Opción A (aprobada): subInline al lado del valor con el margen %
+          // de venta en gris. Sublabel pasa a ser el YoY (igual que KG card).
+          // Si no hay data del año anterior, mantenemos el formato clásico
+          // "X% de venta" en el sublabel para no perder la información.
+          valueInline={data ? `${data.marginPct.toFixed(1)}%` : undefined}
+          sublabel={
+            yoyM && data
+              ? {
+                  text: `${yoyM.pct >= 0 ? "+" : ""}${yoyM.pct.toFixed(1)}% (${formatMoneyDeltaShort(data.margen - data.prevYear.margen)}) vs ${prevLabel}`,
+                  tone: yoyM.tone,
+                }
+              : {
+                  text: data ? `${data.marginPct.toFixed(1)}% de venta` : "Mes actual",
+                  tone: "neutral",
+                }
+          }
           icon={<TrendingUp size={18} />}
           accent="success"
           loading={loading}
@@ -191,6 +215,7 @@ function AcumCard({
 function KpiCard({
   label,
   value,
+  valueInline,
   sublabel,
   icon,
   accent,
@@ -200,6 +225,8 @@ function KpiCard({
 }: {
   label: string;
   value: string;
+  /** Texto secundario en gris al lado del valor principal (opción B / subInline) */
+  valueInline?: string;
   sublabel: { text: string; tone: "neutral" | "success" | "danger" };
   icon: React.ReactNode;
   accent: "accent" | "success" | "warning";
@@ -244,13 +271,23 @@ function KpiCard({
         </span>
         <span style={{ color: accentVar }}>{icon}</span>
       </div>
-      <div
-        className="mt-3 text-2xl font-semibold tabular-nums"
-        style={{
-          color: loading ? "var(--text-muted)" : "var(--text-primary)",
-        }}
-      >
-        {loading ? "Cargando…" : value}
+      <div className="mt-3 flex items-baseline gap-2 tabular-nums">
+        <span
+          className="text-2xl font-semibold"
+          style={{
+            color: loading ? "var(--text-muted)" : "var(--text-primary)",
+          }}
+        >
+          {loading ? "Cargando…" : value}
+        </span>
+        {!loading && valueInline && (
+          <span
+            className="text-base"
+            style={{ color: "var(--text-muted)", opacity: 0.85 }}
+          >
+            {valueInline}
+          </span>
+        )}
       </div>
       <div
         className="mt-1 flex items-center gap-1 text-xs font-medium"
