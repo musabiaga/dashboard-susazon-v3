@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   ComposedChart,
   Bar,
@@ -12,10 +12,26 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 import { countBizDays, isBusinessDay } from "@/lib/business-days";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
+
+interface ClienteDelDia {
+  no_cliente: string;
+  cliente: string;
+  vendedor: string;
+  venta: number;
+  margen: number;
+  kg: number;
+  marginPct: number;
+}
+
+interface ClientesDiaResponse {
+  items: ClienteDelDia[];
+  total: { venta: number; margen: number; kg: number; marginPct: number };
+}
 
 type ViewMode = "pesos" | "kg";
 const VIEW_MODE_KEY = "tracking-diario-mode";
@@ -35,6 +51,9 @@ interface Props {
   prevMonthShortYY: string;
   elapsedBizDays: number;
   totalBizDays: number;
+  /** Territorio activo del dashboard. "" = todos los territorios visibles
+   *  (el RLS de Supabase filtra automáticamente por permisos del usuario). */
+  territorio?: string;
 }
 
 export function TrackingDiarioTab({
@@ -46,7 +65,94 @@ export function TrackingDiarioTab({
   prevMonthShortYY,
   elapsedBizDays,
   totalBizDays,
+  territorio = "",
 }: Props) {
+  // ============ Estado de expansión de filas (Mejora 1) ============
+  // Al hacer click en la flecha de un día, se hace fetch lazy a
+  // /api/dashboard/clientes-dia y se cachea el resultado en `dayCache`.
+  // Re-expandir un día ya consultado es instantáneo (no re-fetch).
+  // Cambiar de territorio invalida el cache (porque la query depende del territorio).
+  const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
+  const [dayCache, setDayCache] = useState<Map<number, ClientesDiaResponse>>(
+    () => new Map()
+  );
+  const [loadingDays, setLoadingDays] = useState<Set<number>>(new Set());
+  const [errorDays, setErrorDays] = useState<Map<number, string>>(
+    () => new Map()
+  );
+
+  // Invalidar cache cuando cambia el territorio (porque las queries dependen
+  // del filtro de territorio).
+  useEffect(() => {
+    setExpandedDays(new Set());
+    setDayCache(new Map());
+    setLoadingDays(new Set());
+    setErrorDays(new Map());
+  }, [territorio, currentYear, currentMonth]);
+
+  async function toggleDayExpand(day: number) {
+    // Si ya está expandido → cerrar
+    if (expandedDays.has(day)) {
+      setExpandedDays((prev) => {
+        const next = new Set(prev);
+        next.delete(day);
+        return next;
+      });
+      return;
+    }
+    // Expandir + (si no cacheado) fetch
+    setExpandedDays((prev) => {
+      const next = new Set(prev);
+      next.add(day);
+      return next;
+    });
+    if (dayCache.has(day)) return; // ya cacheado
+    if (loadingDays.has(day)) return; // ya en flight
+
+    setLoadingDays((prev) => {
+      const next = new Set(prev);
+      next.add(day);
+      return next;
+    });
+    setErrorDays((prev) => {
+      const next = new Map(prev);
+      next.delete(day);
+      return next;
+    });
+    try {
+      const params = new URLSearchParams({
+        year: String(currentYear),
+        month: String(currentMonth),
+        day: String(day),
+      });
+      if (territorio) params.set("territorio", territorio);
+      const resp = await fetch(`/api/dashboard/clientes-dia?${params}`);
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body.error ?? `HTTP ${resp.status}`);
+      }
+      const data = (await resp.json()) as ClientesDiaResponse;
+      setDayCache((prev) => {
+        const next = new Map(prev);
+        next.set(day, data);
+        return next;
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      setErrorDays((prev) => {
+        const next = new Map(prev);
+        next.set(day, msg);
+        return next;
+      });
+    } finally {
+      setLoadingDays((prev) => {
+        const next = new Set(prev);
+        next.delete(day);
+        return next;
+      });
+    }
+  }
+
   // ============ Toggle de vista: Pesos vs Kilos ============
   // Persiste en localStorage. Default = "pesos".
   const [mode, setMode] = useState<ViewMode>("pesos");
@@ -883,6 +989,7 @@ export function TrackingDiarioTab({
             <table className="w-full text-xs tabular-nums">
               <thead>
                 <tr style={{ background: "var(--bg-surface-muted)" }}>
+                  <Th>{" "}</Th>
                   <Th>Día</Th>
                   <Th>Fecha</Th>
                   {!isKg ? (
@@ -908,79 +1015,138 @@ export function TrackingDiarioTab({
                 </tr>
               </thead>
               <tbody>
-                {tableRows.map((row, i) => (
-                  <tr
-                    key={row.d}
-                    style={{
-                      background:
-                        i % 2 === 0
-                          ? "var(--bg-surface)"
-                          : "var(--bg-surface-muted)",
-                    }}
-                  >
-                    <Td>{row.dow}</Td>
-                    <Td>
-                      {row.d} {MONTH_SHORT_LOWER[row.date.getMonth()]}
-                    </Td>
-                    {!isKg ? (
-                      <>
-                        <Td align="right">{formatMoney(row.venta)}</Td>
-                        <Td align="right">{formatMoney(row.acum)}</Td>
-                        <Td align="right">{row.pctPtto.toFixed(1)}%</Td>
-                        <Td
-                          align="right"
-                          color={`var(--${row.velNecesTone})`}
-                          bold
+                {tableRows.map((row, i) => {
+                  const isExpanded = expandedDays.has(row.d);
+                  const isLoading = loadingDays.has(row.d);
+                  const dayDetails = dayCache.get(row.d);
+                  const errMsg = errorDays.get(row.d);
+                  // Total de columnas para el colSpan de la sub-fila
+                  const totalCols = !isKg ? 10 : 9; // expand + dia + fecha + N cols
+                  return (
+                    <Fragment key={row.d}>
+                      <tr
+                        style={{
+                          background:
+                            i % 2 === 0
+                              ? "var(--bg-surface)"
+                              : "var(--bg-surface-muted)",
+                        }}
+                      >
+                        <Td>
+                          <button
+                            type="button"
+                            onClick={() => toggleDayExpand(row.d)}
+                            aria-label={
+                              isExpanded
+                                ? `Colapsar día ${row.d}`
+                                : `Ver clientes del día ${row.d}`
+                            }
+                            className="flex h-5 w-5 items-center justify-center rounded transition-colors hover:bg-[var(--bg-surface-muted)]"
+                            style={{ color: "var(--text-secondary)" }}
+                          >
+                            <ChevronRight
+                              size={14}
+                              style={{
+                                transform: isExpanded
+                                  ? "rotate(90deg)"
+                                  : "none",
+                                transition: "transform 0.15s ease",
+                              }}
+                            />
+                          </button>
+                        </Td>
+                        <Td>{row.dow}</Td>
+                        <Td>
+                          {row.d} {MONTH_SHORT_LOWER[row.date.getMonth()]}
+                        </Td>
+                        {!isKg ? (
+                          <>
+                            <Td align="right">{formatMoney(row.venta)}</Td>
+                            <Td align="right">{formatMoney(row.acum)}</Td>
+                            <Td align="right">{row.pctPtto.toFixed(1)}%</Td>
+                            <Td
+                              align="right"
+                              color={`var(--${row.velNecesTone})`}
+                              bold
+                            >
+                              {hasPtto ? formatMoney(row.velNeces) : "—"}
+                            </Td>
+                            <Td align="right">{formatMoney(row.margen)}</Td>
+                            <Td align="right">{row.marginPct.toFixed(1)}%</Td>
+                            <Td align="right">{formatKilos(row.kg)}</Td>
+                          </>
+                        ) : (
+                          <>
+                            <Td align="right">{formatKilos(row.kg)}</Td>
+                            <Td align="right">{formatKilos(row.acumKg)}</Td>
+                            <Td align="right">
+                              {hasPrev ? formatKilos(row.acumKgPrev) : "—"}
+                            </Td>
+                            <Td
+                              align="right"
+                              color={
+                                hasPrev
+                                  ? row.diffKg >= 0
+                                    ? "var(--success)"
+                                    : "var(--danger)"
+                                  : undefined
+                              }
+                              bold
+                            >
+                              {hasPrev
+                                ? `${row.diffKg >= 0 ? "+" : ""}${formatKilos(row.diffKg)}`
+                                : "—"}
+                            </Td>
+                            <Td
+                              align="right"
+                              color={
+                                hasPrev
+                                  ? row.pctVs2025 >= 0
+                                    ? "var(--success)"
+                                    : "var(--danger)"
+                                  : undefined
+                              }
+                            >
+                              {hasPrev
+                                ? `${row.pctVs2025 >= 0 ? "+" : ""}${row.pctVs2025.toFixed(1)}%`
+                                : "—"}
+                            </Td>
+                            <Td align="right">
+                              {hasPrev ? formatKilos(row.kgPrevDaily) : "—"}
+                            </Td>
+                          </>
+                        )}
+                      </tr>
+                      {/* Sub-fila expandida con clientes del día */}
+                      {isExpanded && (
+                        <tr
+                          style={{
+                            background:
+                              i % 2 === 0
+                                ? "var(--bg-surface)"
+                                : "var(--bg-surface-muted)",
+                          }}
                         >
-                          {hasPtto ? formatMoney(row.velNeces) : "—"}
-                        </Td>
-                        <Td align="right">{formatMoney(row.margen)}</Td>
-                        <Td align="right">{row.marginPct.toFixed(1)}%</Td>
-                        <Td align="right">{formatKilos(row.kg)}</Td>
-                      </>
-                    ) : (
-                      <>
-                        <Td align="right">{formatKilos(row.kg)}</Td>
-                        <Td align="right">{formatKilos(row.acumKg)}</Td>
-                        <Td align="right">
-                          {hasPrev ? formatKilos(row.acumKgPrev) : "—"}
-                        </Td>
-                        <Td
-                          align="right"
-                          color={
-                            hasPrev
-                              ? row.diffKg >= 0
-                                ? "var(--success)"
-                                : "var(--danger)"
-                              : undefined
-                          }
-                          bold
-                        >
-                          {hasPrev
-                            ? `${row.diffKg >= 0 ? "+" : ""}${formatKilos(row.diffKg)}`
-                            : "—"}
-                        </Td>
-                        <Td
-                          align="right"
-                          color={
-                            hasPrev
-                              ? row.pctVs2025 >= 0
-                                ? "var(--success)"
-                                : "var(--danger)"
-                              : undefined
-                          }
-                        >
-                          {hasPrev
-                            ? `${row.pctVs2025 >= 0 ? "+" : ""}${row.pctVs2025.toFixed(1)}%`
-                            : "—"}
-                        </Td>
-                        <Td align="right">
-                          {hasPrev ? formatKilos(row.kgPrevDaily) : "—"}
-                        </Td>
-                      </>
-                    )}
-                  </tr>
-                ))}
+                          <td
+                            colSpan={totalCols}
+                            style={{
+                              padding: "8px 12px 16px 36px",
+                              borderLeft: "3px solid var(--accent)",
+                            }}
+                          >
+                            <ClientesDelDiaPanel
+                              loading={isLoading}
+                              error={errMsg}
+                              data={dayDetails}
+                              isKg={isKg}
+                              dayLabel={`${row.d} ${MONTH_SHORT_LOWER[row.date.getMonth()]}`}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
                 {/* Row TOTAL */}
                 {tableTotals && (
                   <tr
@@ -989,6 +1155,7 @@ export function TrackingDiarioTab({
                       borderTop: "2px solid var(--border-strong)",
                     }}
                   >
+                    <Td>{" "}</Td>
                     <Td bold>—</Td>
                     <Td bold>TOTAL</Td>
                     {!isKg ? (
@@ -1386,5 +1553,225 @@ function TtRow({
         {value}
       </span>
     </div>
+  );
+}
+
+// ============================================================
+// ClientesDelDiaPanel — sub-tabla expandida bajo cada día
+// ============================================================
+// Muestra los clientes que facturaron en un día específico.
+// Estados: loading (spinner) | error (mensaje rojo) | data (tabla scroll).
+// La tabla incluye Cliente, Vendedor, Venta $, % del día, KG, Margen $,
+// Margen %. Sort por venta descendente. Total al final.
+// El layout cambia ligeramente con isKg (vista Kilos): destaca KG.
+function ClientesDelDiaPanel({
+  loading,
+  error,
+  data,
+  isKg,
+  dayLabel,
+}: {
+  loading: boolean;
+  error?: string;
+  data?: ClientesDiaResponse;
+  isKg: boolean;
+  dayLabel: string;
+}) {
+  if (loading) {
+    return (
+      <div
+        className="flex items-center gap-2 py-3 text-xs"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        <Loader2 size={14} className="animate-spin" />
+        <span>Cargando clientes del {dayLabel}…</span>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div
+        className="rounded border px-3 py-2 text-xs"
+        style={{
+          background: "rgba(239, 68, 68, 0.08)",
+          borderColor: "var(--danger)",
+          color: "var(--danger)",
+        }}
+      >
+        Error cargando clientes del {dayLabel}: {error}
+      </div>
+    );
+  }
+  if (!data || data.items.length === 0) {
+    return (
+      <div
+        className="py-3 text-xs italic"
+        style={{ color: "var(--text-muted)" }}
+      >
+        Sin clientes con facturación el {dayLabel}.
+      </div>
+    );
+  }
+
+  const totalVenta = data.total.venta;
+  const totalKg = data.total.kg;
+
+  return (
+    <div className="space-y-2">
+      <div
+        className="text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        Clientes del {dayLabel} · {data.items.length}{" "}
+        {data.items.length === 1 ? "cliente" : "clientes"}
+      </div>
+      <div
+        className="overflow-y-auto rounded border"
+        style={{
+          maxHeight: 300,
+          borderColor: "var(--border)",
+          background: "var(--bg-surface)",
+        }}
+      >
+        <table className="w-full text-[11px] tabular-nums">
+          <thead
+            className="sticky top-0 z-10"
+            style={{ background: "var(--bg-surface-muted)" }}
+          >
+            <tr>
+              <SubTh>Cliente</SubTh>
+              <SubTh>Vendedor</SubTh>
+              <SubTh align="right">Venta $</SubTh>
+              <SubTh align="right">{isKg ? "% KG día" : "% Venta día"}</SubTh>
+              <SubTh align="right">KG</SubTh>
+              <SubTh align="right">Margen $</SubTh>
+              <SubTh align="right">Margen %</SubTh>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((c, i) => {
+              const pctDia = isKg
+                ? totalKg > 0
+                  ? (c.kg / totalKg) * 100
+                  : 0
+                : totalVenta > 0
+                  ? (c.venta / totalVenta) * 100
+                  : 0;
+              return (
+                <tr
+                  key={c.no_cliente}
+                  style={{
+                    background:
+                      i % 2 === 0
+                        ? "var(--bg-surface)"
+                        : "var(--bg-surface-muted)",
+                  }}
+                >
+                  <SubTd>
+                    <div
+                      className="truncate"
+                      style={{
+                        maxWidth: 280,
+                        color: "var(--text-primary)",
+                      }}
+                      title={c.cliente}
+                    >
+                      {c.cliente}
+                    </div>
+                    <div
+                      className="text-[10px]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {c.no_cliente}
+                    </div>
+                  </SubTd>
+                  <SubTd>
+                    <div
+                      className="truncate"
+                      style={{ maxWidth: 180 }}
+                      title={c.vendedor}
+                    >
+                      {c.vendedor}
+                    </div>
+                  </SubTd>
+                  <SubTd align="right">{formatMoney(c.venta)}</SubTd>
+                  <SubTd align="right">{pctDia.toFixed(1)}%</SubTd>
+                  <SubTd align="right">{formatKilos(c.kg)}</SubTd>
+                  <SubTd align="right">{formatMoney(c.margen)}</SubTd>
+                  <SubTd align="right">{c.marginPct.toFixed(1)}%</SubTd>
+                </tr>
+              );
+            })}
+            {/* Row TOTAL */}
+            <tr
+              style={{
+                background: "var(--bg-surface-muted)",
+                borderTop: "2px solid var(--border-strong)",
+              }}
+            >
+              <SubTd bold>TOTAL</SubTd>
+              <SubTd>—</SubTd>
+              <SubTd align="right" bold>
+                {formatMoney(data.total.venta)}
+              </SubTd>
+              <SubTd align="right" bold>
+                100.0%
+              </SubTd>
+              <SubTd align="right" bold>
+                {formatKilos(data.total.kg)}
+              </SubTd>
+              <SubTd align="right" bold>
+                {formatMoney(data.total.margen)}
+              </SubTd>
+              <SubTd align="right" bold>
+                {data.total.marginPct.toFixed(1)}%
+              </SubTd>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SubTh({
+  children,
+  align = "left",
+}: {
+  children: React.ReactNode;
+  align?: "left" | "right" | "center";
+}) {
+  return (
+    <th
+      className={`px-2 py-1.5 font-semibold uppercase tracking-wider text-[9px] text-${align}`}
+      style={{
+        borderBottom: "1px solid var(--border)",
+        color: "var(--text-secondary)",
+      }}
+    >
+      {children}
+    </th>
+  );
+}
+
+function SubTd({
+  children,
+  align = "left",
+  bold = false,
+}: {
+  children: React.ReactNode;
+  align?: "left" | "right" | "center";
+  bold?: boolean;
+}) {
+  return (
+    <td
+      className={`px-2 py-1 text-${align}`}
+      style={{
+        color: "var(--text-primary)",
+        fontWeight: bold ? 600 : 400,
+      }}
+    >
+      {children}
+    </td>
   );
 }

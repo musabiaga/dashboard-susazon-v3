@@ -317,6 +317,7 @@ export function DashboardClient({
                     prevMonthShortYY={prevMonthShortYY}
                     elapsedBizDays={elapsedBizDays}
                     totalBizDays={totalBizDays}
+                    territorio={effectiveSelected}
                   />
                 );
               }
