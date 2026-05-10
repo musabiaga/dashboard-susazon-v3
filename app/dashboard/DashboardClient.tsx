@@ -327,6 +327,8 @@ export function DashboardClient({
                     kpi={activeKpi}
                     cutoffYear={currentYear}
                     cutoffMonth={currentMonth}
+                    exportTerritory={effectiveSelected}
+                    exportPeriodLabel={monthShortYY}
                   />
                 );
               }
@@ -345,6 +347,9 @@ export function DashboardClient({
                     dimensionLabelPlural="Grupos"
                     topNChart={10}
                     showKg
+                    exportTabName="GrupoProducto"
+                    exportPeriodLabel={monthShortYY}
+                    exportTerritory={effectiveSelected}
                   />
                 );
               }
@@ -359,6 +364,8 @@ export function DashboardClient({
                     monthLabel24={prev2MonthShortYY}
                     monthLabel25={prevMonthShortYY}
                     monthLabel26={monthShortYY}
+                    exportTerritory={effectiveSelected}
+                    exportPeriodLabel={monthShortYY}
                   />
                 );
               }
@@ -382,6 +389,9 @@ export function DashboardClient({
                     selectionStorageKey="clientes-selected"
                     multiSelectMaxItems={15}
                     multiSelectPlaceholder="Buscar cliente…"
+                    exportTabName="Clientes"
+                    exportPeriodLabel={monthShortYY}
+                    exportTerritory={effectiveSelected}
                   />
                 );
               }
@@ -432,6 +442,8 @@ export function DashboardClient({
                     monthLabel24={prev2MonthShortYY}
                     monthLabel25={prevMonthShortYY}
                     monthLabel26={monthShortYY}
+                    exportPeriodLabel={monthShortYY}
+                    exportTerritory={effectiveSelected}
                   />
                 );
               }

@@ -16,6 +16,11 @@ import { formatMoney, formatKilos } from "@/lib/format";
 import type { DimensionRow } from "@/components/dashboard/DimensionTab";
 import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
+import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import type {
+  ExcelColumn,
+  ExcelSummaryRow,
+} from "@/lib/export-excel";
 
 const PRODUCTOS_SELECTED_KEY = "productos-selected-skus";
 const MAX_CUSTOM_SELECTION = 15;
@@ -29,6 +34,10 @@ interface Props {
   topNChartDefault?: 10 | 15;
   /** Cuántos SKUs en tabla. Default 50. */
   topNTable?: number;
+  /** Territorio activo para resumen + filename del Excel. "" = "Todos". */
+  exportTerritory?: string;
+  /** Etiqueta de periodo para el resumen (ej. "Mayo 2026"). */
+  exportPeriodLabel?: string;
 }
 
 /**
@@ -46,6 +55,8 @@ export function ProductosTab({
   monthLabel26,
   topNChartDefault = 15,
   topNTable = 50,
+  exportTerritory = "",
+  exportPeriodLabel,
 }: Props) {
   const [topNChart, setTopNChart] = useState<10 | 15>(topNChartDefault);
 
@@ -119,8 +130,190 @@ export function ProductosTab({
     return sorted.slice(0, topNTable);
   }, [isCustomMode, top, sorted, topNTable]);
 
+  // ============ Export Excel ============
+  // WYSIWYG: respeta multi-select de SKUs. Lazy import.
+  const handleExportExcel = async () => {
+    const { exportToExcel, sanitizeFileName, todayISO } = await import(
+      "@/lib/export-excel"
+    );
+
+    const territorioLabel =
+      exportTerritory && exportTerritory !== "" ? exportTerritory : "Todos";
+
+    const totals = tableRows.reduce(
+      (acc, r) => ({
+        v24: acc.v24 + r.v24,
+        v25: acc.v25 + r.v25,
+        v26: acc.v26 + r.v26,
+        k24: acc.k24 + (r.k24 ?? 0),
+        k25: acc.k25 + (r.k25 ?? 0),
+        k26: acc.k26 + (r.k26 ?? 0),
+        m24: acc.m24 + (r.m24 ?? 0),
+        m25: acc.m25 + (r.m25 ?? 0),
+        m26: acc.m26 + (r.m26 ?? 0),
+        v24_alDia: acc.v24_alDia + (r.v24_alDia ?? r.v24),
+        v25_alDia: acc.v25_alDia + (r.v25_alDia ?? r.v25),
+        v26_alDia: acc.v26_alDia + (r.v26_alDia ?? r.v26),
+        k24_alDia: acc.k24_alDia + (r.k24_alDia ?? r.k24 ?? 0),
+        k25_alDia: acc.k25_alDia + (r.k25_alDia ?? r.k25 ?? 0),
+        k26_alDia: acc.k26_alDia + (r.k26_alDia ?? r.k26 ?? 0),
+      }),
+      {
+        v24: 0, v25: 0, v26: 0,
+        k24: 0, k25: 0, k26: 0,
+        m24: 0, m25: 0, m26: 0,
+        v24_alDia: 0, v25_alDia: 0, v26_alDia: 0,
+        k24_alDia: 0, k25_alDia: 0, k26_alDia: 0,
+      }
+    );
+
+    const summary: ExcelSummaryRow[] = [
+      ...(exportPeriodLabel
+        ? [{ label: "Periodo", value: exportPeriodLabel }]
+        : []),
+      { label: "Territorio", value: territorioLabel },
+      { label: "Dimensión", value: "SKUs (Productos)" },
+      {
+        label: "Modo",
+        value: isCustomMode
+          ? `Selección custom (${tableRows.length} SKUs)`
+          : `Default (Top ${topNTable})`,
+      },
+      { label: "# SKUs exportados", value: tableRows.length, numFmt: "#,##0" },
+      {
+        label: `Venta total ${monthLabel26}`,
+        value: totals.v26,
+        numFmt: "$#,##0",
+      },
+      {
+        label: `KG total ${monthLabel26}`,
+        value: totals.k26,
+        numFmt: "#,##0",
+      },
+      {
+        label: `Margen total ${monthLabel26}`,
+        value: totals.m26,
+        numFmt: "$#,##0",
+      },
+    ];
+
+    const columns: ExcelColumn[] = [
+      { header: "SKU", key: "name", width: 42 },
+      // Pesos cierre
+      { header: `Venta ${monthLabel24} cierre`, key: "v24", width: 16, numFmt: "$#,##0" },
+      { header: `Venta ${monthLabel25} cierre`, key: "v25", width: 16, numFmt: "$#,##0" },
+      { header: `Venta ${monthLabel26} cierre`, key: "v26", width: 16, numFmt: "$#,##0" },
+      // Pesos al-día
+      { header: `Venta ${monthLabel24} al-día`, key: "v24_alDia", width: 16, numFmt: "$#,##0" },
+      { header: `Venta ${monthLabel25} al-día`, key: "v25_alDia", width: 16, numFmt: "$#,##0" },
+      { header: `Venta ${monthLabel26} al-día`, key: "v26_alDia", width: 16, numFmt: "$#,##0" },
+      { header: "Var Venta % (cierre 26 vs 25)", key: "varVentaPct", width: 18, numFmt: "0.0%" },
+      // KG cierre
+      { header: `KG ${monthLabel24} cierre`, key: "k24", width: 14, numFmt: "#,##0" },
+      { header: `KG ${monthLabel25} cierre`, key: "k25", width: 14, numFmt: "#,##0" },
+      { header: `KG ${monthLabel26} cierre`, key: "k26", width: 14, numFmt: "#,##0" },
+      { header: `KG ${monthLabel24} al-día`, key: "k24_alDia", width: 14, numFmt: "#,##0" },
+      { header: `KG ${monthLabel25} al-día`, key: "k25_alDia", width: 14, numFmt: "#,##0" },
+      { header: `KG ${monthLabel26} al-día`, key: "k26_alDia", width: 14, numFmt: "#,##0" },
+      { header: "Var KG %", key: "varKgPct", width: 14, numFmt: "0.0%" },
+      // Margen
+      { header: `Margen ${monthLabel24}`, key: "m24", width: 16, numFmt: "$#,##0" },
+      { header: `Margen ${monthLabel25}`, key: "m25", width: 16, numFmt: "$#,##0" },
+      { header: `Margen ${monthLabel26}`, key: "m26", width: 16, numFmt: "$#,##0" },
+      { header: `Margen % ${monthLabel24}`, key: "mp24", width: 14, numFmt: "0.0%" },
+      { header: `Margen % ${monthLabel25}`, key: "mp25", width: 14, numFmt: "0.0%" },
+      { header: `Margen % ${monthLabel26}`, key: "mp26", width: 14, numFmt: "0.0%" },
+    ];
+
+    const xlsxRows = tableRows.map((r) => {
+      const k24 = r.k24 ?? 0;
+      const k25 = r.k25 ?? 0;
+      const k26 = r.k26 ?? 0;
+      const m24 = r.m24 ?? 0;
+      const m25 = r.m25 ?? 0;
+      const m26 = r.m26 ?? 0;
+      return {
+        name: r.name,
+        v24: r.v24,
+        v25: r.v25,
+        v26: r.v26,
+        v24_alDia: r.v24_alDia ?? r.v24,
+        v25_alDia: r.v25_alDia ?? r.v25,
+        v26_alDia: r.v26_alDia ?? r.v26,
+        varVentaPct: r.v25 > 0 ? (r.v26 - r.v25) / r.v25 : 0,
+        k24,
+        k25,
+        k26,
+        k24_alDia: r.k24_alDia ?? k24,
+        k25_alDia: r.k25_alDia ?? k25,
+        k26_alDia: r.k26_alDia ?? k26,
+        varKgPct: k25 > 0 ? (k26 - k25) / k25 : 0,
+        m24,
+        m25,
+        m26,
+        mp24: r.v24 > 0 ? m24 / r.v24 : 0,
+        mp25: r.v25 > 0 ? m25 / r.v25 : 0,
+        mp26: r.v26 > 0 ? m26 / r.v26 : 0,
+      };
+    });
+
+    const totalRow: Record<string, unknown> = {
+      name: `TOTAL (${tableRows.length} SKUs)`,
+      v24: totals.v24,
+      v25: totals.v25,
+      v26: totals.v26,
+      v24_alDia: totals.v24_alDia,
+      v25_alDia: totals.v25_alDia,
+      v26_alDia: totals.v26_alDia,
+      varVentaPct: totals.v25 > 0 ? (totals.v26 - totals.v25) / totals.v25 : 0,
+      k24: totals.k24,
+      k25: totals.k25,
+      k26: totals.k26,
+      k24_alDia: totals.k24_alDia,
+      k25_alDia: totals.k25_alDia,
+      k26_alDia: totals.k26_alDia,
+      varKgPct: totals.k25 > 0 ? (totals.k26 - totals.k25) / totals.k25 : 0,
+      m24: totals.m24,
+      m25: totals.m25,
+      m26: totals.m26,
+      mp24: totals.v24 > 0 ? totals.m24 / totals.v24 : 0,
+      mp25: totals.v25 > 0 ? totals.m25 / totals.v25 : 0,
+      mp26: totals.v26 > 0 ? totals.m26 / totals.v26 : 0,
+    };
+
+    const territoriosForFile =
+      territorioLabel.length > 30 ? "varios" : territorioLabel;
+    const fileName = `Productos_${sanitizeFileName(territoriosForFile)}_${todayISO()}`;
+
+    await exportToExcel({
+      fileName,
+      sheetName: "Productos",
+      title: `Tab Productos · ${monthLabel26}`,
+      subtitle: `${territorioLabel}${
+        exportPeriodLabel ? ` · ${exportPeriodLabel}` : ""
+      } · ${tableRows.length} SKUs`,
+      summary,
+      columns,
+      rows: xlsxRows,
+      totalRow,
+    });
+  };
+
   return (
     <div className="space-y-4">
+      {/* Toolbar superior: solo botón export */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <ExportExcelButton
+          onExport={handleExportExcel}
+          disabled={tableRows.length === 0}
+          title={
+            tableRows.length === 0
+              ? "Sin filas para exportar"
+              : `Exportar ${tableRows.length} SKU${tableRows.length === 1 ? "" : "s"} a Excel`
+          }
+        />
+      </div>
+
       {/* ============ Chart top N — venta + kilos ============ */}
       <div
         className="rounded-[var(--radius-lg)] border p-4"

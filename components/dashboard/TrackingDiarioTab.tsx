@@ -17,6 +17,11 @@ import { formatMoney, formatKilos } from "@/lib/format";
 import { countBizDays, isBusinessDay } from "@/lib/business-days";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
+import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import type {
+  ExcelColumn,
+  ExcelSummaryRow,
+} from "@/lib/export-excel";
 
 interface ClienteDelDia {
   no_cliente: string;
@@ -398,11 +403,142 @@ export function TrackingDiarioTab({
   const kgSignDelta = yoyKgDelta >= 0 ? "+" : "";
   const kgArrow = yoyKgPct >= 0 ? "▲" : "▼";
 
+  // ============ Export Excel ============
+  const handleExportExcel = async () => {
+    const { exportToExcel, sanitizeFileName, todayISO } = await import(
+      "@/lib/export-excel"
+    );
+    const territorioLabel =
+      territorio && territorio !== "" ? territorio : "Todos";
+
+    const summary: ExcelSummaryRow[] = [
+      { label: "Periodo", value: monthShortYY },
+      { label: "Territorio", value: territorioLabel },
+      {
+        label: "Día hábil del mes",
+        value: `${elapsedBizDays} de ${totalBizDays}`,
+      },
+      { label: "Días con factura", value: daysWithInvoice, numFmt: "#,##0" },
+      // Pesos
+      { label: "Venta acumulada del mes", value: acum, numFmt: "$#,##0" },
+      ...(hasPtto
+        ? [
+            { label: "PTTO mes", value: ptto, numFmt: "$#,##0" as const },
+            { label: "Alcance %", value: alcancePct / 100, numFmt: "0.0%" as const },
+            { label: "Faltante PTTO", value: faltante, numFmt: "$#,##0" as const },
+            { label: "Velocidad original (meta/día)", value: velOrig, numFmt: "$#,##0" as const },
+            { label: "Velocidad actual (acum/día)", value: velActual, numFmt: "$#,##0" as const },
+            { label: "Velocidad necesaria (faltante/día restante)", value: velNeces, numFmt: "$#,##0" as const },
+            { label: "Run rate proyectado", value: runRate, numFmt: "$#,##0" as const },
+          ]
+        : []),
+      { label: "Margen $ del mes", value: marginMoney, numFmt: "$#,##0" },
+      { label: "Margen % del mes", value: marginPct / 100, numFmt: "0.0%" },
+      ...(hasPrev
+        ? [
+            { label: `Venta ${prevMonthShortYY} (cierre)`, value: prevYearVenta, numFmt: "$#,##0" as const },
+            { label: "Var % YoY (vs mismo mes 2025 cierre)", value: yoyCh / 100, numFmt: "0.0%" as const },
+          ]
+        : []),
+      // KG
+      { label: "KG acumulados del mes", value: acumKg, numFmt: "#,##0" },
+      ...(hasPrev
+        ? [
+            { label: "KG mismo mes año anterior", value: prevYearKg, numFmt: "#,##0" as const },
+            { label: "Diferencia KG vs 2025", value: yoyKgDelta, numFmt: "#,##0" as const },
+            { label: "Var % KG vs 2025", value: yoyKgPct / 100, numFmt: "0.0%" as const },
+          ]
+        : []),
+    ];
+
+    const columns: ExcelColumn[] = [
+      { header: "Día", key: "d", width: 6, numFmt: "0", align: "center" },
+      { header: "Día semana", key: "dow", width: 8, align: "center" },
+      { header: "Fecha ISO", key: "fechaIso", width: 12, align: "center" },
+      // Pesos
+      { header: "Venta del día", key: "venta", width: 16, numFmt: "$#,##0" },
+      { header: "Venta acumulada", key: "acum", width: 16, numFmt: "$#,##0" },
+      { header: "% PTTO acumulado", key: "pctPtto", width: 14, numFmt: "0.0%" },
+      { header: "Vel. necesaria del día", key: "velNeces", width: 16, numFmt: "$#,##0" },
+      { header: "Margen $ del día", key: "margen", width: 14, numFmt: "$#,##0" },
+      { header: "Margen % del día", key: "marginPct", width: 12, numFmt: "0.0%" },
+      // Kilos
+      { header: "KG del día", key: "kg", width: 12, numFmt: "#,##0" },
+      { header: "KG acumulado 2026", key: "acumKg", width: 16, numFmt: "#,##0" },
+      { header: "KG acumulado 2025 (mismo día)", key: "acumKgPrev", width: 18, numFmt: "#,##0" },
+      { header: "Diferencia KG (26 - 25)", key: "diffKg", width: 14, numFmt: "#,##0" },
+      { header: "Var % KG vs 25", key: "pctVs2025", width: 14, numFmt: "0.0%" },
+      { header: "KG 2025 del día", key: "kgPrevDaily", width: 14, numFmt: "#,##0" },
+    ];
+
+    const xlsxRows = tableRows.map((r) => ({
+      d: r.d,
+      dow: r.dow,
+      fechaIso: `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(r.d).padStart(2, "0")}`,
+      venta: r.venta,
+      acum: r.acum,
+      pctPtto: r.pctPtto / 100,
+      velNeces: r.velNeces,
+      margen: r.margen,
+      marginPct: r.marginPct / 100,
+      kg: r.kg,
+      acumKg: r.acumKg,
+      acumKgPrev: r.acumKgPrev,
+      diffKg: r.diffKg,
+      pctVs2025: r.pctVs2025 / 100,
+      kgPrevDaily: r.kgPrevDaily,
+    }));
+
+    const totalRow: Record<string, unknown> = tableTotals
+      ? {
+          d: "",
+          dow: "",
+          fechaIso: "TOTAL",
+          venta: tableTotals.ventaTot,
+          acum: tableTotals.ventaTot,
+          pctPtto: hasPtto ? tableTotals.ventaTot / ptto : 0,
+          velNeces: "",
+          margen: tableTotals.margenTot,
+          marginPct: tableTotals.marginPctTot / 100,
+          kg: tableTotals.kgTot,
+          acumKg: tableTotals.kgTot,
+          acumKgPrev: tableTotals.kgPrevTot,
+          diffKg: tableTotals.diffKgTot,
+          pctVs2025: tableTotals.pctVs2025Tot / 100,
+          kgPrevDaily: "",
+        }
+      : { d: "", dow: "", fechaIso: "TOTAL" };
+
+    const territoriosForFile =
+      territorioLabel.length > 30 ? "varios" : territorioLabel;
+    const fileName = `TrackingDiario_${sanitizeFileName(territoriosForFile)}_${currentYear}-${String(currentMonth).padStart(2, "0")}_${todayISO()}`;
+
+    await exportToExcel({
+      fileName,
+      sheetName: "TrackingDiario",
+      title: `Tab Tracking Diario · ${monthShortYY}`,
+      subtitle: `${territorioLabel} · Día ${elapsedBizDays} de ${totalBizDays}`,
+      summary,
+      columns,
+      rows: xlsxRows,
+      totalRow,
+    });
+  };
+
   return (
     <div className="space-y-4">
-      {/* ============ Toggle Pesos / Kilos ============ */}
-      <div className="flex items-center justify-end">
+      {/* ============ Toggle Pesos / Kilos + Export ============ */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <ModeToggle mode={mode} onChange={switchMode} />
+        <ExportExcelButton
+          onExport={handleExportExcel}
+          disabled={tableRows.length === 0}
+          title={
+            tableRows.length === 0
+              ? "Sin filas para exportar"
+              : `Exportar ${tableRows.length} día${tableRows.length === 1 ? "" : "s"} de ${monthShortYY} a Excel`
+          }
+        />
       </div>
 
       {/* ============ 8 stats grid ============ */}

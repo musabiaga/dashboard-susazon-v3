@@ -15,6 +15,11 @@ import {
 import { formatMoney } from "@/lib/format";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
+import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import type {
+  ExcelColumn,
+  ExcelSummaryRow,
+} from "@/lib/export-excel";
 
 const MONTHS_SHORT_ES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -32,6 +37,10 @@ interface Props {
   // Uso: en abril 2026, May-Dic 2026 son null (mes futuro).
   cutoffYear: number;
   cutoffMonth: number; // 1-12
+  /** Territorio activo para resumen + filename del Excel ("" = "Todos"). */
+  exportTerritory?: string;
+  /** Etiqueta de periodo para el resumen del Excel. */
+  exportPeriodLabel?: string;
 }
 
 /**
@@ -41,7 +50,13 @@ interface Props {
  *   - 3 series de líneas: Margen% 2024/2025/2026 sobre eje Y derecho (0-50%)
  *   - Meses futuros (después de cutoff) quedan vacíos (no fuerzan a 0).
  */
-export function VentasTab({ kpi, cutoffYear, cutoffMonth }: Props) {
+export function VentasTab({
+  kpi,
+  cutoffYear,
+  cutoffMonth,
+  exportTerritory = "",
+  exportPeriodLabel,
+}: Props) {
   const chartData = useMemo(() => {
     // Index por (anio, mes) → MonthlyPoint
     const byKey = new Map<string, { v: number; m: number }>();
@@ -118,16 +133,207 @@ export function VentasTab({ kpi, cutoffYear, cutoffMonth }: Props) {
     });
   }, [kpi.monthly, kpi.currentMonthAlDia, cutoffYear, cutoffMonth]);
 
+  // ============ Export Excel ============
+  const handleExportExcel = async () => {
+    const { exportToExcel, sanitizeFileName, todayISO } = await import(
+      "@/lib/export-excel"
+    );
+    const territorioLabel =
+      exportTerritory && exportTerritory !== "" ? exportTerritory : "Todos";
+
+    // Re-construir data full (con venta + margen + al-día) — no podemos
+    // reusar chartData porque no carga margen $ desagregado.
+    const byKey = new Map<string, { v: number; m: number }>();
+    for (const p of kpi.monthly) {
+      byKey.set(`${p.anio}-${p.mes}`, { v: p.venta, m: p.margen });
+    }
+    const ald = kpi.currentMonthAlDia;
+
+    const xlsxRows = MONTHS_SHORT_ES.map((label, i) => {
+      const mes = i + 1;
+      const get = (anio: number) => byKey.get(`${anio}-${mes}`);
+      const future = (anio: number) =>
+        anio > cutoffYear || (anio === cutoffYear && mes > cutoffMonth);
+      const isCurrentSlot = mes === cutoffMonth;
+
+      const v24 = get(2024);
+      const v25 = get(2025);
+      const v26 = get(2026);
+
+      const venta24 = future(2024) ? null : v24?.v ?? 0;
+      const venta25 = future(2025) ? null : v25?.v ?? 0;
+      const venta26 = future(2026) ? null : v26?.v ?? 0;
+      const margen24 = future(2024) ? null : v24?.m ?? 0;
+      const margen25 = future(2025) ? null : v25?.m ?? 0;
+      const margen26 = future(2026) ? null : v26?.m ?? 0;
+
+      const v24Ald =
+        isCurrentSlot && ald ? Math.min(venta24 ?? 0, ald.v24) : venta24;
+      const v25Ald =
+        isCurrentSlot && ald ? Math.min(venta25 ?? 0, ald.v25) : venta25;
+      const v26Ald =
+        isCurrentSlot && ald ? Math.min(venta26 ?? 0, ald.v26) : venta26;
+      const m24Ald =
+        isCurrentSlot && ald ? Math.min(margen24 ?? 0, ald.m24) : margen24;
+      const m25Ald =
+        isCurrentSlot && ald ? Math.min(margen25 ?? 0, ald.m25) : margen25;
+      const m26Ald =
+        isCurrentSlot && ald ? Math.min(margen26 ?? 0, ald.m26) : margen26;
+
+      const mp24 =
+        venta24 != null && margen24 != null && venta24 > 0
+          ? margen24 / venta24
+          : null;
+      const mp25 =
+        venta25 != null && margen25 != null && venta25 > 0
+          ? margen25 / venta25
+          : null;
+      const mp26 =
+        venta26 != null && margen26 != null && venta26 > 0
+          ? margen26 / venta26
+          : null;
+
+      return {
+        mes: label,
+        mes_num: mes,
+        venta24,
+        venta25,
+        venta26,
+        venta24_alDia: v24Ald,
+        venta25_alDia: v25Ald,
+        venta26_alDia: v26Ald,
+        margen24,
+        margen25,
+        margen26,
+        margen24_alDia: m24Ald,
+        margen25_alDia: m25Ald,
+        margen26_alDia: m26Ald,
+        mp24,
+        mp25,
+        mp26,
+        var_pct_25: venta24 && venta25 != null && venta24 > 0
+          ? (venta25 - venta24) / venta24
+          : null,
+        var_pct_26: venta25 && venta26 != null && venta25 > 0
+          ? (venta26 - venta25) / venta25
+          : null,
+      };
+    });
+
+    // Totales: sumas por año (ignorando null = mes futuro)
+    const sum = (key: keyof (typeof xlsxRows)[number]) =>
+      xlsxRows.reduce(
+        (s, r) => s + ((r[key] as number | null | undefined) ?? 0),
+        0
+      );
+    const tot_v24 = sum("venta24");
+    const tot_v25 = sum("venta25");
+    const tot_v26 = sum("venta26");
+    const tot_m24 = sum("margen24");
+    const tot_m25 = sum("margen25");
+    const tot_m26 = sum("margen26");
+
+    const summary: ExcelSummaryRow[] = [
+      ...(exportPeriodLabel
+        ? [{ label: "Periodo", value: exportPeriodLabel }]
+        : []),
+      { label: "Territorio", value: territorioLabel },
+      {
+        label: "Cutoff",
+        value: `${MONTHS_LONG_ES[cutoffMonth - 1]} ${cutoffYear}`,
+      },
+      { label: "Venta YTD 2024 (al cierre)", value: tot_v24, numFmt: "$#,##0" },
+      { label: "Venta YTD 2025 (al cierre)", value: tot_v25, numFmt: "$#,##0" },
+      { label: "Venta YTD 2026", value: tot_v26, numFmt: "$#,##0" },
+      { label: "Margen YTD 2024", value: tot_m24, numFmt: "$#,##0" },
+      { label: "Margen YTD 2025", value: tot_m25, numFmt: "$#,##0" },
+      { label: "Margen YTD 2026", value: tot_m26, numFmt: "$#,##0" },
+    ];
+
+    const columns: ExcelColumn[] = [
+      { header: "Mes", key: "mes", width: 8, align: "center" },
+      { header: "Mes (#)", key: "mes_num", width: 10, numFmt: "0", align: "center" },
+      // Venta cierre
+      { header: "Venta 2024 cierre", key: "venta24", width: 16, numFmt: "$#,##0" },
+      { header: "Venta 2025 cierre", key: "venta25", width: 16, numFmt: "$#,##0" },
+      { header: "Venta 2026 cierre", key: "venta26", width: 16, numFmt: "$#,##0" },
+      // Venta al-día
+      { header: "Venta 2024 al-día", key: "venta24_alDia", width: 16, numFmt: "$#,##0" },
+      { header: "Venta 2025 al-día", key: "venta25_alDia", width: 16, numFmt: "$#,##0" },
+      { header: "Venta 2026 al-día", key: "venta26_alDia", width: 16, numFmt: "$#,##0" },
+      // Variaciones
+      { header: "Var % 25 vs 24", key: "var_pct_25", width: 14, numFmt: "0.0%" },
+      { header: "Var % 26 vs 25", key: "var_pct_26", width: 14, numFmt: "0.0%" },
+      // Margen
+      { header: "Margen 2024", key: "margen24", width: 14, numFmt: "$#,##0" },
+      { header: "Margen 2025", key: "margen25", width: 14, numFmt: "$#,##0" },
+      { header: "Margen 2026", key: "margen26", width: 14, numFmt: "$#,##0" },
+      { header: "Margen 2024 al-día", key: "margen24_alDia", width: 16, numFmt: "$#,##0" },
+      { header: "Margen 2025 al-día", key: "margen25_alDia", width: 16, numFmt: "$#,##0" },
+      { header: "Margen 2026 al-día", key: "margen26_alDia", width: 16, numFmt: "$#,##0" },
+      // Margen %
+      { header: "Margen % 2024", key: "mp24", width: 12, numFmt: "0.0%" },
+      { header: "Margen % 2025", key: "mp25", width: 12, numFmt: "0.0%" },
+      { header: "Margen % 2026", key: "mp26", width: 12, numFmt: "0.0%" },
+    ];
+
+    const totalRow: Record<string, unknown> = {
+      mes: "TOTAL",
+      mes_num: "",
+      venta24: tot_v24,
+      venta25: tot_v25,
+      venta26: tot_v26,
+      venta24_alDia: sum("venta24_alDia"),
+      venta25_alDia: sum("venta25_alDia"),
+      venta26_alDia: sum("venta26_alDia"),
+      var_pct_25: tot_v24 > 0 ? (tot_v25 - tot_v24) / tot_v24 : 0,
+      var_pct_26: tot_v25 > 0 ? (tot_v26 - tot_v25) / tot_v25 : 0,
+      margen24: tot_m24,
+      margen25: tot_m25,
+      margen26: tot_m26,
+      margen24_alDia: sum("margen24_alDia"),
+      margen25_alDia: sum("margen25_alDia"),
+      margen26_alDia: sum("margen26_alDia"),
+      mp24: tot_v24 > 0 ? tot_m24 / tot_v24 : 0,
+      mp25: tot_v25 > 0 ? tot_m25 / tot_v25 : 0,
+      mp26: tot_v26 > 0 ? tot_m26 / tot_v26 : 0,
+    };
+
+    const territoriosForFile =
+      territorioLabel.length > 30 ? "varios" : territorioLabel;
+    const fileName = `Ventas_${sanitizeFileName(territoriosForFile)}_${todayISO()}`;
+
+    await exportToExcel({
+      fileName,
+      sheetName: "Ventas",
+      title: `Tab Ventas · ${cutoffYear}`,
+      subtitle: `${territorioLabel}${
+        exportPeriodLabel ? ` · ${exportPeriodLabel}` : ""
+      } · Cutoff: ${MONTHS_LONG_ES[cutoffMonth - 1]} ${cutoffYear}`,
+      summary,
+      columns,
+      rows: xlsxRows,
+      totalRow,
+    });
+  };
+
   return (
-    <div
-      className="rounded-[var(--radius-lg)] border p-4"
-      style={{
-        background: "var(--bg-surface)",
-        borderColor: "var(--border)",
-        boxShadow: "var(--shadow-card)",
-      }}
-    >
-      <ResponsiveContainer width="100%" height={460}>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <ExportExcelButton
+          onExport={handleExportExcel}
+          title="Exportar 12 meses de Ventas a Excel"
+        />
+      </div>
+      <div
+        className="rounded-[var(--radius-lg)] border p-4"
+        style={{
+          background: "var(--bg-surface)",
+          borderColor: "var(--border)",
+          boxShadow: "var(--shadow-card)",
+        }}
+      >
+        <ResponsiveContainer width="100%" height={460}>
         <ComposedChart
           data={chartData}
           margin={{ top: 20, right: 60, bottom: 5, left: 60 }}
@@ -277,6 +483,7 @@ export function VentasTab({ kpi, cutoffYear, cutoffMonth }: Props) {
           />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }

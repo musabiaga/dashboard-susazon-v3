@@ -12,6 +12,10 @@ interface Props {
   monthLabel24: string;
   monthLabel25: string;
   monthLabel26: string;
+  /** Territorio activo para el resumen del Excel ("" = Todos). */
+  exportTerritory?: string;
+  /** Etiqueta de periodo para el resumen del Excel (ej "Mayo 2026"). */
+  exportPeriodLabel?: string;
 }
 
 const VENDEDORES_SELECTION_KEY = "vendedores-selected";
@@ -35,6 +39,8 @@ export function VendedoresTab({
   monthLabel24,
   monthLabel25,
   monthLabel26,
+  exportTerritory = "",
+  exportPeriodLabel,
 }: Props) {
   const [merged, setMerged] = useState(false);
   const [topN, setTopN] = useState<10 | 20 | null>(20);
@@ -81,6 +87,9 @@ export function VendedoresTab({
         selectionStorageKey={VENDEDORES_SELECTION_KEY}
         multiSelectMaxItems={15}
         multiSelectPlaceholder="Buscar vendedor…"
+        exportTabName={merged ? "Vendedores_Unidos" : "Vendedores_Separados"}
+        exportPeriodLabel={exportPeriodLabel}
+        exportTerritory={exportTerritory}
       />
     </div>
   );

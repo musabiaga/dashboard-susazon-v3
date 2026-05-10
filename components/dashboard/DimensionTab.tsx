@@ -7,6 +7,11 @@ import {
   type GroupedBarSeries,
 } from "@/components/dashboard/GroupedBarChart";
 import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
+import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import type {
+  ExcelColumn,
+  ExcelSummaryRow,
+} from "@/lib/export-excel";
 
 export interface DimensionRow {
   name: string;
@@ -65,6 +70,14 @@ interface Props {
   multiSelectMaxItems?: number;
   /** Placeholder del buscador (ej. "Buscar cliente…"). */
   multiSelectPlaceholder?: string;
+  /** Si está definido, se renderiza el botón "Exportar Excel" arriba del chart.
+   *  El nombre se usa para filename + sheet name. Ej: "GrupoProducto",
+   *  "Clientes", "Vendedores_Sus". */
+  exportTabName?: string;
+  /** Etiqueta corta del periodo para el resumen. Ej: "Mayo 2026". */
+  exportPeriodLabel?: string;
+  /** Territorio activo para resumen + filename del Excel. "" = "Todos". */
+  exportTerritory?: string;
 }
 
 /**
@@ -94,6 +107,9 @@ export function DimensionTab({
   selectionStorageKey,
   multiSelectMaxItems = 15,
   multiSelectPlaceholder = "Buscar…",
+  exportTabName,
+  exportPeriodLabel,
+  exportTerritory = "",
 }: Props) {
   // Selección custom (multi-select). Vacía = comportamiento default Top N.
   // Persistencia en localStorage si selectionStorageKey está definido.
@@ -182,8 +198,216 @@ export function DimensionTab({
     { key: "mp26", label: `Margen % ${monthLabel26}`, color: "#10b981" },
   ];
 
+  // ============ Export Excel ============
+  // Lazy import (exceljs ~700KB se carga solo al click). WYSIWYG: respeta
+  // el multi-select activo (tableRows ya viene filtrado).
+  const handleExportExcel = exportTabName
+    ? async () => {
+        const { exportToExcel, sanitizeFileName, todayISO } = await import(
+          "@/lib/export-excel"
+        );
+
+        const territorioLabel =
+          exportTerritory && exportTerritory !== ""
+            ? exportTerritory
+            : "Todos";
+
+        const totalCierre = tableRows.reduce(
+          (acc, r) => ({
+            v24: acc.v24 + r.v24,
+            v25: acc.v25 + r.v25,
+            v26: acc.v26 + r.v26,
+            k24: acc.k24 + (r.k24 ?? 0),
+            k25: acc.k25 + (r.k25 ?? 0),
+            k26: acc.k26 + (r.k26 ?? 0),
+            m24: acc.m24 + (r.m24 ?? 0),
+            m25: acc.m25 + (r.m25 ?? 0),
+            m26: acc.m26 + (r.m26 ?? 0),
+            v24_alDia: acc.v24_alDia + (r.v24_alDia ?? r.v24),
+            v25_alDia: acc.v25_alDia + (r.v25_alDia ?? r.v25),
+            v26_alDia: acc.v26_alDia + (r.v26_alDia ?? r.v26),
+            k24_alDia: acc.k24_alDia + (r.k24_alDia ?? r.k24 ?? 0),
+            k25_alDia: acc.k25_alDia + (r.k25_alDia ?? r.k25 ?? 0),
+            k26_alDia: acc.k26_alDia + (r.k26_alDia ?? r.k26 ?? 0),
+            m24_alDia: acc.m24_alDia + (r.m24_alDia ?? r.m24 ?? 0),
+            m25_alDia: acc.m25_alDia + (r.m25_alDia ?? r.m25 ?? 0),
+            m26_alDia: acc.m26_alDia + (r.m26_alDia ?? r.m26 ?? 0),
+          }),
+          {
+            v24: 0, v25: 0, v26: 0,
+            k24: 0, k25: 0, k26: 0,
+            m24: 0, m25: 0, m26: 0,
+            v24_alDia: 0, v25_alDia: 0, v26_alDia: 0,
+            k24_alDia: 0, k25_alDia: 0, k26_alDia: 0,
+            m24_alDia: 0, m25_alDia: 0, m26_alDia: 0,
+          }
+        );
+
+        const summary: ExcelSummaryRow[] = [
+          ...(exportPeriodLabel
+            ? [{ label: "Periodo", value: exportPeriodLabel }]
+            : []),
+          { label: "Territorio", value: territorioLabel },
+          { label: "Dimensión", value: dimensionLabelPlural },
+          {
+            label: isCustomMode ? "Modo" : "Modo",
+            value: isCustomMode
+              ? `Selección custom (${tableRows.length} items)`
+              : topNTable == null
+                ? "Default (todos)"
+                : `Default (Top ${topNTable})`,
+          },
+          {
+            label: `# ${dimensionLabelPlural} exportados`,
+            value: tableRows.length,
+            numFmt: "#,##0",
+          },
+          {
+            label: `Venta total ${monthLabel26}`,
+            value: totalCierre.v26,
+            numFmt: "$#,##0",
+          },
+          {
+            label: `Venta total ${monthLabel25}`,
+            value: totalCierre.v25,
+            numFmt: "$#,##0",
+          },
+          {
+            label: `Venta total ${monthLabel24}`,
+            value: totalCierre.v24,
+            numFmt: "$#,##0",
+          },
+        ];
+
+        // Columnas: dim + venta cierre 24/25/26 + venta al-día 24/25/26 +
+        // kg + margen + margen % + var %
+        const columns: ExcelColumn[] = [
+          { header: dimensionLabel, key: "name", width: 38 },
+          // Pesos cierre
+          { header: `Venta ${monthLabel24} cierre`, key: "v24", width: 16, numFmt: "$#,##0" },
+          { header: `Venta ${monthLabel25} cierre`, key: "v25", width: 16, numFmt: "$#,##0" },
+          { header: `Venta ${monthLabel26} cierre`, key: "v26", width: 16, numFmt: "$#,##0" },
+          // Pesos al-día (comparativos día-vs-día)
+          { header: `Venta ${monthLabel24} al-día`, key: "v24_alDia", width: 16, numFmt: "$#,##0" },
+          { header: `Venta ${monthLabel25} al-día`, key: "v25_alDia", width: 16, numFmt: "$#,##0" },
+          { header: `Venta ${monthLabel26} al-día`, key: "v26_alDia", width: 16, numFmt: "$#,##0" },
+          // Var %
+          { header: "Var Venta % (cierre 26 vs 25)", key: "varVentaPct", width: 18, numFmt: "0.0%" },
+          // KG cierre
+          { header: `KG ${monthLabel24} cierre`, key: "k24", width: 14, numFmt: "#,##0" },
+          { header: `KG ${monthLabel25} cierre`, key: "k25", width: 14, numFmt: "#,##0" },
+          { header: `KG ${monthLabel26} cierre`, key: "k26", width: 14, numFmt: "#,##0" },
+          { header: `KG ${monthLabel24} al-día`, key: "k24_alDia", width: 14, numFmt: "#,##0" },
+          { header: `KG ${monthLabel25} al-día`, key: "k25_alDia", width: 14, numFmt: "#,##0" },
+          { header: `KG ${monthLabel26} al-día`, key: "k26_alDia", width: 14, numFmt: "#,##0" },
+          { header: "Var KG %", key: "varKgPct", width: 14, numFmt: "0.0%" },
+          // Margen
+          { header: `Margen ${monthLabel24}`, key: "m24", width: 16, numFmt: "$#,##0" },
+          { header: `Margen ${monthLabel25}`, key: "m25", width: 16, numFmt: "$#,##0" },
+          { header: `Margen ${monthLabel26}`, key: "m26", width: 16, numFmt: "$#,##0" },
+          { header: `Margen % ${monthLabel24}`, key: "mp24", width: 14, numFmt: "0.0%" },
+          { header: `Margen % ${monthLabel25}`, key: "mp25", width: 14, numFmt: "0.0%" },
+          { header: `Margen % ${monthLabel26}`, key: "mp26", width: 14, numFmt: "0.0%" },
+        ];
+
+        const xlsxRows = tableRows.map((r) => {
+          const k24 = r.k24 ?? 0;
+          const k25 = r.k25 ?? 0;
+          const k26 = r.k26 ?? 0;
+          const m24 = r.m24 ?? 0;
+          const m25 = r.m25 ?? 0;
+          const m26 = r.m26 ?? 0;
+          return {
+            name: r.name,
+            v24: r.v24,
+            v25: r.v25,
+            v26: r.v26,
+            v24_alDia: r.v24_alDia ?? r.v24,
+            v25_alDia: r.v25_alDia ?? r.v25,
+            v26_alDia: r.v26_alDia ?? r.v26,
+            varVentaPct: r.v25 > 0 ? (r.v26 - r.v25) / r.v25 : 0,
+            k24,
+            k25,
+            k26,
+            k24_alDia: r.k24_alDia ?? k24,
+            k25_alDia: r.k25_alDia ?? k25,
+            k26_alDia: r.k26_alDia ?? k26,
+            varKgPct: k25 > 0 ? (k26 - k25) / k25 : 0,
+            m24,
+            m25,
+            m26,
+            mp24: r.v24 > 0 ? m24 / r.v24 : 0,
+            mp25: r.v25 > 0 ? m25 / r.v25 : 0,
+            mp26: r.v26 > 0 ? m26 / r.v26 : 0,
+          };
+        });
+
+        const totalRow: Record<string, unknown> = {
+          name: `TOTAL (${tableRows.length} ${dimensionLabelPlural.toLowerCase()})`,
+          v24: totalCierre.v24,
+          v25: totalCierre.v25,
+          v26: totalCierre.v26,
+          v24_alDia: totalCierre.v24_alDia,
+          v25_alDia: totalCierre.v25_alDia,
+          v26_alDia: totalCierre.v26_alDia,
+          varVentaPct:
+            totalCierre.v25 > 0
+              ? (totalCierre.v26 - totalCierre.v25) / totalCierre.v25
+              : 0,
+          k24: totalCierre.k24,
+          k25: totalCierre.k25,
+          k26: totalCierre.k26,
+          k24_alDia: totalCierre.k24_alDia,
+          k25_alDia: totalCierre.k25_alDia,
+          k26_alDia: totalCierre.k26_alDia,
+          varKgPct:
+            totalCierre.k25 > 0
+              ? (totalCierre.k26 - totalCierre.k25) / totalCierre.k25
+              : 0,
+          m24: totalCierre.m24,
+          m25: totalCierre.m25,
+          m26: totalCierre.m26,
+          mp24: totalCierre.v24 > 0 ? totalCierre.m24 / totalCierre.v24 : 0,
+          mp25: totalCierre.v25 > 0 ? totalCierre.m25 / totalCierre.v25 : 0,
+          mp26: totalCierre.v26 > 0 ? totalCierre.m26 / totalCierre.v26 : 0,
+        };
+
+        const territoriosForFile =
+          territorioLabel.length > 30 ? "varios" : territorioLabel;
+        const fileName = `${sanitizeFileName(exportTabName)}_${sanitizeFileName(territoriosForFile)}_${todayISO()}`;
+
+        await exportToExcel({
+          fileName,
+          sheetName: exportTabName.slice(0, 31),
+          title: `Tab ${exportTabName} · ${monthLabel26}`,
+          subtitle: `${territorioLabel}${
+            exportPeriodLabel ? ` · ${exportPeriodLabel}` : ""
+          } · ${tableRows.length} ${dimensionLabelPlural.toLowerCase()}`,
+          summary,
+          columns,
+          rows: xlsxRows,
+          totalRow,
+        });
+      }
+    : null;
+
   return (
     <div className="space-y-4">
+      {/* Toolbar superior: solo botón export (alineado a la derecha) */}
+      {handleExportExcel && (
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <ExportExcelButton
+            onExport={handleExportExcel}
+            disabled={tableRows.length === 0}
+            title={
+              tableRows.length === 0
+                ? "Sin filas para exportar"
+                : `Exportar ${tableRows.length} fila${tableRows.length === 1 ? "" : "s"} a Excel`
+            }
+          />
+        </div>
+      )}
+
       {/* Chart top N */}
       <div
         className="rounded-[var(--radius-lg)] border p-4"
