@@ -6,6 +6,8 @@ import {
   Building2,
   PanelLeftClose,
   PanelLeftOpen,
+  Check,
+  Square,
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 
@@ -64,9 +66,17 @@ export interface Territory {
 
 interface SidebarProps {
   territories: Territory[];
-  selected: string; // "" = "Todos"
-  onSelect: (name: string) => void;
+  /** Set de territorios marcados (multi-select). Mejora 7. */
+  selected: Set<string>;
+  /** Toggle de un territorio: agrega o quita del Set. */
+  onToggle: (name: string) => void;
+  /** Marca/desmarca todos los territorios activos. */
+  onToggleAll: () => void;
+  /** Selecciona SOLO ese territorio (deselecciona todos los demás). */
+  onSelectOnly: (name: string) => void;
   totalKpi: TerritoryKpi;
+  /** KPI agregada de la selección actual (puede ser parcial). */
+  selectedKpi: TerritoryKpi;
   // Estado controlado desde el padre (DashboardClient persiste en localStorage)
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -74,8 +84,10 @@ interface SidebarProps {
 
 /**
  * Sidebar de territorios — lista filtrada por permisos vía RLS.
- * Click en un territorio cambia el contexto del dashboard a ese.
- * Click en "Todos" agrega todos los territorios visibles.
+ *
+ * Mejora 7: multi-select con checkboxes. Click en una fila toggle ese
+ * territorio. Click en "Todos" marca/desmarca a todos. Hover muestra botón
+ * "Solo" para selección rápida de uno solo (deselecciona los demás).
  *
  * Soporta modo `collapsed`: cuando está cerrado se reduce a una mini-tira de
  * 44px con solo el botón para reabrir. La preferencia se persiste en
@@ -84,13 +96,23 @@ interface SidebarProps {
 export function Sidebar({
   territories,
   selected,
-  onSelect,
+  onToggle,
+  onToggleAll,
+  onSelectOnly,
   totalKpi,
+  selectedKpi,
   collapsed,
   onToggleCollapsed,
 }: SidebarProps) {
   const total = territories.length;
+  const activeTerritories = territories.filter((t) => t.isActive);
+  const activeCount = activeTerritories.length;
   const disabledCount = territories.filter((t) => !t.isActive).length;
+  const selectedCount = activeTerritories.filter((t) =>
+    selected.has(t.name)
+  ).length;
+  const allSelected = activeCount > 0 && selectedCount === activeCount;
+  const noneSelected = selectedCount === 0;
 
   // ===== Modo colapsado: mini-tira con botón =====
   if (collapsed) {
@@ -116,7 +138,7 @@ export function Sidebar({
     );
   }
 
-  // ===== Modo expandido: lista completa =====
+  // ===== Modo expandido: lista completa con checkboxes =====
   return (
     <aside
       className="flex w-64 shrink-0 flex-col border-r transition-all duration-200"
@@ -143,8 +165,16 @@ export function Sidebar({
             className="mt-1 text-[11px]"
             style={{ color: "var(--text-muted)" }}
           >
-            {total} visible{total === 1 ? "" : "s"}
-            {disabledCount > 0 && ` · ${disabledCount} apagado${disabledCount === 1 ? "" : "s"}`}
+            <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+              {selectedCount}
+            </span>{" "}
+            de {activeCount} activo{activeCount === 1 ? "" : "s"}
+            {disabledCount > 0 && (
+              <>
+                {" · "}
+                {disabledCount} apagado{disabledCount === 1 ? "" : "s"}
+              </>
+            )}
           </p>
         </div>
         <button
@@ -160,13 +190,17 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
+        {/* Toggle "Todos" — marca/desmarca todos los activos */}
         <SidebarItem
-          label="Todos"
+          label={allSelected ? "Todos" : noneSelected ? "Ninguno" : "Mixto"}
           icon={<Layers size={14} />}
-          selected={selected === ""}
-          onClick={() => onSelect("")}
+          checkboxState={
+            allSelected ? "checked" : noneSelected ? "empty" : "partial"
+          }
+          onClick={onToggleAll}
           disabled={false}
-          kpi={totalKpi}
+          kpi={allSelected ? totalKpi : selectedKpi}
+          isToggleAll
         />
         <div
           className="my-2 border-t"
@@ -185,8 +219,9 @@ export function Sidebar({
           <SidebarItem
             key={t.name}
             label={t.name}
-            selected={selected === t.name}
-            onClick={() => onSelect(t.name)}
+            checkboxState={selected.has(t.name) ? "checked" : "empty"}
+            onClick={() => onToggle(t.name)}
+            onSelectOnly={t.isActive ? () => onSelectOnly(t.name) : undefined}
             disabled={!t.isActive}
             tooltip={
               !t.isActive
@@ -201,65 +236,154 @@ export function Sidebar({
   );
 }
 
+type CheckboxState = "checked" | "empty" | "partial";
+
 function SidebarItem({
   label,
   icon,
-  selected,
+  checkboxState,
   onClick,
+  onSelectOnly,
   disabled,
   tooltip,
   kpi,
+  isToggleAll = false,
 }: {
   label: string;
   icon?: React.ReactNode;
-  selected: boolean;
+  checkboxState: CheckboxState;
   onClick: () => void;
+  onSelectOnly?: () => void;
   disabled: boolean;
   tooltip?: string;
   kpi?: TerritoryKpi;
+  isToggleAll?: boolean;
 }) {
   const hasKpi = kpi && kpi.venta > 0;
+  const isChecked = checkboxState === "checked";
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={tooltip}
-      className="flex w-full flex-col gap-0.5 rounded-[var(--radius)] px-3 py-2 text-left transition-colors"
+    <div
+      className="group relative flex w-full items-stretch rounded-[var(--radius)] transition-colors"
       style={{
-        background: selected ? "var(--accent-soft)" : "transparent",
-        color: selected
-          ? "var(--accent)"
-          : disabled
-          ? "var(--text-muted)"
-          : "var(--text-primary)",
-        fontWeight: selected ? 600 : 400,
+        background: isChecked && !isToggleAll ? "var(--accent-soft)" : "transparent",
       }}
     >
-      <span className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-2 truncate text-sm">
-          {icon}
-          <span className="truncate">{label}</span>
+      <button
+        type="button"
+        onClick={onClick}
+        title={tooltip}
+        disabled={disabled}
+        className="flex flex-1 flex-col gap-0.5 rounded-[var(--radius)] px-3 py-2 text-left transition-colors hover:bg-[var(--bg-surface-muted)] disabled:cursor-not-allowed"
+        style={{
+          color: disabled
+            ? "var(--text-muted)"
+            : isChecked && !isToggleAll
+              ? "var(--accent)"
+              : "var(--text-primary)",
+          fontWeight: isChecked && !isToggleAll ? 600 : 400,
+        }}
+      >
+        <span className="flex items-center justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-2 truncate text-sm">
+            <CheckboxIcon state={checkboxState} disabled={disabled} />
+            {icon}
+            <span className="truncate">{label}</span>
+          </span>
+          {disabled && (
+            <AlertTriangle
+              size={12}
+              style={{ color: "var(--warning)" }}
+            />
+          )}
         </span>
-        {disabled && (
-          <AlertTriangle
-            size={12}
-            style={{ color: "var(--warning)" }}
-          />
+        {hasKpi && (
+          <span
+            className="ml-6 flex items-baseline gap-1.5 text-[11px] tabular-nums"
+            style={{
+              color:
+                isChecked && !isToggleAll
+                  ? "var(--accent)"
+                  : "var(--text-muted)",
+              opacity: disabled ? 0.5 : 1,
+            }}
+          >
+            <span className="font-semibold">{formatMoney(kpi!.venta)}</span>
+            <span style={{ color: "var(--text-muted)" }}>·</span>
+            <span>{kpi!.marginPct.toFixed(1)}%</span>
+          </span>
         )}
-      </span>
-      {hasKpi && (
-        <span
-          className="ml-1 flex items-baseline gap-1.5 text-[11px] tabular-nums"
+      </button>
+      {/* Botón "Solo" — visible al hover, selecciona SOLO este territorio */}
+      {onSelectOnly && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectOnly();
+          }}
+          aria-label={`Seleccionar solo ${label}`}
+          title={`Solo ${label}`}
+          className="my-1 mr-1 hidden items-center rounded px-2 text-[10px] font-semibold uppercase tracking-wider transition-colors group-hover:flex hover:bg-[var(--accent-soft)]"
           style={{
-            color: selected ? "var(--accent)" : "var(--text-muted)",
-            opacity: disabled ? 0.5 : 1,
+            color: "var(--accent)",
           }}
         >
-          <span className="font-semibold">{formatMoney(kpi!.venta)}</span>
-          <span style={{ color: "var(--text-muted)" }}>·</span>
-          <span>{kpi!.marginPct.toFixed(1)}%</span>
-        </span>
+          Solo
+        </button>
       )}
-    </button>
+    </div>
+  );
+}
+
+function CheckboxIcon({
+  state,
+  disabled,
+}: {
+  state: CheckboxState;
+  disabled: boolean;
+}) {
+  // Tamaño consistente para alineación del texto. Color según estado.
+  const color = disabled
+    ? "var(--text-muted)"
+    : state === "checked"
+      ? "var(--accent)"
+      : state === "partial"
+        ? "var(--accent)"
+        : "var(--text-muted)";
+  if (state === "checked") {
+    return (
+      <span
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border"
+        style={{
+          background: color,
+          borderColor: color,
+        }}
+      >
+        <Check size={11} style={{ color: "white" }} strokeWidth={3} />
+      </span>
+    );
+  }
+  if (state === "partial") {
+    return (
+      <span
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border"
+        style={{
+          background: color,
+          borderColor: color,
+        }}
+      >
+        <span
+          className="h-0.5 w-2.5 rounded-sm"
+          style={{ background: "white" }}
+        />
+      </span>
+    );
+  }
+  return (
+    <Square
+      size={16}
+      strokeWidth={1.5}
+      style={{ color, flexShrink: 0 }}
+    />
   );
 }

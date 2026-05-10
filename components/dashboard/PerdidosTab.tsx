@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertOctagon,
   TrendingDown,
   AlertTriangle,
   Search,
   X,
-  MapPin,
-  ChevronDown,
-  Check,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { formatMoney, formatKilos } from "@/lib/format";
@@ -107,15 +104,9 @@ interface Props {
   monthShortYY: string; // "May 26"
   prevMonthShortYY: string; // "May 25"
   topNTable?: number; // default 100
-  /** Cuando se muestra "Todos los territorios" en el sidebar, el padre pasa
-   *  los rows agrupados por territorio para que el tab pueda hacer su propio
-   *  multi-select de territorios. Si undefined, no se muestra el filtro. */
-  byTerritory?: Record<string, PerdidoRow[]>;
-  /** Lista de territorios activos disponibles (orden alfabético). */
-  availableTerritories?: string[];
-  /** Territorio activo en el sidebar. Vacío = "Todos". Lo usamos para
-   *  el bloque resumen del Excel y para etiquetar cada cliente con su
-   *  territorio cuando NO estamos en modo "Todos". */
+  /** Etiqueta del territorio actual (proviene del sidebar global ya
+   *  agregado). Usado en el resumen del Excel y en la etiqueta de
+   *  cada cliente cuando hay multi-territorio. */
   currentTerritory?: string;
 }
 
@@ -172,82 +163,13 @@ export function PerdidosTab({
   monthShortYY,
   prevMonthShortYY,
   topNTable = 100,
-  byTerritory,
-  availableTerritories,
   currentTerritory = "",
 }: Props) {
-  // Multi-select de territorios. Solo activo cuando el padre nos pasa
-  // byTerritory (= sidebar en "Todos"). Default: TODOS los territorios
-  // activos seleccionados (= comportamiento original sin filtro).
-  const allTerritoriesAvailable = !!byTerritory && !!availableTerritories;
-  const [selectedTerritories, setSelectedTerritories] = useState<Set<string>>(
-    () => new Set(availableTerritories ?? [])
-  );
-  // Re-sincronizar la selección si cambia la lista de territorios disponibles
-  // (ej: el admin apaga uno). Evitamos romper la selección actual; solo
-  // agregamos los nuevos como activos por default.
-  const lastTerritoriesRef = useRef<string[]>(availableTerritories ?? []);
-  useEffect(() => {
-    if (!availableTerritories) return;
-    const prev = lastTerritoriesRef.current;
-    const prevSet = new Set(prev);
-    const news = availableTerritories.filter((t) => !prevSet.has(t));
-    if (news.length > 0) {
-      setSelectedTerritories((s) => new Set([...s, ...news]));
-    }
-    lastTerritoriesRef.current = availableTerritories;
-  }, [availableTerritories]);
-
-  // Rows efectivos: si tenemos filtro de territorios, recalculamos
-  // sumando solo los seleccionados; si no, usamos rowsProp directo.
-  const rows = useMemo<PerdidoRow[]>(() => {
-    if (!allTerritoriesAvailable) return rowsProp;
-    if (selectedTerritories.size === availableTerritories!.length) {
-      // Todos seleccionados → equivalente al total agregado
-      return rowsProp;
-    }
-    if (selectedTerritories.size === 0) return [];
-    // Suma de los territorios seleccionados (por no_cliente)
-    const acc = new Map<string, PerdidoRow>();
-    const addAll = (rs: PerdidoRow[]) => {
-      for (const r of rs) {
-        const cur = acc.get(r.no_cliente);
-        if (!cur) {
-          acc.set(r.no_cliente, { ...r });
-          continue;
-        }
-        // Sumar todos los campos numéricos (3 años × mes/ytd × venta/kg/margen +
-        // los al-día). Mantener cliente/vendedor del primero.
-        const fields: (keyof PerdidoRow)[] = [
-          "mes_venta_2024", "mes_kg_2024", "mes_margen_2024",
-          "ytd_venta_2024", "ytd_kg_2024", "ytd_margen_2024",
-          "mes_venta_alDia_2024", "mes_kg_alDia_2024", "mes_margen_alDia_2024",
-          "mes_venta_2025", "mes_kg_2025", "mes_margen_2025",
-          "ytd_venta_2025", "ytd_kg_2025", "ytd_margen_2025",
-          "mes_venta_alDia_2025", "mes_kg_alDia_2025", "mes_margen_alDia_2025",
-          "mes_venta_2026", "mes_kg_2026", "mes_margen_2026",
-          "ytd_venta_2026", "ytd_kg_2026", "ytd_margen_2026",
-          "mes_venta_alDia_2026", "mes_kg_alDia_2026", "mes_margen_alDia_2026",
-        ];
-        for (const f of fields) {
-          const a = (cur[f] as number | undefined) ?? 0;
-          const b = (r[f] as number | undefined) ?? 0;
-          (cur as unknown as Record<string, unknown>)[f] = a + b;
-        }
-      }
-    };
-    for (const t of selectedTerritories) {
-      const tr = byTerritory![t];
-      if (tr) addAll(tr);
-    }
-    return Array.from(acc.values());
-  }, [
-    allTerritoriesAvailable,
-    rowsProp,
-    selectedTerritories,
-    byTerritory,
-    availableTerritories,
-  ]);
+  // Mejora 7: multi-select de territorios ahora vive en el sidebar global.
+  // Aquí solo recibimos los rows ya agregados (DashboardClient hace la
+  // agregación con `aggregatePerdidoRows`). Esto simplifica mucho el tab
+  // y elimina la duplicación de UI.
+  const rows: PerdidoRow[] = rowsProp;
 
   const [dim, setDim] = useState<PerdidoDim>("mes");
   // Buscador: filtra por substring en cliente y/o vendedor (case-insensitive).
@@ -528,39 +450,14 @@ export function PerdidosTab({
       "@/lib/export-excel"
     );
 
-    // Map: no_cliente → lista de territorios donde aparece (para multi-select).
-    // Si NO estamos en modo "Todos" (byTerritory undefined), usamos
-    // currentTerritory como fallback único.
-    const territorioByClient = new Map<string, string[]>();
-    if (byTerritory) {
-      for (const [t, rs] of Object.entries(byTerritory)) {
-        if (!selectedTerritories.has(t)) continue;
-        for (const r of rs) {
-          const arr = territorioByClient.get(r.no_cliente) ?? [];
-          if (!arr.includes(t)) arr.push(t);
-          territorioByClient.set(r.no_cliente, arr);
-        }
-      }
-    }
-
     // Map original PerdidoRow por no_cliente (para sacar campos cierre completos
     // que `computed` no carga, ej. mes_venta_2025 cierre).
     const fullRowByClient = new Map<string, PerdidoRow>();
     for (const r of rows) fullRowByClient.set(r.no_cliente, r);
 
-    // Etiqueta de territorios para el resumen + nombre del archivo
-    const territorioLabel = (() => {
-      if (allTerritoriesAvailable) {
-        if (selectedTerritories.size === availableTerritories!.length) {
-          return "Todos";
-        }
-        if (selectedTerritories.size === 0) return "(ninguno)";
-        return Array.from(selectedTerritories).sort().join(", ");
-      }
-      return currentTerritory && currentTerritory !== ""
-        ? currentTerritory
-        : "Todos";
-    })();
+    // Etiqueta de territorios — viene del sidebar global ya formateada.
+    const territorioLabel =
+      currentTerritory && currentTerritory !== "" ? currentTerritory : "Todos";
 
     const statusActiveLabel =
       Array.from(activeStatuses)
@@ -736,11 +633,8 @@ export function PerdidosTab({
     // Filas de datos
     const xlsxRows = tableRows.map((t) => {
       const full = fullRowByClient.get(t.no_cliente);
-      const territorios = territorioByClient.get(t.no_cliente);
-      const territorio =
-        territorios && territorios.length > 0
-          ? territorios.join(", ")
-          : currentTerritory || "";
+      // Mejora 7: el territorio viene del sidebar global ya agregado.
+      const territorio = currentTerritory || "";
 
       // Cierre 2025 según dim
       const v25_cierre =
@@ -870,15 +764,8 @@ export function PerdidosTab({
 
   return (
     <div className="space-y-4">
-      {/* Toggles + filtro de territorios + export */}
+      {/* Toggles + export (multi-select de territorios vive en el sidebar global) */}
       <div className="flex flex-wrap items-center justify-end gap-3">
-        {allTerritoriesAvailable && (
-          <TerritoryFilter
-            available={availableTerritories!}
-            selected={selectedTerritories}
-            onChange={setSelectedTerritories}
-          />
-        )}
         <MetricToggle value={metric} onChange={switchMetric} />
         <DimToggle value={dim} onChange={setDim} monthShortYY={monthShortYY} />
         <ExportExcelButton
@@ -1391,162 +1278,6 @@ function Td({
     >
       {children}
     </td>
-  );
-}
-
-// ============================================================
-// TerritoryFilter — dropdown con checkboxes (Mejora Perdidos)
-// ============================================================
-function TerritoryFilter({
-  available,
-  selected,
-  onChange,
-}: {
-  available: string[];
-  selected: Set<string>;
-  onChange: (next: Set<string>) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  const total = available.length;
-  const selCount = selected.size;
-  const allSelected = selCount === total;
-  const noneSelected = selCount === 0;
-
-  function toggleOne(t: string) {
-    const next = new Set(selected);
-    if (next.has(t)) next.delete(t);
-    else next.add(t);
-    onChange(next);
-  }
-  function selectAll() {
-    onChange(new Set(available));
-  }
-  function clearAll() {
-    onChange(new Set());
-  }
-
-  const label = allSelected
-    ? `Todos los territorios (${total})`
-    : noneSelected
-      ? "Ningún territorio"
-      : `${selCount} de ${total} territorios`;
-
-  return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-[var(--radius)] border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--bg-surface-muted)]"
-        style={{
-          background: "var(--bg-surface)",
-          borderColor: "var(--border)",
-          color: "var(--text-primary)",
-          minWidth: 220,
-        }}
-      >
-        <MapPin size={14} style={{ color: "var(--text-secondary)" }} />
-        <span className="flex-1 text-left">{label}</span>
-        {!allSelected && !noneSelected && (
-          <span
-            className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-            style={{
-              background: "var(--warning-soft)",
-              color: "var(--warning)",
-            }}
-          >
-            Filtro
-          </span>
-        )}
-        <ChevronDown
-          size={14}
-          style={{
-            color: "var(--text-secondary)",
-            transform: open ? "rotate(180deg)" : "none",
-            transition: "transform 0.15s ease",
-          }}
-        />
-      </button>
-
-      {open && (
-        <div
-          className="absolute right-0 top-full z-50 mt-1 max-h-80 w-72 overflow-y-auto rounded-[var(--radius-lg)] border shadow-lg"
-          style={{
-            background: "var(--bg-surface)",
-            borderColor: "var(--border-strong)",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-          }}
-        >
-          {/* Acciones rápidas */}
-          <div
-            className="flex items-center justify-between gap-2 border-b px-3 py-2"
-            style={{ borderColor: "var(--border)" }}
-          >
-            <button
-              type="button"
-              onClick={selectAll}
-              className="text-[11px] font-medium hover:underline"
-              style={{ color: "var(--accent)" }}
-            >
-              Seleccionar todos
-            </button>
-            <span style={{ color: "var(--text-muted)" }}>·</span>
-            <button
-              type="button"
-              onClick={clearAll}
-              className="text-[11px] font-medium hover:underline"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Limpiar
-            </button>
-          </div>
-          {/* Lista de territorios */}
-          {available.map((t) => {
-            const checked = selected.has(t);
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => toggleOne(t)}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-[var(--bg-surface-muted)]"
-                style={{
-                  color: checked ? "var(--text-primary)" : "var(--text-secondary)",
-                  fontWeight: checked ? 600 : 400,
-                }}
-              >
-                <span
-                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded border"
-                  style={{
-                    borderColor: checked ? "var(--accent)" : "var(--border)",
-                    background: checked ? "var(--accent)" : "transparent",
-                  }}
-                >
-                  {checked && (
-                    <Check size={11} style={{ color: "white" }} />
-                  )}
-                </span>
-                <span>{t}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
   );
 }
 

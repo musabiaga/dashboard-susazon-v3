@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar, type Territory, type TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { KpiCardsRow, type KpiData } from "@/components/dashboard/KpiCardsRow";
 import { DashboardTabs, TAB_LABELS, type TabKey } from "@/components/dashboard/DashboardTabs";
@@ -20,6 +20,14 @@ import {
 } from "@/components/dashboard/PerdidosTab";
 import { MonthSelector } from "@/components/dashboard/MonthSelector";
 import { AlertCircle, Clock } from "lucide-react";
+import {
+  aggregateKpis,
+  aggregateDimensionRows,
+  aggregatePerdidoRows,
+  aggregateBudget,
+  selectedKpis,
+  rowsBySelected,
+} from "@/lib/aggregate";
 
 interface DimensionDataset {
   byTerritory: Record<string, DimensionRow[]>;
@@ -102,7 +110,93 @@ export function DashboardClient({
   todayYear,
   todayMonth,
 }: DashboardClientProps) {
-  const [selectedTerritory, setSelectedTerritory] = useState<string>(""); // "" = Todos
+  // Mejora 7: multi-select de territorios global. Set vacío = ninguno.
+  // Default = TODOS los territorios activos seleccionados (equivalente al
+  // antiguo "Todos"). Persistencia en localStorage.
+  const SELECTED_KEY = "dashboard-selected-territories";
+  const activeTerritoryNames = useMemo(
+    () =>
+      territories
+        .filter((t) => t.isActive)
+        .map((t) => t.name),
+    [territories]
+  );
+  const [selectedTerritories, setSelectedTerritories] = useState<Set<string>>(
+    () => new Set(activeTerritoryNames)
+  );
+  // Hidratación cliente-side desde localStorage. Si la persistencia es
+  // inválida (territorios renombrados, apagados, etc.) cae al default.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(SELECTED_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed)) {
+          const valid = parsed.filter(
+            (s): s is string =>
+              typeof s === "string" && activeTerritoryNames.includes(s)
+          );
+          if (valid.length > 0) {
+            setSelectedTerritories(new Set(valid));
+          }
+        }
+      }
+    } catch {
+      // ignore — usar default
+    }
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // solo en mount
+
+  // Sync localStorage cada vez que cambia la selección (después de hidratado)
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(
+        SELECTED_KEY,
+        JSON.stringify(Array.from(selectedTerritories))
+      );
+    } catch {
+      // ignore
+    }
+  }, [selectedTerritories, hydrated]);
+
+  // Si aparecen territorios nuevos (ej: admin reactiva uno) los agregamos al
+  // Set actual de forma transparente.
+  const lastActiveRef = useRef<string[]>(activeTerritoryNames);
+  useEffect(() => {
+    if (!hydrated) return;
+    const prev = new Set(lastActiveRef.current);
+    const newOnes = activeTerritoryNames.filter((n) => !prev.has(n));
+    if (newOnes.length > 0) {
+      setSelectedTerritories((s) => new Set([...s, ...newOnes]));
+    }
+    lastActiveRef.current = activeTerritoryNames;
+  }, [activeTerritoryNames, hydrated]);
+
+  const handleToggleTerritory = (name: string) => {
+    setSelectedTerritories((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+  const handleToggleAll = () => {
+    setSelectedTerritories((prev) => {
+      // Si todos están seleccionados → limpiar. Si hay alguno desmarcado o
+      // vacío → marcar todos los activos.
+      const allSelected =
+        prev.size === activeTerritoryNames.length &&
+        activeTerritoryNames.every((n) => prev.has(n));
+      return allSelected ? new Set() : new Set(activeTerritoryNames);
+    });
+  };
+  const handleSelectOnly = (name: string) => {
+    setSelectedTerritories(new Set([name]));
+  };
+
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
 
   // Estado de sidebar collapsible. Default = abierto.
@@ -134,24 +228,79 @@ export function DashboardClient({
 
   const disabledTerritories = territories.filter((t) => !t.isActive);
 
-  // Si seleccionado actual está apagado, fallback a Todos
-  const effectiveSelected = (() => {
-    if (!selectedTerritory) return "";
-    const t = territories.find((x) => x.name === selectedTerritory);
-    return t && t.isActive ? selectedTerritory : "";
+  // Mejora 7: derivación del estado agregado a partir del Set de selección.
+  // Casos optimizados:
+  //   - "all": todos los activos seleccionados → usar pre-agregados del server
+  //   - "single": exactamente 1 → tomar ese territorio directo
+  //   - "multi": 2+ pero no todos → agregar dinámicamente en cliente
+  //   - "none": 0 seleccionados → mostrar empty state
+  const selectionMode: "all" | "single" | "multi" | "none" = (() => {
+    if (selectedTerritories.size === 0) return "none";
+    if (
+      selectedTerritories.size === activeTerritoryNames.length &&
+      activeTerritoryNames.every((n) => selectedTerritories.has(n))
+    )
+      return "all";
+    if (selectedTerritories.size === 1) return "single";
+    return "multi";
+  })();
+  const singleSelected: string =
+    selectionMode === "single"
+      ? Array.from(selectedTerritories)[0]
+      : "";
+
+  // KPI agregado de los territorios seleccionados (memoizado).
+  const activeKpi: TerritoryKpi = useMemo(() => {
+    if (selectionMode === "all") return totalKpi;
+    if (selectionMode === "none") return aggregateKpis([]);
+    if (selectionMode === "single") {
+      const t = territories.find((x) => x.name === singleSelected);
+      return t?.kpi ?? aggregateKpis([]);
+    }
+    return aggregateKpis(selectedKpis(territories, selectedTerritories));
+  }, [selectionMode, totalKpi, territories, selectedTerritories, singleSelected]);
+
+  // Budget agregado
+  const activeBudget: number = useMemo(() => {
+    if (selectionMode === "all") return totalVentaBudget;
+    if (selectionMode === "none") return 0;
+    if (selectionMode === "single") {
+      return (
+        territories.find((t) => t.name === singleSelected)?.ventaBudget ?? 0
+      );
+    }
+    return aggregateBudget(territories, selectedTerritories);
+  }, [
+    selectionMode,
+    totalVentaBudget,
+    territories,
+    selectedTerritories,
+    singleSelected,
+  ]);
+
+  // Etiqueta legible para mostrar en el header + pasar a exports
+  const contextLabel = (() => {
+    if (selectionMode === "none") return "Sin territorios seleccionados";
+    if (selectionMode === "all") return "Todos los territorios";
+    if (selectionMode === "single") return singleSelected;
+    // multi: lista comma-separated. Si son muchos, usar "N territorios".
+    const arr = Array.from(selectedTerritories).sort();
+    if (arr.length > 4) return `${arr.length} territorios`;
+    return arr.join(", ");
   })();
 
-  const contextLabel =
-    effectiveSelected === "" ? "Todos los territorios" : effectiveSelected;
+  // Etiqueta para los exports (más compacta — usa "Todos" en all)
+  const exportTerritoryLabel = (() => {
+    if (selectionMode === "none") return "(ninguno)";
+    if (selectionMode === "all") return "Todos";
+    if (selectionMode === "single") return singleSelected;
+    return Array.from(selectedTerritories).sort().join(", ");
+  })();
 
-  // KPI activo según selección (Todos vs territorio específico)
+  // KPI cards data (mismo cálculo de antes pero usando activeKpi/activeBudget)
   const activeKpiData: KpiData = useMemo(() => {
-    const territory = territories.find((t) => t.name === effectiveSelected);
-    const kpi = effectiveSelected === "" ? totalKpi : territory?.kpi ?? totalKpi;
-    const ventaBudget =
-      effectiveSelected === ""
-        ? totalVentaBudget
-        : territory?.ventaBudget ?? 0;
+    const kpi = activeKpi;
+    const ventaBudget = activeBudget;
     // Run-Rate: usa días HÁBILES (L-S menos feriados LFT), NO calendario.
     // Antes usaba días calendario, lo que subestimaba la velocidad real porque
     // dividía la venta por días que el negocio no opera (domingos + feriados).
@@ -187,10 +336,8 @@ export function DashboardClient({
       ventaBudget,
     };
   }, [
-    effectiveSelected,
-    territories,
-    totalKpi,
-    totalVentaBudget,
+    activeKpi,
+    activeBudget,
     currentMonthLabel,
     monthShortYY,
     prevMonthShortYY,
@@ -203,9 +350,12 @@ export function DashboardClient({
     <div className="flex flex-1">
       <Sidebar
         territories={territories}
-        selected={effectiveSelected}
-        onSelect={setSelectedTerritory}
+        selected={selectedTerritories}
+        onToggle={handleToggleTerritory}
+        onToggleAll={handleToggleAll}
+        onSelectOnly={handleSelectOnly}
         totalKpi={totalKpi}
+        selectedKpi={activeKpi}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={toggleSidebar}
       />
@@ -295,16 +445,29 @@ export function DashboardClient({
           {/* Tabs */}
           <DashboardTabs active={activeTab} onChange={setActiveTab}>
             {(() => {
-              const activeKpi =
-                effectiveSelected === ""
-                  ? totalKpi
-                  : territories.find((t) => t.name === effectiveSelected)
-                      ?.kpi ?? totalKpi;
-              const activeBudget =
-                effectiveSelected === ""
-                  ? totalVentaBudget
-                  : territories.find((t) => t.name === effectiveSelected)
-                      ?.ventaBudget ?? 0;
+              // Helper inline para resolver rows según selectionMode.
+              // En "all" usa el pre-agregado (rápido); en "single" toma directo;
+              // en "multi"/"none" agrega dinámicamente.
+              const resolveDimRows = (
+                ds: DimensionDataset
+              ): DimensionRow[] => {
+                if (selectionMode === "all") return ds.total;
+                if (selectionMode === "none") return [];
+                if (selectionMode === "single")
+                  return ds.byTerritory[singleSelected] ?? [];
+                return aggregateDimensionRows(
+                  rowsBySelected(ds.byTerritory, selectedTerritories)
+                );
+              };
+              const resolvePerdidoRows = (): PerdidoRow[] => {
+                if (selectionMode === "all") return perdidos.total;
+                if (selectionMode === "none") return [];
+                if (selectionMode === "single")
+                  return perdidos.byTerritory[singleSelected] ?? [];
+                return aggregatePerdidoRows(
+                  rowsBySelected(perdidos.byTerritory, selectedTerritories)
+                );
+              };
 
               if (activeTab === "tracking") {
                 return (
@@ -317,7 +480,7 @@ export function DashboardClient({
                     prevMonthShortYY={prevMonthShortYY}
                     elapsedBizDays={elapsedBizDays}
                     totalBizDays={totalBizDays}
-                    territorio={effectiveSelected}
+                    territorio={exportTerritoryLabel}
                   />
                 );
               }
@@ -327,19 +490,15 @@ export function DashboardClient({
                     kpi={activeKpi}
                     cutoffYear={currentYear}
                     cutoffMonth={currentMonth}
-                    exportTerritory={effectiveSelected}
+                    exportTerritory={exportTerritoryLabel}
                     exportPeriodLabel={monthShortYY}
                   />
                 );
               }
               if (activeTab === "grupo") {
-                const grupoRows =
-                  effectiveSelected === ""
-                    ? grupos.total
-                    : grupos.byTerritory[effectiveSelected] ?? [];
                 return (
                   <DimensionTab
-                    rows={grupoRows}
+                    rows={resolveDimRows(grupos)}
                     monthLabel24={prev2MonthShortYY}
                     monthLabel25={prevMonthShortYY}
                     monthLabel26={monthShortYY}
@@ -349,34 +508,26 @@ export function DashboardClient({
                     showKg
                     exportTabName="GrupoProducto"
                     exportPeriodLabel={monthShortYY}
-                    exportTerritory={effectiveSelected}
+                    exportTerritory={exportTerritoryLabel}
                   />
                 );
               }
               if (activeTab === "productos") {
-                const skuRows =
-                  effectiveSelected === ""
-                    ? skus.total
-                    : skus.byTerritory[effectiveSelected] ?? [];
                 return (
                   <ProductosTab
-                    rows={skuRows}
+                    rows={resolveDimRows(skus)}
                     monthLabel24={prev2MonthShortYY}
                     monthLabel25={prevMonthShortYY}
                     monthLabel26={monthShortYY}
-                    exportTerritory={effectiveSelected}
+                    exportTerritory={exportTerritoryLabel}
                     exportPeriodLabel={monthShortYY}
                   />
                 );
               }
               if (activeTab === "clientes") {
-                const clienteRows =
-                  effectiveSelected === ""
-                    ? clientes.total
-                    : clientes.byTerritory[effectiveSelected] ?? [];
                 return (
                   <DimensionTab
-                    rows={clienteRows}
+                    rows={resolveDimRows(clientes)}
                     monthLabel24={prev2MonthShortYY}
                     monthLabel25={prevMonthShortYY}
                     monthLabel26={monthShortYY}
@@ -391,59 +542,32 @@ export function DashboardClient({
                     multiSelectPlaceholder="Buscar cliente…"
                     exportTabName="Clientes"
                     exportPeriodLabel={monthShortYY}
-                    exportTerritory={effectiveSelected}
+                    exportTerritory={exportTerritoryLabel}
                   />
                 );
               }
               if (activeTab === "perdidos") {
-                const perdidoRows =
-                  effectiveSelected === ""
-                    ? perdidos.total
-                    : perdidos.byTerritory[effectiveSelected] ?? [];
-                // Cuando estamos en "Todos" del sidebar pasamos TAMBIÉN
-                // perdidos.byTerritory para que el tab pueda hacer su propio
-                // multi-select de territorios. Cuando estamos en un territorio
-                // específico, ese filtro queda desactivado (solo se ve ese).
-                const showTerritoryFilter = effectiveSelected === "";
+                // Mejora 7: ya no hay TerritoryFilter local. El sidebar es la
+                // fuente única; pasamos los rows ya agregados.
                 return (
                   <PerdidosTab
-                    rows={perdidoRows}
+                    rows={resolvePerdidoRows()}
                     monthShortYY={monthShortYY}
                     prevMonthShortYY={prevMonthShortYY}
-                    byTerritory={
-                      showTerritoryFilter ? perdidos.byTerritory : undefined
-                    }
-                    availableTerritories={
-                      showTerritoryFilter
-                        ? territories
-                            .filter((t) => t.isActive)
-                            .map((t) => t.name)
-                            .sort()
-                        : undefined
-                    }
-                    currentTerritory={effectiveSelected}
+                    currentTerritory={exportTerritoryLabel}
                   />
                 );
               }
               if (activeTab === "vendedores") {
-                const rowsSeparados =
-                  effectiveSelected === ""
-                    ? vendedores.separados.total
-                    : vendedores.separados.byTerritory[effectiveSelected] ??
-                      [];
-                const rowsUnidos =
-                  effectiveSelected === ""
-                    ? vendedores.unidos.total
-                    : vendedores.unidos.byTerritory[effectiveSelected] ?? [];
                 return (
                   <VendedoresTab
-                    rowsSeparados={rowsSeparados}
-                    rowsUnidos={rowsUnidos}
+                    rowsSeparados={resolveDimRows(vendedores.separados)}
+                    rowsUnidos={resolveDimRows(vendedores.unidos)}
                     monthLabel24={prev2MonthShortYY}
                     monthLabel25={prevMonthShortYY}
                     monthLabel26={monthShortYY}
                     exportPeriodLabel={monthShortYY}
-                    exportTerritory={effectiveSelected}
+                    exportTerritory={exportTerritoryLabel}
                   />
                 );
               }
