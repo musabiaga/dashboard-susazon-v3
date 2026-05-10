@@ -434,15 +434,17 @@ export default async function DashboardPage({
     supabase.from("kpi_sku_diario")
       .select("territorio, sku, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
-    // Cliente
+    // Cliente — incluye no_cliente para que el tab Perdidos pueda mergear
+    // los acumulados al-día N por cliente único (no por nombre, que puede
+    // colisionar entre clientes distintos con el mismo nombre).
     supabase.from("kpi_cliente_diario")
-      .select("territorio, cliente, anio, total_venta, total_kg, total_margen")
+      .select("territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24),
     supabase.from("kpi_cliente_diario")
-      .select("territorio, cliente, anio, total_venta, total_kg, total_margen")
+      .select("territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
     supabase.from("kpi_cliente_diario")
-      .select("territorio, cliente, anio, total_venta, total_kg, total_margen")
+      .select("territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
     // Vendedor
     supabase.from("kpi_vendedor_diario")
@@ -646,6 +648,71 @@ export default async function DashboardPage({
     byTerritory: perdidosByTerritory,
     total: perdidosTotal,
   };
+
+  // ============ Mejora 2 Commit C: PerdidoRow con datos al-día =============
+  // Construir Map<no_cliente, Map<anio, {venta, kg}>> con acumulado AL MISMO
+  // DÍA LABORAL del mes 2026 actual. Por territorio (para byTerritory) y
+  // total (sumando todos los territorios).
+  type AlDiaCliente = { v: number; k: number };
+  const alDiaByTerrCliAnio = new Map<
+    string,
+    Map<string, Map<number, AlDiaCliente>>
+  >();
+  const alDiaTotalCliAnio = new Map<string, Map<number, AlDiaCliente>>();
+
+  for (const row of clienteAlDiaAll) {
+    if (!row.no_cliente) continue;
+    const v = Number(row.total_venta) || 0;
+    const k = Number(row.total_kg ?? 0) || 0;
+    // Por territorio
+    let terrMap = alDiaByTerrCliAnio.get(row.territorio);
+    if (!terrMap) {
+      terrMap = new Map();
+      alDiaByTerrCliAnio.set(row.territorio, terrMap);
+    }
+    let cliMap = terrMap.get(row.no_cliente);
+    if (!cliMap) {
+      cliMap = new Map();
+      terrMap.set(row.no_cliente, cliMap);
+    }
+    const cur = cliMap.get(row.anio) ?? { v: 0, k: 0 };
+    cur.v += v;
+    cur.k += k;
+    cliMap.set(row.anio, cur);
+    // Total (sumando across territorios)
+    let totMap = alDiaTotalCliAnio.get(row.no_cliente);
+    if (!totMap) {
+      totMap = new Map();
+      alDiaTotalCliAnio.set(row.no_cliente, totMap);
+    }
+    const tcur = totMap.get(row.anio) ?? { v: 0, k: 0 };
+    tcur.v += v;
+    tcur.k += k;
+    totMap.set(row.anio, tcur);
+  }
+
+  // Mergear al-día en cada PerdidoRow
+  for (const [terr, rows] of Object.entries(perdidos.byTerritory)) {
+    const terrMap = alDiaByTerrCliAnio.get(terr);
+    for (const r of rows) {
+      const cliMap = terrMap?.get(r.no_cliente);
+      const a25 = cliMap?.get(currentYear - 1);
+      const a26 = cliMap?.get(currentYear);
+      r.mes_venta_alDia_2025 = a25?.v ?? 0;
+      r.mes_venta_alDia_2026 = a26?.v ?? 0;
+      r.mes_kg_alDia_2025 = a25?.k ?? 0;
+      r.mes_kg_alDia_2026 = a26?.k ?? 0;
+    }
+  }
+  for (const r of perdidos.total) {
+    const cliMap = alDiaTotalCliAnio.get(r.no_cliente);
+    const a25 = cliMap?.get(currentYear - 1);
+    const a26 = cliMap?.get(currentYear);
+    r.mes_venta_alDia_2025 = a25?.v ?? 0;
+    r.mes_venta_alDia_2026 = a26?.v ?? 0;
+    r.mes_kg_alDia_2025 = a25?.k ?? 0;
+    r.mes_kg_alDia_2026 = a26?.k ?? 0;
+  }
 
   // ============ SKUs (Tab Productos) ============
   // Necesitamos venta, kilos y margen por SKU x territorio x año (mes filter).

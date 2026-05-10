@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertOctagon,
   TrendingDown,
@@ -12,21 +12,33 @@ import { formatMoney, formatKilos } from "@/lib/format";
 
 export type PerdidoStatus = "perdido" | "declive" | "nuevo" | "estable";
 export type PerdidoDim = "mes" | "ytd";
+export type PerdidoMetric = "pesos" | "kilos";
+
+const PERDIDOS_METRIC_KEY = "perdidos-metric-mode";
 
 export interface PerdidoRow {
   no_cliente: string;
   cliente: string;
   vendedor: string;
-  // Mes actual
+  // Mes actual cierre completo (mes_2025 = todo el mes 2025; mes_2026 = lo que llevamos)
   mes_venta_2025: number;
   mes_venta_2026: number;
   mes_kg_2025: number;
   mes_kg_2026: number;
-  // YTD (Ene a mes actual)
+  // YTD cierre completo (ytd_2025 = Ene-mes_actual 2025 todo cerrado;
+  //                     ytd_2026 = Ene-hoy 2026 parcial)
   ytd_venta_2025: number;
   ytd_venta_2026: number;
   ytd_kg_2025: number;
   ytd_kg_2026: number;
+  // ===== Al MISMO DÍA LABORAL del mes 2026 actual (Mejora 2 Commit C) =====
+  // Para 2025: acumulado del mes hasta el día calendario equivalente al
+  // día hábil que llevamos en 2026. Permite comparativos día-vs-día.
+  // Para 2026: igual que mes_venta_2026 (lo que llevamos hoy).
+  mes_venta_alDia_2025?: number;
+  mes_venta_alDia_2026?: number;
+  mes_kg_alDia_2025?: number;
+  mes_kg_alDia_2026?: number;
 }
 
 interface Props {
@@ -93,17 +105,63 @@ export function PerdidosTab({
   // nuevos, no solo perdidos/declive).
   const [search, setSearch] = useState("");
 
+  // Toggle Pesos / Kilos (Mejora 2 Commit C). Persistencia localStorage.
+  const [metric, setMetric] = useState<PerdidoMetric>("pesos");
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PERDIDOS_METRIC_KEY);
+      if (saved === "kilos" || saved === "pesos") setMetric(saved);
+    } catch {
+      // ignore
+    }
+  }, []);
+  const switchMetric = (next: PerdidoMetric) => {
+    setMetric(next);
+    try {
+      window.localStorage.setItem(PERDIDOS_METRIC_KEY, next);
+    } catch {
+      // ignore
+    }
+  };
+
   // Compute TODOS los clientes con status (incluye estables y nuevos).
-  // El filtro por status "perdido/declive only" se aplica más adelante,
-  // dependiendo de si el buscador está activo o no.
+  //
+  // Mejora 2 Commit C: comparativo DÍA-VS-DÍA equitativo.
+  //   - Modo Mes: usar acumulado al mismo día laboral (mes_venta_alDia_*)
+  //   - Modo YTD: ytd_2025_alDia ≈ ytd_2025_cierre - mes_2025_cierre + mes_2025_alDia
+  //     (al ytd cerrado le restamos el mes 2025 cerrado y le sumamos el
+  //      mes 2025 al-día — quedamos con Ene-(mismo día actual) de 2025)
+  //   - Para 2026: mes_alDia_2026 ≈ mes_2026 (ambos parciales hasta hoy)
+  //                ytd_alDia_2026 = ytd_2026 (ya es Ene-hoy)
   const computed: Computed[] = useMemo(() => {
     const out: Computed[] = [];
     for (const r of rows) {
-      const v25 = dim === "mes" ? r.mes_venta_2025 : r.ytd_venta_2025;
-      const v26 = dim === "mes" ? r.mes_venta_2026 : r.ytd_venta_2026;
-      const k25 = dim === "mes" ? r.mes_kg_2025 : r.ytd_kg_2025;
-      const k26 = dim === "mes" ? r.mes_kg_2026 : r.ytd_kg_2026;
-      const { status, declinePct } = computeStatus(v25, v26);
+      const mesAlDia25 = r.mes_venta_alDia_2025 ?? 0;
+      const mesAlDia26 = r.mes_venta_alDia_2026 ?? r.mes_venta_2026;
+      const mesKgAlDia25 = r.mes_kg_alDia_2025 ?? 0;
+      const mesKgAlDia26 = r.mes_kg_alDia_2026 ?? r.mes_kg_2026;
+
+      // YTD al-día (ajuste con la fórmula explicada arriba)
+      const ytdAlDia25 = Math.max(
+        0,
+        r.ytd_venta_2025 - r.mes_venta_2025 + mesAlDia25
+      );
+      const ytdAlDia26 = r.ytd_venta_2026; // ya es Ene-hoy
+      const ytdKgAlDia25 = Math.max(
+        0,
+        r.ytd_kg_2025 - r.mes_kg_2025 + mesKgAlDia25
+      );
+      const ytdKgAlDia26 = r.ytd_kg_2026;
+
+      const v25 = dim === "mes" ? mesAlDia25 : ytdAlDia25;
+      const v26 = dim === "mes" ? mesAlDia26 : ytdAlDia26;
+      const k25 = dim === "mes" ? mesKgAlDia25 : ytdKgAlDia25;
+      const k26 = dim === "mes" ? mesKgAlDia26 : ytdKgAlDia26;
+
+      // Status calculado en la métrica activa (pesos o kilos)
+      const baseRef = metric === "pesos" ? v25 : k25;
+      const baseCur = metric === "pesos" ? v26 : k26;
+      const { status, declinePct } = computeStatus(baseRef, baseCur);
       if (!status) continue;
       out.push({
         no_cliente: r.no_cliente,
@@ -117,8 +175,11 @@ export function PerdidosTab({
         declinePct,
       });
     }
-    return out.sort((a, b) => b.v25 - a.v25);
-  }, [rows, dim]);
+    // Ordenar por la métrica activa (pesos o kilos) para que el "Top" sea coherente
+    return out.sort((a, b) =>
+      metric === "pesos" ? b.v25 - a.v25 : b.k25 - a.k25
+    );
+  }, [rows, dim, metric]);
 
   // Búsqueda activa = al menos 2 caracteres (evita re-renders de cada letra
   // sin propósito y match accidental con strings de 1 char muy comunes).
@@ -158,8 +219,9 @@ export function PerdidosTab({
 
   return (
     <div className="space-y-4">
-      {/* Toggle */}
-      <div className="flex items-center justify-end">
+      {/* Toggles */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <MetricToggle value={metric} onChange={switchMetric} />
         <DimToggle value={dim} onChange={setDim} monthShortYY={monthShortYY} />
       </div>
 
@@ -271,34 +333,39 @@ export function PerdidosTab({
                   <Th>Cliente</Th>
                   <Th>Vendedor</Th>
                   <Th align="center">Status</Th>
-                  <Th align="right">{labelPrev} $</Th>
-                  <Th align="right">{labelCurr} $</Th>
-                  <Th align="right">Var $ %</Th>
-                  <Th align="right">{labelPrev} kg</Th>
-                  <Th align="right">{labelCurr} kg</Th>
-                  <Th align="right">Var kg %</Th>
+                  {metric === "pesos" ? (
+                    <>
+                      <Th align="right">{labelPrev} $</Th>
+                      <Th align="right">{labelCurr} $</Th>
+                      <Th align="right">Var $ %</Th>
+                    </>
+                  ) : (
+                    <>
+                      <Th align="right">{labelPrev} kg</Th>
+                      <Th align="right">{labelCurr} kg</Th>
+                      <Th align="right">Var kg %</Th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {tableRows.map((r, i) => {
-                  const varKgPct =
-                    r.k25 > 0 ? ((r.k26 - r.k25) / r.k25) * 100 : null;
-                  const varKgColor =
-                    varKgPct == null
+                  // Var % en la métrica activa
+                  const refV = metric === "pesos" ? r.v25 : r.k25;
+                  const curV = metric === "pesos" ? r.v26 : r.k26;
+                  const varPct =
+                    refV > 0 ? ((curV - refV) / refV) * 100 : null;
+                  const varColor =
+                    varPct == null
                       ? "var(--text-muted)"
-                      : varKgPct <= -100
+                      : varPct <= -100
                         ? "var(--danger)"
-                        : varKgPct < -30
+                        : varPct < -30
                           ? "var(--danger)"
-                          : varKgPct < 0
+                          : varPct < 0
                             ? "var(--warning)"
                             : "var(--success)";
-                  const var$Color =
-                    r.declinePct >= 100
-                      ? "var(--danger)"
-                      : r.declinePct > 30
-                        ? "var(--danger)"
-                        : "var(--warning)";
+                  const fmt = metric === "pesos" ? formatMoney : formatKilos;
                   return (
                     <tr
                       key={r.no_cliente}
@@ -318,17 +385,12 @@ export function PerdidosTab({
                       <Td align="center">
                         <StatusBadge status={r.status} />
                       </Td>
-                      <Td align="right">{formatMoney(r.v25)}</Td>
-                      <Td align="right">{formatMoney(r.v26)}</Td>
-                      <Td align="right" bold color={var$Color}>
-                        -{r.declinePct.toFixed(1)}%
-                      </Td>
-                      <Td align="right">{formatKilos(r.k25)}</Td>
-                      <Td align="right">{formatKilos(r.k26)}</Td>
-                      <Td align="right" bold color={varKgColor}>
-                        {varKgPct == null
+                      <Td align="right">{fmt(refV)}</Td>
+                      <Td align="right">{fmt(curV)}</Td>
+                      <Td align="right" bold color={varColor}>
+                        {varPct == null
                           ? "—"
-                          : `${varKgPct >= 0 ? "+" : ""}${varKgPct.toFixed(1)}%`}
+                          : `${varPct >= 0 ? "+" : ""}${varPct.toFixed(1)}%`}
                       </Td>
                     </tr>
                   );
@@ -357,6 +419,47 @@ export function PerdidosTab({
 // ============================================================
 // Sub-components
 // ============================================================
+function MetricToggle({
+  value,
+  onChange,
+}: {
+  value: PerdidoMetric;
+  onChange: (v: PerdidoMetric) => void;
+}) {
+  const opts: Array<{ v: PerdidoMetric; label: string }> = [
+    { v: "pesos", label: "Pesos" },
+    { v: "kilos", label: "Kilos" },
+  ];
+  return (
+    <div
+      className="flex items-center gap-0.5 rounded-[var(--radius)] border p-0.5"
+      style={{
+        background: "var(--bg-surface-muted)",
+        borderColor: "var(--border)",
+      }}
+    >
+      {opts.map((opt) => {
+        const active = opt.v === value;
+        return (
+          <button
+            key={opt.v}
+            type="button"
+            onClick={() => onChange(opt.v)}
+            className="rounded-[var(--radius-sm)] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+            style={{
+              background: active ? "var(--bg-surface)" : "transparent",
+              color: active ? "var(--accent)" : "var(--text-muted)",
+              boxShadow: active ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function DimToggle({
   value,
   onChange,
