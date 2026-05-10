@@ -6,16 +6,10 @@ import Image from "next/image";
 import { Lock, Mail, ShieldAlert, Loader2, ArrowRight } from "lucide-react";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { LOGIN_QUOTES, shuffleQuotes, type Quote } from "@/lib/login-quotes";
 
 const SUPABASE_CONFIGURED =
   !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
   !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("PEGAR_AQUI");
-
-// Tiempo entre frases (ms) — 9s da tiempo cómodo de leer sin marear.
-const QUOTE_ROTATE_MS = 9000;
-// Duración del fade (ms) entre frase saliente y entrante
-const QUOTE_FADE_MS = 600;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,31 +19,11 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  // Frases rotativas (orden barajado por sesión)
-  const [quotes] = useState<Quote[]>(() => shuffleQuotes(LOGIN_QUOTES));
-  const [quoteIdx, setQuoteIdx] = useState(0);
-  const [quoteVisible, setQuoteVisible] = useState(true);
-
-  // Trigger de la intro: cambia `mounted` después del primer render para que
-  // las animaciones CSS arranquen (desde el estado inicial "antes" → "después").
+  // Trigger de la intro: cambia `mounted` después del primer render
   useEffect(() => {
     const t = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(t);
   }, []);
-
-  // Rotación de frases: fade out → cambiar índice → fade in
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setQuoteVisible(false);
-      window.setTimeout(() => {
-        setQuoteIdx((i) => (i + 1) % quotes.length);
-        setQuoteVisible(true);
-      }, QUOTE_FADE_MS);
-    }, QUOTE_ROTATE_MS);
-    return () => window.clearInterval(id);
-  }, [quotes.length]);
-
-  const currentQuote = quotes[quoteIdx];
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -163,22 +137,32 @@ export default function LoginPage() {
         <div
           className={`login-hero-content relative z-10 flex flex-col items-center px-12 ${mounted ? "is-loaded" : ""}`}
         >
-          {/* Logo InCom GIGANTE — el "InCom" ya está dentro del escudo */}
+          {/* Logo InCom GIGANTE (versión limpia extraída del SVG) */}
           <div className="login-hero-logo">
             <Image
               src="/incom-mark@4x.png"
               alt="InCom — Inteligencia Comercial Susazón"
               width={1024}
               height={1024}
-              className="h-[480px] w-[480px] drop-shadow-[0_30px_80px_rgba(237,104,8,0.55)] xl:h-[560px] xl:w-[560px]"
+              className="h-[440px] w-[440px] drop-shadow-[0_30px_80px_rgba(237,104,8,0.55)] xl:h-[520px] xl:w-[520px]"
               priority
             />
           </div>
 
-          {/* Solo el subtítulo (sin "InCom" duplicado — ya está en el logo) */}
-          <div className="login-hero-text -mt-4 text-center">
+          {/* InCom + subtítulo — debajo del logo */}
+          <div className="login-hero-text mt-6 text-center">
+            <h1
+              className="text-6xl font-bold tracking-tight text-white xl:text-7xl"
+              style={{
+                fontFamily: "var(--font-bebas), sans-serif",
+                letterSpacing: "0.04em",
+                textShadow: "0 4px 24px rgba(237,104,8,0.35)",
+              }}
+            >
+              InCom
+            </h1>
             <p
-              className="text-xs font-semibold uppercase tracking-[0.5em] text-white/85 xl:text-sm xl:tracking-[0.6em]"
+              className="mt-2 text-xs font-semibold uppercase tracking-[0.5em] text-white/85 xl:text-sm xl:tracking-[0.55em]"
               style={{ fontFamily: "var(--font-montserrat), sans-serif" }}
             >
               Inteligencia Comercial Susazón
@@ -187,30 +171,8 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Frase rotativa de pensador famoso — abajo */}
-        <div className="login-hero-quote absolute inset-x-0 bottom-16 z-10 flex flex-col items-center px-12">
-          <div
-            className="max-w-xl text-center transition-all"
-            style={{
-              opacity: quoteVisible ? 1 : 0,
-              transform: quoteVisible ? "translateY(0)" : "translateY(8px)",
-              transitionDuration: `${QUOTE_FADE_MS}ms`,
-            }}
-          >
-            <p
-              className="text-base font-light italic leading-relaxed text-white/85 xl:text-lg"
-              style={{ fontFamily: "var(--font-montserrat), sans-serif" }}
-            >
-              &ldquo;{currentQuote.text}&rdquo;
-            </p>
-            <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.4em] text-white/55">
-              — {currentQuote.author}
-            </p>
-          </div>
-        </div>
-
-        {/* Footer copyright — muy abajo, casi invisible */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[9px] uppercase tracking-[0.4em] text-white/30">
+        {/* Footer copyright — abajo, discreto */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.4em] text-white/40">
           © {new Date().getFullYear()} · Grupo Susazón
         </div>
       </section>
@@ -403,15 +365,13 @@ export default function LoginPage() {
 
         /* ===== Intro animations (~1.2s total) ===== */
         .login-hero-logo,
-        .login-hero-text,
-        .login-hero-quote {
+        .login-hero-text {
           opacity: 0;
         }
         .login-hero-logo {
           transform: scale(0.85);
         }
-        .login-hero-text,
-        .login-hero-quote {
+        .login-hero-text {
           transform: translateY(16px);
         }
         .login-form-card {
@@ -424,9 +384,6 @@ export default function LoginPage() {
         }
         .is-loaded.login-hero-content .login-hero-text {
           animation: hero-fade-up 700ms cubic-bezier(0.16, 1, 0.3, 1) 550ms forwards;
-        }
-        .login-hero-quote {
-          animation: hero-fade-up 700ms cubic-bezier(0.16, 1, 0.3, 1) 900ms forwards;
         }
         .login-form-card.is-loaded {
           animation: form-slide-in 700ms cubic-bezier(0.16, 1, 0.3, 1) 600ms forwards;
@@ -449,7 +406,6 @@ export default function LoginPage() {
         @media (prefers-reduced-motion: reduce) {
           .login-hero-logo,
           .login-hero-text,
-          .login-hero-quote,
           .login-form-card {
             opacity: 1 !important;
             transform: none !important;
