@@ -343,6 +343,7 @@ export function DashboardClient({
                     dimensionLabel="Grupo"
                     dimensionLabelPlural="Grupos"
                     topNChart={10}
+                    showKg
                   />
                 );
               }
@@ -375,6 +376,7 @@ export function DashboardClient({
                     dimensionLabelPlural="Clientes"
                     topNChart={10}
                     topNTable={50}
+                    showKg
                   />
                 );
               }

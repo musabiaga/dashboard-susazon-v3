@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatKilos } from "@/lib/format";
 import {
   GroupedBarChart,
   type GroupedBarSeries,
@@ -36,6 +36,9 @@ interface Props {
   topNChart?: number | null;
   /** Cuantos en tabla. Si null, muestra TODOS. Default null (todos). */
   topNTable?: number | null;
+  /** Si true, agrega 4 columnas extra de KG en la tabla (kg24, kg25, kg26, var % kg).
+   *  Solo se activa cuando los rows traen k24/k25/k26 poblados. Default false. */
+  showKg?: boolean;
 }
 
 /**
@@ -60,6 +63,7 @@ export function DimensionTab({
   dimensionLabelPlural,
   topNChart = 10,
   topNTable = null,
+  showKg = false,
 }: Props) {
   const sorted = useMemo(
     () => [...rows].sort((a, b) => b.v26 - a.v26),
@@ -138,16 +142,31 @@ export function DimensionTab({
               <thead>
                 <tr style={{ background: "var(--bg-surface-muted)" }}>
                   <Th>{dimensionLabel}</Th>
+                  {/* Pesos */}
                   <Th align="right">{monthLabel24}</Th>
                   <Th align="right">{monthLabel25}</Th>
                   <Th align="right">{monthLabel26}</Th>
                   <Th align="right">Var %</Th>
+                  {/* KG (opcional) */}
+                  {showKg && (
+                    <>
+                      <Th align="right" subtle>{`KG ${monthLabel24}`}</Th>
+                      <Th align="right" subtle>{`KG ${monthLabel25}`}</Th>
+                      <Th align="right" subtle>{`KG ${monthLabel26}`}</Th>
+                      <Th align="right" subtle>Var % KG</Th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {tableRows.map((r, i) => {
                   const varPct =
                     r.v25 > 0 ? ((r.v26 - r.v25) / r.v25) * 100 : null;
+                  const k24 = r.k24 ?? 0;
+                  const k25 = r.k25 ?? 0;
+                  const k26 = r.k26 ?? 0;
+                  const varKgPct =
+                    k25 > 0 ? ((k26 - k25) / k25) * 100 : null;
                   return (
                     <tr
                       key={r.name + i}
@@ -177,6 +196,28 @@ export function DimensionTab({
                           ? "—"
                           : `${varPct >= 0 ? "+" : ""}${varPct.toFixed(1)}%`}
                       </Td>
+                      {showKg && (
+                        <>
+                          <Td align="right" subtle>{formatKilos(k24)}</Td>
+                          <Td align="right" subtle>{formatKilos(k25)}</Td>
+                          <Td align="right" subtle>{formatKilos(k26)}</Td>
+                          <Td
+                            align="right"
+                            bold
+                            color={
+                              varKgPct == null
+                                ? "var(--text-muted)"
+                                : varKgPct >= 0
+                                  ? "var(--success)"
+                                  : "var(--danger)"
+                            }
+                          >
+                            {varKgPct == null
+                              ? "—"
+                              : `${varKgPct >= 0 ? "+" : ""}${varKgPct.toFixed(1)}%`}
+                          </Td>
+                        </>
+                      )}
                     </tr>
                   );
                 })}
@@ -204,16 +245,20 @@ export function DimensionTab({
 function Th({
   children,
   align = "left",
+  subtle = false,
 }: {
   children: React.ReactNode;
   align?: "left" | "right" | "center";
+  /** Si true, color más tenue + borde izquierdo sutil para separar grupo de columnas. */
+  subtle?: boolean;
 }) {
   return (
     <th
       className={`border-b px-3 py-2 font-semibold uppercase tracking-wider text-[10px] text-${align}`}
       style={{
         borderColor: "var(--border)",
-        color: "var(--text-secondary)",
+        color: subtle ? "var(--text-muted)" : "var(--text-secondary)",
+        borderLeft: subtle ? "1px dashed var(--border)" : undefined,
       }}
     >
       {children}
@@ -226,18 +271,22 @@ function Td({
   align = "left",
   color,
   bold = false,
+  subtle = false,
 }: {
   children: React.ReactNode;
   align?: "left" | "right" | "center";
   color?: string;
   bold?: boolean;
+  /** Si true, color más tenue + borde izquierdo sutil. */
+  subtle?: boolean;
 }) {
   return (
     <td
       className={`px-3 py-2 text-${align}`}
       style={{
-        color: color ?? "var(--text-primary)",
+        color: color ?? (subtle ? "var(--text-secondary)" : "var(--text-primary)"),
         fontWeight: bold ? 600 : 400,
+        borderLeft: subtle ? "1px dashed var(--border)" : undefined,
       }}
     >
       {children}

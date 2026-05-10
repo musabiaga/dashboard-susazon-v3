@@ -60,6 +60,7 @@ function buildDimDataset<
     territorio: string;
     anio: number;
     total_venta: number | string | null;
+    total_kg?: number | string | null;
   },
 >(
   rows: T[] | null,
@@ -74,11 +75,27 @@ function buildDimDataset<
       byTerrMap.set(row.territorio, m);
     }
     const name = getName(row);
-    const cur = m.get(name) ?? { name, v24: 0, v25: 0, v26: 0 };
+    const cur = m.get(name) ?? {
+      name,
+      v24: 0,
+      v25: 0,
+      v26: 0,
+      k24: 0,
+      k25: 0,
+      k26: 0,
+    };
     const v = Number(row.total_venta) || 0;
-    if (row.anio === cy - 2) cur.v24 = v;
-    else if (row.anio === cy - 1) cur.v25 = v;
-    else if (row.anio === cy) cur.v26 = v;
+    const k = Number(row.total_kg ?? 0) || 0;
+    if (row.anio === cy - 2) {
+      cur.v24 = v;
+      cur.k24 = k;
+    } else if (row.anio === cy - 1) {
+      cur.v25 = v;
+      cur.k25 = k;
+    } else if (row.anio === cy) {
+      cur.v26 = v;
+      cur.k26 = k;
+    }
     m.set(name, cur);
   }
   const byTerritory: Record<string, DimensionRow[]> = {};
@@ -91,10 +108,16 @@ function buildDimDataset<
         v24: 0,
         v25: 0,
         v26: 0,
+        k24: 0,
+        k25: 0,
+        k26: 0,
       };
       cur.v24 += r.v24;
       cur.v25 += r.v25;
       cur.v26 += r.v26;
+      cur.k24 = (cur.k24 ?? 0) + (r.k24 ?? 0);
+      cur.k25 = (cur.k25 ?? 0) + (r.k25 ?? 0);
+      cur.k26 = (cur.k26 ?? 0) + (r.k26 ?? 0);
       totalMap.set(r.name, cur);
     }
   }
@@ -219,7 +242,7 @@ export default async function DashboardPage({
   ] = await Promise.all([
     supabase
       .from("kpi_grupo_summary")
-      .select("territorio, grupo, anio, total_venta")
+      .select("territorio, grupo, anio, total_venta, total_kg")
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
     supabase
@@ -229,7 +252,7 @@ export default async function DashboardPage({
       .eq("mes", currentMonth),
     supabase
       .from("kpi_cliente_summary")
-      .select("territorio, no_cliente, cliente, anio, total_venta")
+      .select("territorio, no_cliente, cliente, anio, total_venta, total_kg")
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
     supabase
