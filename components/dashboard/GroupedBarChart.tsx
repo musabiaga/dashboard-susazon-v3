@@ -12,6 +12,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatMoney } from "@/lib/format";
+import {
+  ChartLegend,
+  type ChartLegendSection,
+} from "@/components/dashboard/ChartLegend";
 
 export interface GroupedBarSeries {
   key: string;   // dataKey en cada item
@@ -142,12 +146,38 @@ export function GroupedBarChart({
         <Legend
           verticalAlign={legendVerticalAlign}
           align="center"
-          height={28}
+          height={hasMargin ? 32 : 24}
           wrapperStyle={{
-            fontSize: 12,
-            paddingBottom: legendVerticalAlign === "top" ? 8 : 0,
+            paddingBottom: legendVerticalAlign === "top" ? 4 : 0,
           }}
-          iconType="rect"
+          content={() => (
+            <ChartLegend
+              sections={[
+                {
+                  title: "Venta",
+                  visualKind: hasAlDia ? "barras apiladas" : "barras",
+                  items: series.map((s) => ({
+                    label: s.label,
+                    color: s.color,
+                    type: hasAlDia ? "bar-stacked" : "bar",
+                  })),
+                },
+                ...(hasMargin && marginPctSeries
+                  ? [
+                      {
+                        title: "Margen %",
+                        visualKind: "líneas",
+                        items: marginPctSeries.map((s) => ({
+                          label: s.label.replace(/^Margen %\s+/, ""),
+                          color: s.color,
+                          type: "line-dashed" as const,
+                        })),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          )}
         />
         {hasAlDia
           ? // Modo apilado: cada año es 2 segmentos (al-día sólido + resto

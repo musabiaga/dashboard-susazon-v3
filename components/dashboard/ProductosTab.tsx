@@ -15,6 +15,7 @@ import {
 import { formatMoney, formatKilos } from "@/lib/format";
 import type { DimensionRow } from "@/components/dashboard/DimensionTab";
 import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
+import { ChartLegend } from "@/components/dashboard/ChartLegend";
 
 const PRODUCTOS_SELECTED_KEY = "productos-selected-skus";
 const MAX_CUSTOM_SELECTION = 15;
@@ -265,9 +266,32 @@ export function ProductosTab({
                 <Legend
                   verticalAlign="top"
                   align="center"
-                  height={28}
-                  wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
-                  iconType="rect"
+                  height={32}
+                  wrapperStyle={{ paddingBottom: 4 }}
+                  content={() => (
+                    <ChartLegend
+                      sections={[
+                        {
+                          title: "Kilos",
+                          visualKind: "barras apiladas",
+                          items: [
+                            { label: monthLabel24, color: "rgba(148, 163, 184, 0.85)", type: "bar-stacked" },
+                            { label: monthLabel25, color: "rgba(59, 130, 246, 0.85)", type: "bar-stacked" },
+                            { label: monthLabel26, color: "rgba(16, 185, 129, 0.85)", type: "bar-stacked" },
+                          ],
+                        },
+                        {
+                          title: "Venta $",
+                          visualKind: "líneas",
+                          items: [
+                            { label: monthLabel24, color: "#94a3b8", type: "line-dashed" },
+                            { label: monthLabel25, color: "#3b82f6", type: "line-solid" },
+                            { label: monthLabel26, color: "#f59e0b", type: "line-solid" },
+                          ],
+                        },
+                      ]}
+                    />
+                  )}
                 />
                 {/* 3 series de barras Kilos APILADAS (Mejora 2 día-vs-día):
                     cada año se compone de "al día N" (sólido) + "resto hasta

@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { formatMoney } from "@/lib/format";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
+import { ChartLegend } from "@/components/dashboard/ChartLegend";
 
 const MONTHS_SHORT_ES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -120,8 +121,34 @@ export function VentasTab({ kpi, cutoffYear, cutoffMonth }: Props) {
             cursor={{ fill: "rgba(0,0,0,0.04)" }}
           />
           <Legend
-            wrapperStyle={{ fontSize: 12 }}
-            iconType="circle"
+            verticalAlign="top"
+            align="center"
+            height={32}
+            wrapperStyle={{ paddingBottom: 4 }}
+            content={() => (
+              <ChartLegend
+                sections={[
+                  {
+                    title: "Venta",
+                    visualKind: "barras",
+                    items: [
+                      { label: "2024", color: "rgba(148, 163, 184, 0.85)", type: "bar" },
+                      { label: "2025", color: "rgba(59, 130, 246, 0.85)", type: "bar" },
+                      { label: "2026", color: "rgba(16, 185, 129, 0.85)", type: "bar" },
+                    ],
+                  },
+                  {
+                    title: "Margen %",
+                    visualKind: "líneas",
+                    items: [
+                      { label: "2024", color: "#94a3b8", type: "line-dashed" },
+                      { label: "2025", color: "#3b82f6", type: "line-dashed" },
+                      { label: "2026", color: "#10b981", type: "line-dashed" },
+                    ],
+                  },
+                ]}
+              />
+            )}
           />
           {/* Barras de venta (eje izquierdo) */}
           <Bar

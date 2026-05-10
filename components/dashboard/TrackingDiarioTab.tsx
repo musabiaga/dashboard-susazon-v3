@@ -15,6 +15,7 @@ import {
 import { formatMoney, formatKilos } from "@/lib/format";
 import { countBizDays, isBusinessDay } from "@/lib/business-days";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
+import { ChartLegend } from "@/components/dashboard/ChartLegend";
 
 type ViewMode = "pesos" | "kg";
 const VIEW_MODE_KEY = "tracking-diario-mode";
@@ -723,8 +724,59 @@ export function TrackingDiarioTab({
                 }}
               />
               <Legend
-                wrapperStyle={{ fontSize: 12 }}
-                iconType="line"
+                verticalAlign="top"
+                align="center"
+                height={32}
+                wrapperStyle={{ paddingBottom: 4 }}
+                content={() => (
+                  <ChartLegend
+                    sections={!isKg
+                      ? [
+                          {
+                            title: "Diario",
+                            visualKind: "barras",
+                            items: [
+                              { label: "Venta Diaria", color: "rgba(59, 130, 246, 0.6)", type: "bar" },
+                            ],
+                          },
+                          {
+                            title: "Tendencia",
+                            visualKind: "líneas",
+                            items: [
+                              { label: "Acumulado", color: "#1e3a8a", type: "line-solid" },
+                              ...(hasPtto
+                                ? [{ label: "Ptto Linear", color: "#a855f7", type: "line-dashed" as const }]
+                                : []),
+                              ...(hasPrev
+                                ? [{ label: `Año Anterior (${prevMonthShortYY})`, color: "#94a3b8", type: "line-dashed" as const }]
+                                : []),
+                            ],
+                          },
+                        ]
+                      : [
+                          {
+                            title: "Diario",
+                            visualKind: "barras",
+                            items: [
+                              { label: "KG Diaria", color: "rgba(16, 185, 129, 0.6)", type: "bar" },
+                            ],
+                          },
+                          {
+                            title: "Tendencia",
+                            visualKind: "líneas",
+                            items: [
+                              { label: "Acumulado KG 2026", color: "#065f46", type: "line-solid" },
+                              ...(hasPrev
+                                ? [
+                                    { label: `Acumulado KG ${prevMonthShortYY}`, color: "#94a3b8", type: "line-dashed" as const },
+                                    { label: "Pace 2025 (lineal)", color: "#a855f7", type: "line-dashed" as const },
+                                  ]
+                                : []),
+                            ],
+                          },
+                        ]}
+                  />
+                )}
               />
               {!isKg ? (
                 <>
