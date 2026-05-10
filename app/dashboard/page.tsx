@@ -324,6 +324,7 @@ export default async function DashboardPage({
     { data: budgetRows },
     { data: dailyCurrent },
     { data: dailyPrevYear },
+    { data: dailyPrev2Year },
   ] = await Promise.all([
     supabase
       .from("kpi_monthly_summary")
@@ -347,6 +348,14 @@ export default async function DashboardPage({
       .from("kpi_daily_summary")
       .select("fecha, territorio, total_venta, total_margen, total_kg")
       .eq("anio", currentYear - 1)
+      .eq("mes", currentMonth)
+      .order("fecha"),
+    // Daily 2024 del mes actual — para sombreado al-día del slot del mes
+    // actual del chart Ventas (Commit B Mejora 2)
+    supabase
+      .from("kpi_daily_summary")
+      .select("fecha, territorio, total_venta, total_margen, total_kg")
+      .eq("anio", currentYear - 2)
       .eq("mes", currentMonth)
       .order("fecha"),
   ]);
@@ -774,6 +783,46 @@ export default async function DashboardPage({
     });
   }
 
+  // Acumulados al día N del mes actual por año (Mejora 2 Commit B).
+  // Usado por VentasTab para apilar barras del slot del mes actual:
+  // segmento sólido = al-día, segmento translúcido = resto hasta cierre.
+  const ensureCurrentMonthAlDia = (k: TerritoryKpi) => {
+    if (!k.currentMonthAlDia) {
+      k.currentMonthAlDia = {
+        v24: 0, v25: 0, v26: 0,
+        m24: 0, m25: 0, m26: 0,
+      };
+    }
+    return k.currentMonthAlDia;
+  };
+  // 2024 (cutoff24)
+  for (const row of dailyPrev2Year ?? []) {
+    const day = new Date(row.fecha + "T12:00:00").getDate();
+    if (day > cutoff24) continue;
+    const t = ensureT(row.territorio);
+    const ald = ensureCurrentMonthAlDia(t);
+    ald.v24 += Number(row.total_venta) || 0;
+    ald.m24 += Number(row.total_margen) || 0;
+  }
+  // 2025 (cutoff25) — aprovechamos dailyPrevYear que ya tenemos cargado
+  for (const row of dailyPrevYear ?? []) {
+    const day = new Date(row.fecha + "T12:00:00").getDate();
+    if (day > cutoff25) continue;
+    const t = ensureT(row.territorio);
+    const ald = ensureCurrentMonthAlDia(t);
+    ald.v25 += Number(row.total_venta) || 0;
+    ald.m25 += Number(row.total_margen) || 0;
+  }
+  // 2026 (cutoff26 = daysCurrent) — aprovechamos dailyCurrent ya cargado
+  for (const row of dailyCurrent ?? []) {
+    const day = new Date(row.fecha + "T12:00:00").getDate();
+    if (day > cutoff26) continue;
+    const t = ensureT(row.territorio);
+    const ald = ensureCurrentMonthAlDia(t);
+    ald.v26 += Number(row.total_venta) || 0;
+    ald.m26 += Number(row.total_margen) || 0;
+  }
+
   for (const [name, k] of kpiByTerritory) {
     kpiByTerritory.set(name, withMarginPct(k));
   }
@@ -859,6 +908,21 @@ export default async function DashboardPage({
         const yr = Number(y);
         acumByYear[yr] = (acumByYear[yr] ?? 0) + v;
       }
+      // Sumar currentMonthAlDia de cada territorio al total
+      const accAld = acc.currentMonthAlDia ?? {
+        v24: 0, v25: 0, v26: 0, m24: 0, m25: 0, m26: 0,
+      };
+      const kAld = k.currentMonthAlDia ?? {
+        v24: 0, v25: 0, v26: 0, m24: 0, m25: 0, m26: 0,
+      };
+      const currentMonthAlDia = {
+        v24: accAld.v24 + kAld.v24,
+        v25: accAld.v25 + kAld.v25,
+        v26: accAld.v26 + kAld.v26,
+        m24: accAld.m24 + kAld.m24,
+        m25: accAld.m25 + kAld.m25,
+        m26: accAld.m26 + kAld.m26,
+      };
       return {
         venta: acc.venta + k.venta,
         margen: acc.margen + k.margen,
@@ -872,6 +936,7 @@ export default async function DashboardPage({
         acumByYear,
         daily: { current: [], prevYear: [] }, // populamos abajo
         monthly: [],
+        currentMonthAlDia,
       };
     },
     emptyKpi()

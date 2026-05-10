@@ -42,6 +42,15 @@ export interface TerritoryKpi {
   // Monthly breakdown todos los años — usado por tab Ventas.
   // Cada entrada es (anio, mes, venta, margen, kg) sumando sobre territorio.
   monthly: MonthlyPoint[];
+  // Acumulado AL DÍA N del mes actual de cada año (Mejora 2 Commit B).
+  // Permite mostrar barras apiladas en el slot del mes actual del chart
+  // anual de Ventas: segmento sólido = al-día, segmento translúcido = resto.
+  // Para 2026 = lo facturado hasta hoy. Para 2024/25 = acumulado al día
+  // calendario equivalente al día hábil que llevamos en 2026.
+  currentMonthAlDia?: {
+    v24: number; v25: number; v26: number;
+    m24: number; m25: number; m26: number;
+  };
 }
 
 export interface Territory {

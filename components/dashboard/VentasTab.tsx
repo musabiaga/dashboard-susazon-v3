@@ -50,11 +50,15 @@ export function VentasTab({ kpi, cutoffYear, cutoffMonth }: Props) {
     }
 
     // 12 filas, una por mes. Cada fila tiene venta y margen% por año.
+    // Mejora 2 Commit B: el slot del mes actual usa barras apiladas
+    // (al-día sólido + resto translúcido). Los demás meses se ven igual.
+    const ald = kpi.currentMonthAlDia;
     return MONTHS_SHORT_ES.map((label, i) => {
       const mes = i + 1;
       const get = (anio: number) => byKey.get(`${anio}-${mes}`);
       const future = (anio: number) =>
         anio > cutoffYear || (anio === cutoffYear && mes > cutoffMonth);
+      const isCurrentSlot = mes === cutoffMonth; // mes actual
 
       const v24 = get(2024);
       const v25 = get(2025);
@@ -64,6 +68,29 @@ export function VentasTab({ kpi, cutoffYear, cutoffMonth }: Props) {
       const venta24 = future(2024) ? null : v24?.v ?? 0;
       const venta25 = future(2025) ? null : v25?.v ?? 0;
       const venta26 = future(2026) ? null : v26?.v ?? 0;
+
+      // Para el slot del mes actual, calculamos al-día y resto.
+      // Para los demás meses, al-día = cierre y resto = 0 (las barras
+      // se ven idénticas a una barra simple porque el segmento translúcido
+      // tiene altura 0).
+      const v24AlDia = isCurrentSlot && ald
+        ? Math.min(venta24 ?? 0, ald.v24)
+        : (venta24 ?? 0);
+      const v25AlDia = isCurrentSlot && ald
+        ? Math.min(venta25 ?? 0, ald.v25)
+        : (venta25 ?? 0);
+      const v26AlDia = isCurrentSlot && ald
+        ? Math.min(venta26 ?? 0, ald.v26)
+        : (venta26 ?? 0);
+      const v24Rest = isCurrentSlot && ald
+        ? Math.max(0, (venta24 ?? 0) - v24AlDia)
+        : 0;
+      const v25Rest = isCurrentSlot && ald
+        ? Math.max(0, (venta25 ?? 0) - v25AlDia)
+        : 0;
+      const v26Rest = isCurrentSlot && ald
+        ? Math.max(0, (venta26 ?? 0) - v26AlDia)
+        : 0;
 
       const margenPct = (
         agg: { v: number; m: number } | undefined
@@ -75,12 +102,21 @@ export function VentasTab({ kpi, cutoffYear, cutoffMonth }: Props) {
         venta24,
         venta25,
         venta26,
+        // Segmentos apilados (Mejora 2 Commit B)
+        venta24_alDia: future(2024) ? null : v24AlDia,
+        venta25_alDia: future(2025) ? null : v25AlDia,
+        venta26_alDia: future(2026) ? null : v26AlDia,
+        __rest_v24: future(2024) ? null : v24Rest,
+        __rest_v25: future(2025) ? null : v25Rest,
+        __rest_v26: future(2026) ? null : v26Rest,
+        // Flag para que el tooltip sepa si mostrar info de día-vs-día
+        __isCurrentSlot: isCurrentSlot,
         margenPct24: future(2024) ? null : margenPct(v24),
         margenPct25: future(2025) ? null : margenPct(v25),
         margenPct26: future(2026) ? null : margenPct(v26),
       };
     });
-  }, [kpi.monthly, cutoffYear, cutoffMonth]);
+  }, [kpi.monthly, kpi.currentMonthAlDia, cutoffYear, cutoffMonth]);
 
   return (
     <div
@@ -150,26 +186,61 @@ export function VentasTab({ kpi, cutoffYear, cutoffMonth }: Props) {
               />
             )}
           />
-          {/* Barras de venta (eje izquierdo) */}
+          {/* Barras de venta APILADAS (Mejora 2 Commit B):
+              - Slot del mes actual: segmento sólido (al-día) + segmento
+                translúcido (resto hasta cierre)
+              - Demás slots: __rest = 0 → solo se ve segmento sólido
+                (que es el cierre completo). Visualmente idéntico a barra
+                simple. */}
           <Bar
             yAxisId="left"
-            dataKey="venta24"
+            dataKey="venta24_alDia"
+            stackId="stack-v24"
             name="Venta 2024"
-            fill="rgba(148, 163, 184, 0.7)"
+            fill="rgba(148, 163, 184, 0.85)"
+            radius={[0, 0, 0, 0]}
+          />
+          <Bar
+            yAxisId="left"
+            dataKey="__rest_v24"
+            stackId="stack-v24"
+            name="Venta 2024"
+            legendType="none"
+            fill="rgba(148, 163, 184, 0.28)"
             radius={[2, 2, 0, 0]}
           />
           <Bar
             yAxisId="left"
-            dataKey="venta25"
+            dataKey="venta25_alDia"
+            stackId="stack-v25"
             name="Venta 2025"
             fill="rgba(59, 130, 246, 0.85)"
+            radius={[0, 0, 0, 0]}
+          />
+          <Bar
+            yAxisId="left"
+            dataKey="__rest_v25"
+            stackId="stack-v25"
+            name="Venta 2025"
+            legendType="none"
+            fill="rgba(59, 130, 246, 0.28)"
             radius={[2, 2, 0, 0]}
           />
           <Bar
             yAxisId="left"
-            dataKey="venta26"
+            dataKey="venta26_alDia"
+            stackId="stack-v26"
             name="Venta 2026"
             fill="rgba(16, 185, 129, 0.85)"
+            radius={[0, 0, 0, 0]}
+          />
+          <Bar
+            yAxisId="left"
+            dataKey="__rest_v26"
+            stackId="stack-v26"
+            name="Venta 2026"
+            legendType="none"
+            fill="rgba(16, 185, 129, 0.28)"
             radius={[2, 2, 0, 0]}
           />
           {/* Líneas de margen % (eje derecho) */}
@@ -234,17 +305,37 @@ function VentasTooltip({
   const monthIdx = MONTHS_SHORT_ES.indexOf(label ?? "");
   const monthLong = monthIdx >= 0 ? MONTHS_LONG_ES[monthIdx] : (label ?? "");
 
-  // Split por tipo de serie
-  const ventaItems = payload.filter((p) => p.name?.startsWith("Venta"));
+  // Recharts inyecta el row completo en payload[0].payload — usamos eso
+  // para leer al-día / cierre / margen sin duplicados (las 6 series de
+  // venta apiladas darían 6 entries al filtrar por name).
+  const row = (payload[0] as TooltipPayloadItem & {
+    payload?: Record<string, number | string | boolean | null>;
+  })?.payload;
+  const num = (key: string): number | null => {
+    if (!row) return null;
+    const v = row[key];
+    return typeof v === "number" ? v : null;
+  };
+  const isCurrentSlot = !!(row && row["__isCurrentSlot"]);
+
+  // Margen items se mantienen del payload (líneas, no apiladas)
   const margenItems = payload.filter((p) => p.name?.startsWith("Margen%"));
 
-  // Var YoY si hay 2 años con data
-  const v25 = ventaItems.find((p) => p.name === "Venta 2025")?.value;
-  const v26 = ventaItems.find((p) => p.name === "Venta 2026")?.value;
+  // Cierres por año (suma de al-día + resto) — para YoY del header
+  const v25 = num("venta25");
+  const v26 = num("venta26");
   const yoyDelta =
-    typeof v25 === "number" && v25 > 0 && typeof v26 === "number"
+    v25 != null && v25 > 0 && v26 != null
       ? ((v26 - v25) / v25) * 100
       : null;
+
+  // Series de Venta para mostrar en sección — usamos al-día como principal
+  // y cierre como referencia (solo cuando es el mes actual).
+  const ventaShow = [
+    { label: "2024", colorBar: "rgba(148, 163, 184, 0.85)", cierreKey: "venta24", alDiaKey: "venta24_alDia" },
+    { label: "2025", colorBar: "rgba(59, 130, 246, 0.85)",  cierreKey: "venta25", alDiaKey: "venta25_alDia" },
+    { label: "2026", colorBar: "rgba(16, 185, 129, 0.85)",  cierreKey: "venta26", alDiaKey: "venta26_alDia" },
+  ];
 
   return (
     <div
@@ -282,28 +373,46 @@ function VentasTooltip({
         )}
       </div>
 
-      {/* Sección Venta */}
-      {ventaItems.length > 0 && (
-        <div className="px-3 py-2">
-          <div
-            className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Venta
-          </div>
-          {ventaItems.map((p) => (
+      {/* Sección Venta — al día N (oscuro) + cierre (referencia) si mes actual */}
+      <div className="px-3 py-2">
+        <div
+          className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Venta {isCurrentSlot ? "· al mismo día laboral" : ""}
+        </div>
+        {ventaShow.map((s) => {
+          const cierre = num(s.cierreKey);
+          const alDia = num(s.alDiaKey);
+          if (cierre == null && alDia == null) return null;
+          // Si NO es slot actual, al-día = cierre; mostramos solo el cierre.
+          // Si SÍ es slot actual, al-día puede ser distinto del cierre →
+          // mostramos al-día como principal + "cierre $X" como referencia.
+          const showSecondary =
+            isCurrentSlot &&
+            alDia != null &&
+            cierre != null &&
+            cierre > 0 &&
+            cierre !== alDia;
+          return (
             <Row
-              key={p.name}
-              color={p.color}
-              label={p.name?.replace("Venta ", "") ?? ""}
+              key={s.label}
+              color={s.colorBar}
+              label={s.label}
               value={
-                typeof p.value === "number" ? formatMoney(p.value) : "—"
+                isCurrentSlot && alDia != null
+                  ? formatMoney(alDia)
+                  : cierre != null
+                    ? formatMoney(cierre)
+                    : "—"
+              }
+              valueSecondary={
+                showSecondary ? `cierre ${formatMoney(cierre)}` : undefined
               }
             />
-          ))}
-        </div>
-      )}
-
+          );
+        })}
+      </div>
       {/* Sección Margen% */}
       {margenItems.length > 0 && (
         <div
@@ -336,10 +445,13 @@ function Row({
   color,
   label,
   value,
+  valueSecondary,
 }: {
   color: string | undefined;
   label: string;
   value: string;
+  /** Texto secundario en gris (ej: "cierre $X" como referencia) */
+  valueSecondary?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-0.5">
@@ -350,11 +462,21 @@ function Row({
         />
         <span style={{ color: "var(--text-secondary)" }}>{label}</span>
       </span>
-      <span
-        className="font-semibold"
-        style={{ color: "var(--text-primary)" }}
-      >
-        {value}
+      <span className="flex items-baseline gap-1.5">
+        <span
+          className="font-semibold"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {value}
+        </span>
+        {valueSecondary && (
+          <span
+            className="text-[10px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {valueSecondary}
+          </span>
+        )}
       </span>
     </div>
   );
