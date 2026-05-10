@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Lock, Mail, ShieldAlert, Loader2, ArrowRight } from "lucide-react";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
+import { SusazonLogo } from "@/components/brand/SusazonLogo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const SUPABASE_CONFIGURED =
@@ -201,6 +202,18 @@ export default function LoginPage() {
             >
               InCom
             </h1>
+          </div>
+
+          {/* Logo Susazón — branding del cliente. Auto-switch entre marrón
+              (fondos claros) y blanco (fondos oscuros) según el theme. */}
+          <div className="mb-8 flex justify-center">
+            <SusazonLogo
+              surface="page"
+              width={240}
+              height={120}
+              className="h-14 w-auto opacity-90 transition-opacity hover:opacity-100"
+              priority
+            />
           </div>
 
           {/* Header del form */}
