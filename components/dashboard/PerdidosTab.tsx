@@ -5,10 +5,12 @@ import {
   AlertOctagon,
   TrendingDown,
   AlertTriangle,
+  Search,
+  X,
 } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 
-export type PerdidoStatus = "perdido" | "declive";
+export type PerdidoStatus = "perdido" | "declive" | "nuevo" | "estable";
 export type PerdidoDim = "mes" | "ytd";
 
 export interface PerdidoRow {
@@ -50,10 +52,21 @@ function computeStatus(v25: number, v26: number): {
   status: PerdidoStatus | null;
   declinePct: number;
 } {
+  // Perdido: tenía venta en 2025 pero CERO en 2026
   if (v25 > 0 && v26 === 0) return { status: "perdido", declinePct: 100 };
+  // Declive: tenía venta en 2025 y BAJO en 2026 (sin llegar a cero)
   if (v25 > 0 && v26 < v25) {
     return { status: "declive", declinePct: ((v25 - v26) / v25) * 100 };
   }
+  // Nuevo: NO tenía venta en 2025 pero AHORA sí en 2026
+  if (v25 === 0 && v26 > 0) {
+    return { status: "nuevo", declinePct: 0 };
+  }
+  // Estable o creciendo: v26 >= v25 (cubre v25 == v26 o creció)
+  if (v26 >= v25 && (v25 > 0 || v26 > 0)) {
+    return { status: "estable", declinePct: 0 };
+  }
+  // Sin venta en ambos años → no incluir
   return { status: null, declinePct: 0 };
 }
 
@@ -74,8 +87,15 @@ export function PerdidosTab({
   topNTable = 100,
 }: Props) {
   const [dim, setDim] = useState<PerdidoDim>("mes");
+  // Buscador: filtra por substring en cliente y/o vendedor (case-insensitive).
+  // Vacío = comportamiento default (Top 100 perdidos+declive).
+  // Con texto = muestra TODOS los clientes que matchean (incluye estables y
+  // nuevos, no solo perdidos/declive).
+  const [search, setSearch] = useState("");
 
-  // Compute por dimensión activa
+  // Compute TODOS los clientes con status (incluye estables y nuevos).
+  // El filtro por status "perdido/declive only" se aplica más adelante,
+  // dependiendo de si el buscador está activo o no.
   const computed: Computed[] = useMemo(() => {
     const out: Computed[] = [];
     for (const r of rows) {
@@ -100,11 +120,28 @@ export function PerdidosTab({
     return out.sort((a, b) => b.v25 - a.v25);
   }, [rows, dim]);
 
-  const tableRows = useMemo(
-    () => computed.slice(0, topNTable),
-    [computed, topNTable]
-  );
+  // Búsqueda activa = al menos 2 caracteres (evita re-renders de cada letra
+  // sin propósito y match accidental con strings de 1 char muy comunes).
+  const searchActive = search.trim().length >= 2;
 
+  const tableRows = useMemo(() => {
+    if (searchActive) {
+      // Modo búsqueda: filtrar TODOS los clientes (incluyendo estables y
+      // nuevos) por substring match en cliente o vendedor.
+      const q = search.trim().toLowerCase();
+      return computed.filter(
+        (r) =>
+          r.cliente.toLowerCase().includes(q) ||
+          r.vendedor.toLowerCase().includes(q)
+      );
+    }
+    // Modo default: solo perdidos+declive (sin estables ni nuevos), top 100
+    return computed
+      .filter((r) => r.status === "perdido" || r.status === "declive")
+      .slice(0, topNTable);
+  }, [computed, search, searchActive, topNTable]);
+
+  // Stats SIEMPRE basadas en perdidos+declive (no se afectan por el buscador).
   const stats = useMemo(() => {
     const perdidos = computed.filter((r) => r.status === "perdido").length;
     const declives = computed.filter((r) => r.status === "declive");
@@ -148,6 +185,53 @@ export function PerdidosTab({
         />
       </div>
 
+      {/* Buscador */}
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] border p-3"
+        style={{
+          background: "var(--bg-surface)",
+          borderColor: "var(--border)",
+        }}
+      >
+        <div
+          className="flex flex-1 items-center gap-2 rounded-[var(--radius)] border px-3 py-1.5"
+          style={{
+            background: "var(--bg-surface-muted)",
+            borderColor: "var(--border)",
+            minWidth: 280,
+          }}
+        >
+          <Search size={14} style={{ color: "var(--text-muted)" }} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar cliente o vendedor (incluye estables y nuevos)…"
+            className="flex-1 bg-transparent text-sm outline-none"
+            style={{ color: "var(--text-primary)" }}
+          />
+          {search.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Limpiar búsqueda"
+              className="rounded p-0.5 transition-colors hover:bg-[var(--bg-surface)]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <span
+          className="text-[11px]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {searchActive
+            ? `${tableRows.length} resultado${tableRows.length === 1 ? "" : "s"} · incluye estables y nuevos`
+            : `Top ${Math.min(topNTable, tableRows.length)} perdidos / declive · escribe ≥2 letras para buscar TODOS los clientes`}
+        </span>
+      </div>
+
       {/* Tabla */}
       {computed.length === 0 ? (
         <div
@@ -158,7 +242,19 @@ export function PerdidosTab({
             color: "var(--text-muted)",
           }}
         >
-          Sin clientes en estado perdido o declive para esta dimensión 🎉
+          Sin data para esta dimensión.
+        </div>
+      ) : tableRows.length === 0 ? (
+        <div
+          className="rounded-[var(--radius-lg)] border p-12 text-center text-sm"
+          style={{
+            background: "var(--bg-surface)",
+            borderColor: "var(--border)",
+            color: "var(--text-muted)",
+          }}
+        >
+          Sin resultados para <strong>&quot;{search}&quot;</strong>. Verifica
+          la ortografía o búscalo por nombre del vendedor.
         </div>
       ) : (
         <div
@@ -360,6 +456,16 @@ function StatusBadge({ status }: { status: PerdidoStatus }) {
       label: "Declive",
       bg: "var(--warning-soft)",
       color: "var(--warning)",
+    },
+    nuevo: {
+      label: "Nuevo",
+      bg: "rgba(59, 130, 246, 0.15)",
+      color: "#3b82f6",
+    },
+    estable: {
+      label: "Estable",
+      bg: "var(--success-soft)",
+      color: "var(--success)",
     },
   }[status];
   return (
