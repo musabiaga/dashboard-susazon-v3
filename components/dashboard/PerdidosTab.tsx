@@ -15,6 +15,43 @@ export type PerdidoDim = "mes" | "ytd";
 export type PerdidoMetric = "pesos" | "kilos";
 
 const PERDIDOS_METRIC_KEY = "perdidos-metric-mode";
+const PERDIDOS_STATUS_FILTER_KEY = "perdidos-status-filter";
+
+const STATUS_CONFIG: Record<
+  PerdidoStatus,
+  { label: string; bg: string; color: string; bgInactive: string; emoji: string }
+> = {
+  perdido: {
+    label: "Perdido",
+    bg: "var(--danger-soft)",
+    color: "var(--danger)",
+    bgInactive: "var(--bg-surface-muted)",
+    emoji: "🔴",
+  },
+  declive: {
+    label: "Declive",
+    bg: "var(--warning-soft)",
+    color: "var(--warning)",
+    bgInactive: "var(--bg-surface-muted)",
+    emoji: "🟠",
+  },
+  estable: {
+    label: "Estable",
+    bg: "var(--success-soft)",
+    color: "var(--success)",
+    bgInactive: "var(--bg-surface-muted)",
+    emoji: "🟢",
+  },
+  nuevo: {
+    label: "Nuevo",
+    bg: "rgba(59, 130, 246, 0.15)",
+    color: "#3b82f6",
+    bgInactive: "var(--bg-surface-muted)",
+    emoji: "🔵",
+  },
+};
+
+const DEFAULT_STATUS_FILTER: PerdidoStatus[] = ["perdido", "declive"];
 
 export interface PerdidoRow {
   no_cliente: string;
@@ -124,6 +161,44 @@ export function PerdidosTab({
     }
   };
 
+  // Filtro multi-select por status (Mejora). Default: Perdido + Declive
+  // (mantiene comportamiento original del tab). Persiste en localStorage.
+  const [activeStatuses, setActiveStatuses] = useState<Set<PerdidoStatus>>(
+    () => new Set(DEFAULT_STATUS_FILTER)
+  );
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PERDIDOS_STATUS_FILTER_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as unknown;
+        if (Array.isArray(parsed)) {
+          const valid = parsed.filter((s): s is PerdidoStatus =>
+            ["perdido", "declive", "estable", "nuevo"].includes(s as string)
+          );
+          setActiveStatuses(new Set(valid));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+  const toggleStatus = (s: PerdidoStatus) => {
+    setActiveStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      try {
+        window.localStorage.setItem(
+          PERDIDOS_STATUS_FILTER_KEY,
+          JSON.stringify(Array.from(next))
+        );
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
   // Compute TODOS los clientes con status (incluye estables y nuevos).
   //
   // Mejora 2 Commit C: comparativo DÍA-VS-DÍA equitativo.
@@ -186,21 +261,36 @@ export function PerdidosTab({
   const searchActive = search.trim().length >= 2;
 
   const tableRows = useMemo(() => {
+    // Primer filtro: status activos (multi-select). Si NO hay status activos,
+    // la tabla queda vacía y mostramos un mensaje claro.
+    if (activeStatuses.size === 0) return [];
+
+    const byStatus = computed.filter((r) => activeStatuses.has(r.status));
+
     if (searchActive) {
-      // Modo búsqueda: filtrar TODOS los clientes (incluyendo estables y
-      // nuevos) por substring match en cliente o vendedor.
+      // Modo búsqueda: filtra por substring en cliente/vendedor sobre los
+      // status activos. SIN límite Top N.
       const q = search.trim().toLowerCase();
-      return computed.filter(
+      return byStatus.filter(
         (r) =>
           r.cliente.toLowerCase().includes(q) ||
           r.vendedor.toLowerCase().includes(q)
       );
     }
-    // Modo default: solo perdidos+declive (sin estables ni nuevos), top 100
-    return computed
-      .filter((r) => r.status === "perdido" || r.status === "declive")
-      .slice(0, topNTable);
-  }, [computed, search, searchActive, topNTable]);
+    // Modo default: status activos + Top N (preservar el comportamiento
+    // original cuando solo "perdido + declive" están activos).
+    return byStatus.slice(0, topNTable);
+  }, [computed, search, searchActive, topNTable, activeStatuses]);
+
+  // Counts por status (para mostrar contador en cada chip).
+  // Se calcula sobre `computed` SIN filtro de búsqueda — orientativo.
+  const countByStatus = useMemo(() => {
+    const c: Record<PerdidoStatus, number> = {
+      perdido: 0, declive: 0, estable: 0, nuevo: 0,
+    };
+    for (const r of computed) c[r.status]++;
+    return c;
+  }, [computed]);
 
   // Stats SIEMPRE basadas en perdidos+declive (no se afectan por el buscador).
   const stats = useMemo(() => {
@@ -247,51 +337,104 @@ export function PerdidosTab({
         />
       </div>
 
-      {/* Buscador */}
+      {/* Buscador + chips de filtro por status */}
       <div
-        className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] border p-3"
+        className="rounded-[var(--radius-lg)] border p-3"
         style={{
           background: "var(--bg-surface)",
           borderColor: "var(--border)",
         }}
       >
-        <div
-          className="flex flex-1 items-center gap-2 rounded-[var(--radius)] border px-3 py-1.5"
-          style={{
-            background: "var(--bg-surface-muted)",
-            borderColor: "var(--border)",
-            minWidth: 280,
-          }}
-        >
-          <Search size={14} style={{ color: "var(--text-muted)" }} />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar cliente o vendedor (incluye estables y nuevos)…"
-            className="flex-1 bg-transparent text-sm outline-none"
-            style={{ color: "var(--text-primary)" }}
-          />
-          {search.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              aria-label="Limpiar búsqueda"
-              className="rounded p-0.5 transition-colors hover:bg-[var(--bg-surface)]"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <X size={14} />
-            </button>
+        {/* Fila 1: input + sub-label contador */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="flex flex-1 items-center gap-2 rounded-[var(--radius)] border px-3 py-1.5"
+            style={{
+              background: "var(--bg-surface-muted)",
+              borderColor: "var(--border)",
+              minWidth: 280,
+            }}
+          >
+            <Search size={14} style={{ color: "var(--text-muted)" }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar cliente o vendedor…"
+              className="flex-1 bg-transparent text-sm outline-none"
+              style={{ color: "var(--text-primary)" }}
+            />
+            {search.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Limpiar búsqueda"
+                className="rounded p-0.5 transition-colors hover:bg-[var(--bg-surface)]"
+                style={{ color: "var(--text-muted)" }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <span
+            className="text-[11px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {activeStatuses.size === 0
+              ? "Selecciona al menos un status para ver clientes"
+              : searchActive
+                ? `${tableRows.length} resultado${tableRows.length === 1 ? "" : "s"}`
+                : `Mostrando ${tableRows.length} de ${computed.filter((r) => activeStatuses.has(r.status)).length}${
+                    !searchActive && tableRows.length === topNTable ? ` (Top ${topNTable})` : ""
+                  }`}
+          </span>
+        </div>
+
+        {/* Fila 2: chips de filtro por status */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span
+            className="text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Status:
+          </span>
+          {(["perdido", "declive", "estable", "nuevo"] as PerdidoStatus[]).map(
+            (s) => {
+              const cfg = STATUS_CONFIG[s];
+              const active = activeStatuses.has(s);
+              const count = countByStatus[s];
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => toggleStatus(s)}
+                  aria-pressed={active}
+                  className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-all"
+                  style={{
+                    background: active ? cfg.bg : cfg.bgInactive,
+                    borderColor: active ? cfg.color : "var(--border)",
+                    color: active ? cfg.color : "var(--text-muted)",
+                    opacity: active ? 1 : 0.6,
+                  }}
+                >
+                  <span>{cfg.emoji}</span>
+                  <span>{cfg.label}</span>
+                  <span
+                    className="ml-0.5 rounded-full px-1.5 text-[10px] font-bold"
+                    style={{
+                      background: active
+                        ? "rgba(255,255,255,0.3)"
+                        : "transparent",
+                      color: active ? cfg.color : "var(--text-muted)",
+                    }}
+                  >
+                    {count.toLocaleString("es-MX")}
+                  </span>
+                </button>
+              );
+            }
           )}
         </div>
-        <span
-          className="text-[11px]"
-          style={{ color: "var(--text-muted)" }}
-        >
-          {searchActive
-            ? `${tableRows.length} resultado${tableRows.length === 1 ? "" : "s"} · incluye estables y nuevos`
-            : `Top ${Math.min(topNTable, tableRows.length)} perdidos / declive · escribe ≥2 letras para buscar TODOS los clientes`}
-        </span>
       </div>
 
       {/* Tabla */}
@@ -306,6 +449,19 @@ export function PerdidosTab({
         >
           Sin data para esta dimensión.
         </div>
+      ) : activeStatuses.size === 0 ? (
+        <div
+          className="rounded-[var(--radius-lg)] border p-12 text-center text-sm"
+          style={{
+            background: "var(--bg-surface)",
+            borderColor: "var(--border)",
+            color: "var(--text-muted)",
+          }}
+        >
+          Selecciona al menos un{" "}
+          <strong style={{ color: "var(--text-primary)" }}>status</strong>{" "}
+          arriba para ver clientes.
+        </div>
       ) : tableRows.length === 0 ? (
         <div
           className="rounded-[var(--radius-lg)] border p-12 text-center text-sm"
@@ -315,8 +471,17 @@ export function PerdidosTab({
             color: "var(--text-muted)",
           }}
         >
-          Sin resultados para <strong>&quot;{search}&quot;</strong>. Verifica
-          la ortografía o búscalo por nombre del vendedor.
+          {searchActive ? (
+            <>
+              Sin resultados para <strong>&quot;{search}&quot;</strong> con
+              los status activos. Prueba activar más status o ajustar la
+              búsqueda.
+            </>
+          ) : (
+            <>
+              Sin clientes en los status seleccionados para esta dimensión.
+            </>
+          )}
         </div>
       ) : (
         <div
