@@ -13,6 +13,11 @@ import {
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { formatMoney, formatKilos } from "@/lib/format";
+import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import type {
+  ExcelColumn,
+  ExcelSummaryRow,
+} from "@/lib/export-excel";
 
 export type PerdidoStatus = "perdido" | "declive" | "nuevo" | "estable";
 export type PerdidoDim = "mes" | "ytd";
@@ -108,6 +113,10 @@ interface Props {
   byTerritory?: Record<string, PerdidoRow[]>;
   /** Lista de territorios activos disponibles (orden alfabético). */
   availableTerritories?: string[];
+  /** Territorio activo en el sidebar. Vacío = "Todos". Lo usamos para
+   *  el bloque resumen del Excel y para etiquetar cada cliente con su
+   *  territorio cuando NO estamos en modo "Todos". */
+  currentTerritory?: string;
 }
 
 interface Computed {
@@ -165,6 +174,7 @@ export function PerdidosTab({
   topNTable = 100,
   byTerritory,
   availableTerritories,
+  currentTerritory = "",
 }: Props) {
   // Multi-select de territorios. Solo activo cuando el padre nos pasa
   // byTerritory (= sidebar en "Todos"). Default: TODOS los territorios
@@ -508,9 +518,359 @@ export function PerdidosTab({
   const labelPrev = dim === "mes" ? prevMonthShortYY : "Ene–Abr 25";
   const labelCurr = dim === "mes" ? monthShortYY : "Ene–Abr 26";
 
+  // ============ Export Excel ============
+  // WYSIWYG: respeta filtros activos en pantalla (territorios + status +
+  // buscador + dim + métrica). Incluye TODAS las métricas (al-día y cierre,
+  // venta/margen/kg, los 3 años) para permitir tablas dinámicas a posteriori.
+  // Lazy-importa exceljs (~700KB) solo al click.
+  const handleExportExcel = async () => {
+    const { exportToExcel, sanitizeFileName, todayISO } = await import(
+      "@/lib/export-excel"
+    );
+
+    // Map: no_cliente → lista de territorios donde aparece (para multi-select).
+    // Si NO estamos en modo "Todos" (byTerritory undefined), usamos
+    // currentTerritory como fallback único.
+    const territorioByClient = new Map<string, string[]>();
+    if (byTerritory) {
+      for (const [t, rs] of Object.entries(byTerritory)) {
+        if (!selectedTerritories.has(t)) continue;
+        for (const r of rs) {
+          const arr = territorioByClient.get(r.no_cliente) ?? [];
+          if (!arr.includes(t)) arr.push(t);
+          territorioByClient.set(r.no_cliente, arr);
+        }
+      }
+    }
+
+    // Map original PerdidoRow por no_cliente (para sacar campos cierre completos
+    // que `computed` no carga, ej. mes_venta_2025 cierre).
+    const fullRowByClient = new Map<string, PerdidoRow>();
+    for (const r of rows) fullRowByClient.set(r.no_cliente, r);
+
+    // Etiqueta de territorios para el resumen + nombre del archivo
+    const territorioLabel = (() => {
+      if (allTerritoriesAvailable) {
+        if (selectedTerritories.size === availableTerritories!.length) {
+          return "Todos";
+        }
+        if (selectedTerritories.size === 0) return "(ninguno)";
+        return Array.from(selectedTerritories).sort().join(", ");
+      }
+      return currentTerritory && currentTerritory !== ""
+        ? currentTerritory
+        : "Todos";
+    })();
+
+    const statusActiveLabel =
+      Array.from(activeStatuses)
+        .map((s) => STATUS_CONFIG[s].label)
+        .sort()
+        .join(", ") || "(ninguno)";
+
+    // Pérdidas (de la dona) — yáreflejan métrica activa y dim activa
+    const lossPerdido = donutData.lossPerdido;
+    const lossDeclive = donutData.lossDeclive;
+
+    // Bloque resumen
+    const summary: ExcelSummaryRow[] = [
+      { label: "Periodo", value: dimLabel },
+      {
+        label: "Métrica",
+        value: metric === "pesos" ? "Pesos ($)" : "Kilos (KG)",
+      },
+      { label: "Territorio(s)", value: territorioLabel },
+      { label: "Status filtrados", value: statusActiveLabel },
+      {
+        label: "# Clientes Perdido",
+        value: countByStatus.perdido,
+        numFmt: "#,##0",
+      },
+      {
+        label: "# Clientes Declive",
+        value: countByStatus.declive,
+        numFmt: "#,##0",
+      },
+      {
+        label: "# Clientes Estable",
+        value: countByStatus.estable,
+        numFmt: "#,##0",
+      },
+      {
+        label: "# Clientes Nuevo",
+        value: countByStatus.nuevo,
+        numFmt: "#,##0",
+      },
+      {
+        label: "$ Pérdida Perdidos (vs 25 al-día)",
+        value: lossPerdido.venta,
+        numFmt: "$#,##0",
+      },
+      {
+        label: "$ Pérdida Declive (vs 25 al-día)",
+        value: lossDeclive.venta,
+        numFmt: "$#,##0",
+      },
+      {
+        label: "$ Pérdida Total",
+        value: lossPerdido.venta + lossDeclive.venta,
+        numFmt: "$#,##0",
+      },
+      {
+        label: "# Filas exportadas",
+        value: tableRows.length,
+        numFmt: "#,##0",
+      },
+    ];
+
+    // Columnas — exhaustivas para tablas dinámicas
+    const columns: ExcelColumn[] = [
+      { header: "Status", key: "status", width: 12, align: "center" },
+      { header: "Territorio", key: "territorio", width: 22 },
+      { header: "No. Cliente", key: "no_cliente", width: 14 },
+      { header: "Cliente", key: "cliente", width: 38 },
+      { header: "Vendedor", key: "vendedor", width: 24 },
+      // 2024 al-día (informativo)
+      {
+        header: "Venta 2024 al-día",
+        key: "v24_alDia",
+        width: 16,
+        numFmt: "$#,##0",
+      },
+      {
+        header: "KG 2024 al-día",
+        key: "k24_alDia",
+        width: 14,
+        numFmt: "#,##0",
+      },
+      {
+        header: "Margen 2024 al-día",
+        key: "m24_alDia",
+        width: 16,
+        numFmt: "$#,##0",
+      },
+      // 2025 al-día (referencia base de status)
+      {
+        header: "Venta 2025 al-día",
+        key: "v25_alDia",
+        width: 16,
+        numFmt: "$#,##0",
+      },
+      {
+        header: "KG 2025 al-día",
+        key: "k25_alDia",
+        width: 14,
+        numFmt: "#,##0",
+      },
+      {
+        header: "Margen 2025 al-día",
+        key: "m25_alDia",
+        width: 16,
+        numFmt: "$#,##0",
+      },
+      {
+        header: "Margen % 2025 al-día",
+        key: "mPct25_alDia",
+        width: 18,
+        numFmt: "0.0%",
+      },
+      // 2025 cierre completo
+      {
+        header: "Venta 2025 cierre",
+        key: "v25_cierre",
+        width: 16,
+        numFmt: "$#,##0",
+      },
+      {
+        header: "KG 2025 cierre",
+        key: "k25_cierre",
+        width: 14,
+        numFmt: "#,##0",
+      },
+      {
+        header: "Margen 2025 cierre",
+        key: "m25_cierre",
+        width: 16,
+        numFmt: "$#,##0",
+      },
+      // 2026 al-día (actual)
+      {
+        header: "Venta 2026 al-día",
+        key: "v26_alDia",
+        width: 16,
+        numFmt: "$#,##0",
+      },
+      {
+        header: "KG 2026 al-día",
+        key: "k26_alDia",
+        width: 14,
+        numFmt: "#,##0",
+      },
+      {
+        header: "Margen 2026 al-día",
+        key: "m26_alDia",
+        width: 16,
+        numFmt: "$#,##0",
+      },
+      {
+        header: "Margen % 2026 al-día",
+        key: "mPct26_alDia",
+        width: 18,
+        numFmt: "0.0%",
+      },
+      // Variaciones vs 25
+      {
+        header: "Var Venta % vs 25",
+        key: "varVentaPct",
+        width: 16,
+        numFmt: "0.0%",
+      },
+      {
+        header: "Var KG % vs 25",
+        key: "varKgPct",
+        width: 14,
+        numFmt: "0.0%",
+      },
+    ];
+
+    // Filas de datos
+    const xlsxRows = tableRows.map((t) => {
+      const full = fullRowByClient.get(t.no_cliente);
+      const territorios = territorioByClient.get(t.no_cliente);
+      const territorio =
+        territorios && territorios.length > 0
+          ? territorios.join(", ")
+          : currentTerritory || "";
+
+      // Cierre 2025 según dim
+      const v25_cierre =
+        dim === "mes"
+          ? (full?.mes_venta_2025 ?? 0)
+          : (full?.ytd_venta_2025 ?? 0);
+      const k25_cierre =
+        dim === "mes"
+          ? (full?.mes_kg_2025 ?? 0)
+          : (full?.ytd_kg_2025 ?? 0);
+      const m25_cierre =
+        dim === "mes"
+          ? (full?.mes_margen_2025 ?? 0)
+          : (full?.ytd_margen_2025 ?? 0);
+
+      // Margen 2024 al-día
+      const m24_alDia = (() => {
+        if (!full) return 0;
+        if (dim === "mes") return full.mes_margen_alDia_2024 ?? 0;
+        return Math.max(
+          0,
+          (full.ytd_margen_2024 ?? 0) -
+            (full.mes_margen_2024 ?? 0) +
+            (full.mes_margen_alDia_2024 ?? 0)
+        );
+      })();
+
+      const mPct25_alDia = t.v25 > 0 ? t.m25 / t.v25 : 0;
+      const mPct26_alDia = t.v26 > 0 ? t.m26 / t.v26 : 0;
+      const varVentaPct = t.v25 > 0 ? (t.v26 - t.v25) / t.v25 : 0;
+      const varKgPct = t.k25 > 0 ? (t.k26 - t.k25) / t.k25 : 0;
+
+      return {
+        status: STATUS_CONFIG[t.status].label,
+        territorio,
+        no_cliente: t.no_cliente,
+        cliente: t.cliente,
+        vendedor: t.vendedor,
+        v24_alDia: t.v24,
+        k24_alDia: t.k24,
+        m24_alDia,
+        v25_alDia: t.v25,
+        k25_alDia: t.k25,
+        m25_alDia: t.m25,
+        mPct25_alDia,
+        v25_cierre,
+        k25_cierre,
+        m25_cierre,
+        v26_alDia: t.v26,
+        k26_alDia: t.k26,
+        m26_alDia: t.m26,
+        mPct26_alDia,
+        varVentaPct,
+        varKgPct,
+      };
+    });
+
+    // Totales (sumas + recalcular % sobre las sumas)
+    const totals = xlsxRows.reduce(
+      (acc, r) => ({
+        v24_alDia: acc.v24_alDia + (r.v24_alDia as number),
+        k24_alDia: acc.k24_alDia + (r.k24_alDia as number),
+        m24_alDia: acc.m24_alDia + (r.m24_alDia as number),
+        v25_alDia: acc.v25_alDia + (r.v25_alDia as number),
+        k25_alDia: acc.k25_alDia + (r.k25_alDia as number),
+        m25_alDia: acc.m25_alDia + (r.m25_alDia as number),
+        v25_cierre: acc.v25_cierre + (r.v25_cierre as number),
+        k25_cierre: acc.k25_cierre + (r.k25_cierre as number),
+        m25_cierre: acc.m25_cierre + (r.m25_cierre as number),
+        v26_alDia: acc.v26_alDia + (r.v26_alDia as number),
+        k26_alDia: acc.k26_alDia + (r.k26_alDia as number),
+        m26_alDia: acc.m26_alDia + (r.m26_alDia as number),
+      }),
+      {
+        v24_alDia: 0,
+        k24_alDia: 0,
+        m24_alDia: 0,
+        v25_alDia: 0,
+        k25_alDia: 0,
+        m25_alDia: 0,
+        v25_cierre: 0,
+        k25_cierre: 0,
+        m25_cierre: 0,
+        v26_alDia: 0,
+        k26_alDia: 0,
+        m26_alDia: 0,
+      }
+    );
+    const totalRow: Record<string, unknown> = {
+      status: "TOTAL",
+      territorio: "",
+      no_cliente: "",
+      cliente: `${xlsxRows.length} ${xlsxRows.length === 1 ? "cliente" : "clientes"}`,
+      vendedor: "",
+      ...totals,
+      mPct25_alDia:
+        totals.v25_alDia > 0 ? totals.m25_alDia / totals.v25_alDia : 0,
+      mPct26_alDia:
+        totals.v26_alDia > 0 ? totals.m26_alDia / totals.v26_alDia : 0,
+      varVentaPct:
+        totals.v25_alDia > 0
+          ? (totals.v26_alDia - totals.v25_alDia) / totals.v25_alDia
+          : 0,
+      varKgPct:
+        totals.k25_alDia > 0
+          ? (totals.k26_alDia - totals.k25_alDia) / totals.k25_alDia
+          : 0,
+    };
+
+    // Nombre de archivo: "Perdidos_<Territorio>_2026-05-10.xlsx"
+    // Si la lista de territorios es muy larga (multi-select), uso "varios".
+    const territoriosForFile =
+      territorioLabel.length > 30 ? "varios" : territorioLabel;
+    const fileName = `Perdidos_${sanitizeFileName(territoriosForFile)}_${todayISO()}`;
+
+    await exportToExcel({
+      fileName,
+      sheetName: "Perdidos",
+      title: `Tab Perdidos · ${dimLabel}`,
+      subtitle: `${territorioLabel} · Métrica: ${metric === "pesos" ? "Pesos ($)" : "Kilos (KG)"} · Status: ${statusActiveLabel}`,
+      summary,
+      columns,
+      rows: xlsxRows,
+      totalRow,
+    });
+  };
+
   return (
     <div className="space-y-4">
-      {/* Toggles + filtro de territorios */}
+      {/* Toggles + filtro de territorios + export */}
       <div className="flex flex-wrap items-center justify-end gap-3">
         {allTerritoriesAvailable && (
           <TerritoryFilter
@@ -521,6 +881,15 @@ export function PerdidosTab({
         )}
         <MetricToggle value={metric} onChange={switchMetric} />
         <DimToggle value={dim} onChange={setDim} monthShortYY={monthShortYY} />
+        <ExportExcelButton
+          onExport={handleExportExcel}
+          disabled={tableRows.length === 0}
+          title={
+            tableRows.length === 0
+              ? "Sin filas para exportar"
+              : `Exportar ${tableRows.length} fila${tableRows.length === 1 ? "" : "s"} a Excel`
+          }
+        />
       </div>
 
       {/* Dona de status + alertas laterales */}

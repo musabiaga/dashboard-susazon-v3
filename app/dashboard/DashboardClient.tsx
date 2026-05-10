@@ -411,6 +411,7 @@ export function DashboardClient({
                             .sort()
                         : undefined
                     }
+                    currentTerritory={effectiveSelected}
                   />
                 );
               }
