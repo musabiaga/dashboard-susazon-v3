@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ComposedChart,
   Bar,
@@ -14,6 +14,10 @@ import {
 } from "recharts";
 import { formatMoney, formatKilos } from "@/lib/format";
 import type { DimensionRow } from "@/components/dashboard/DimensionTab";
+import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
+
+const PRODUCTOS_SELECTED_KEY = "productos-selected-skus";
+const MAX_CUSTOM_SELECTION = 15;
 
 interface Props {
   rows: DimensionRow[];
@@ -44,11 +48,65 @@ export function ProductosTab({
 }: Props) {
   const [topNChart, setTopNChart] = useState<10 | 15>(topNChartDefault);
 
+  // Selección custom de SKUs (multi-select). Si vacía → comportamiento default
+  // (Top N). Si tiene items → override y se muestran SOLO esos. Persiste en
+  // localStorage para que la elección sobreviva entre sesiones.
+  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(PRODUCTOS_SELECTED_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setSelectedSkus(parsed.filter((s) => typeof s === "string"));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+  const updateSelected = (next: string[]) => {
+    // Lock estricto a MAX_CUSTOM_SELECTION (el componente ya lo maneja, pero
+    // por defensa cortamos aquí también)
+    const trimmed = next.slice(0, MAX_CUSTOM_SELECTION);
+    setSelectedSkus(trimmed);
+    try {
+      window.localStorage.setItem(
+        PRODUCTOS_SELECTED_KEY,
+        JSON.stringify(trimmed)
+      );
+    } catch {
+      // ignore
+    }
+  };
+
   const sorted = useMemo(
     () => [...rows].sort((a, b) => b.v26 - a.v26),
     [rows]
   );
-  const top = useMemo(() => sorted.slice(0, topNChart), [sorted, topNChart]);
+
+  // SKUs disponibles para el selector (todos los nombres únicos de los rows)
+  const availableSkus = useMemo(
+    () => sorted.map((r) => r.name),
+    [sorted]
+  );
+
+  // ¿Modo "personalizado" (selección custom) o "default" (Top N)?
+  const isCustomMode = selectedSkus.length > 0;
+
+  // Items del chart:
+  //  - Custom: respetar el orden de selección del usuario, mapeando rows reales
+  //  - Default: top N por venta del mes actual
+  const top = useMemo(() => {
+    if (isCustomMode) {
+      const byName = new Map(rows.map((r) => [r.name, r]));
+      return selectedSkus
+        .map((name) => byName.get(name))
+        .filter((r): r is DimensionRow => r != null);
+    }
+    return sorted.slice(0, topNChart);
+  }, [isCustomMode, selectedSkus, rows, sorted, topNChart]);
+
   const tableRows = useMemo(
     () => sorted.slice(0, topNTable),
     [sorted, topNTable]
@@ -74,14 +132,40 @@ export function ProductosTab({
           </p>
         ) : (
           <>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-              <h3
-                className="text-xs font-semibold uppercase tracking-wider"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Top {top.length} SKUs · {monthLabel26} · Pesos & Kilos
-              </h3>
-              <TopToggle value={topNChart} onChange={setTopNChart} />
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-col gap-0.5">
+                <h3
+                  className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {isCustomMode
+                    ? `${top.length} SKU${top.length === 1 ? "" : "s"} seleccionado${top.length === 1 ? "" : "s"} · ${monthLabel26} · Pesos & Kilos`
+                    : `Top ${top.length} SKUs · ${monthLabel26} · Pesos & Kilos`}
+                </h3>
+                {isCustomMode && (
+                  <span
+                    className="text-[10px]"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Modo personalizado · Top {topNChart} desactivado mientras haya selección
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-start gap-3">
+                <MultiSelectChips
+                  options={availableSkus}
+                  selected={selectedSkus}
+                  onChange={updateSelected}
+                  maxItems={MAX_CUSTOM_SELECTION}
+                  placeholder="Buscar SKU…"
+                  emptyLabel="Top default"
+                />
+                <TopToggle
+                  value={topNChart}
+                  onChange={setTopNChart}
+                  disabled={isCustomMode}
+                />
+              </div>
             </div>
             <ResponsiveContainer width="100%" height={560}>
               <ComposedChart
@@ -481,17 +565,22 @@ function Row({
 function TopToggle({
   value,
   onChange,
+  disabled = false,
 }: {
   value: 10 | 15;
   onChange: (v: 10 | 15) => void;
+  disabled?: boolean;
 }) {
   return (
     <div
-      className="flex items-center gap-0.5 rounded-[var(--radius)] border p-0.5"
+      className="flex items-center gap-0.5 rounded-[var(--radius)] border p-0.5 transition-opacity"
       style={{
         background: "var(--bg-surface-muted)",
         borderColor: "var(--border)",
+        opacity: disabled ? 0.5 : 1,
+        pointerEvents: disabled ? "none" : "auto",
       }}
+      title={disabled ? "Limpia la selección personalizada para usar Top N" : undefined}
     >
       {([10, 15] as const).map((n) => {
         const active = n === value;
@@ -500,7 +589,8 @@ function TopToggle({
             key={n}
             type="button"
             onClick={() => onChange(n)}
-            className="rounded-[var(--radius-sm)] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+            disabled={disabled}
+            className="rounded-[var(--radius-sm)] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors disabled:cursor-not-allowed"
             style={{
               background: active ? "var(--bg-surface)" : "transparent",
               color: active ? "var(--accent)" : "var(--text-muted)",
