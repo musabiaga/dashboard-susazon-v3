@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Lock, Mail, ShieldAlert, Loader2 } from "lucide-react";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
 import { SusazonLogo } from "@/components/brand/SusazonLogo";
@@ -245,11 +246,28 @@ export default function LoginPage() {
             </form>
           </div>
 
+          {/* Footer "Powered by" — discreto, escudo InCom + texto */}
           <div
-            className="mt-6 text-center text-[10px] uppercase tracking-widest"
+            className="mt-6 flex flex-col items-center gap-1.5 text-[10px]"
             style={{ color: "var(--text-muted)" }}
           >
-            Grupo Susazón · {new Date().getFullYear()}
+            <div className="flex items-center gap-1.5">
+              <span className="uppercase tracking-widest">Powered by</span>
+              <Image
+                src="/incom-mark.png"
+                alt="InCom"
+                width={22}
+                height={22}
+                className="h-[22px] w-[22px] opacity-90"
+              />
+              <span className="uppercase tracking-widest">
+                Inteligencia Comercial Susazón
+                <span className="ml-0.5 text-[8px] align-super">®</span>
+              </span>
+            </div>
+            <div className="uppercase tracking-widest opacity-70">
+              © {new Date().getFullYear()} · Grupo Susazón
+            </div>
           </div>
         </div>
       </main>
