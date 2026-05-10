@@ -361,6 +361,30 @@
   transform: none;
 }
 
+/* OVERRIDE: dropdowns/popovers que necesitan tapar contenido de fondo
+   (ej. el dropdown de "Configurar Todos" en el sidebar). El --bg-surface
+   default de liquid-glass es 6% blanco, demasiado transparente para tapar
+   una lista detrás. Aquí: background oscuro semi-opaco (~92%) + blur más
+   fuerte para look frost real. */
+[data-theme="liquid-glass"] .frost-popover {
+  background: rgba(20, 18, 38, 0.88) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  backdrop-filter: blur(40px) saturate(1.8);
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+/* En el popover, el sub-header ("CONFIGURAR Todos") usa bg-surface-muted
+   que también es muy transparente; lo reforzamos un toque más oscuro para
+   que se distinga del cuerpo del dropdown. */
+[data-theme="liquid-glass"] .frost-popover > div:first-child {
+  background: rgba(0, 0, 0, 0.25) !important;
+}
+
 /* ============================================================================
    TAILWIND THEME BRIDGE
    Expone los CSS vars como utilities Tailwind: bg-page, text-primary, etc.

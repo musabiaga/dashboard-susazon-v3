@@ -371,7 +371,7 @@ function AggregatedItem({
       {/* Dropdown con checkboxes — popup absoluto */}
       {open && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 max-h-[60vh] w-[260px] overflow-y-auto rounded-[var(--radius-lg)] border shadow-lg"
+          className="frost-popover absolute left-0 top-full z-50 mt-1 max-h-[60vh] w-[260px] overflow-y-auto rounded-[var(--radius-lg)] border shadow-lg"
           style={{
             background: "var(--bg-surface)",
             borderColor: "var(--border-strong)",
