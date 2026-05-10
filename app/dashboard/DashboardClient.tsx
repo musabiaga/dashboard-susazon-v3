@@ -110,26 +110,26 @@ export function DashboardClient({
   todayYear,
   todayMonth,
 }: DashboardClientProps) {
-  // Mejora 7: multi-select de territorios global. Set vacío = ninguno.
-  // Default = TODOS los territorios activos seleccionados (equivalente al
-  // antiguo "Todos"). Persistencia en localStorage.
-  const SELECTED_KEY = "dashboard-selected-territories";
+  // Selección uni-select del sidebar: "" = modo "Todos", o nombre = single.
+  // No persiste — cada sesión arranca en "Todos" para mantener UX previa.
+  const [selectedTerritory, setSelectedTerritory] = useState<string>("");
+
+  // Mejora 7: set de territorios que incluye el modo "Todos". Se configura
+  // desde el ⚙️ del sidebar. Solo se aplica cuando selectedTerritory === "".
+  // Persiste en localStorage entre sesiones.
+  const AGGREGATED_KEY = "dashboard-aggregated-territories";
   const activeTerritoryNames = useMemo(
-    () =>
-      territories
-        .filter((t) => t.isActive)
-        .map((t) => t.name),
+    () => territories.filter((t) => t.isActive).map((t) => t.name),
     [territories]
   );
-  const [selectedTerritories, setSelectedTerritories] = useState<Set<string>>(
-    () => new Set(activeTerritoryNames)
-  );
-  // Hidratación cliente-side desde localStorage. Si la persistencia es
-  // inválida (territorios renombrados, apagados, etc.) cae al default.
+  const [aggregatedTerritories, setAggregatedTerritories] = useState<
+    Set<string>
+  >(() => new Set(activeTerritoryNames));
+
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(SELECTED_KEY);
+      const raw = window.localStorage.getItem(AGGREGATED_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as unknown;
         if (Array.isArray(parsed)) {
@@ -137,8 +137,10 @@ export function DashboardClient({
             (s): s is string =>
               typeof s === "string" && activeTerritoryNames.includes(s)
           );
+          // Solo usamos persistencia si tiene contenido válido, si no
+          // caemos al default (todos los activos).
           if (valid.length > 0) {
-            setSelectedTerritories(new Set(valid));
+            setAggregatedTerritories(new Set(valid));
           }
         }
       }
@@ -149,52 +151,46 @@ export function DashboardClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // solo en mount
 
-  // Sync localStorage cada vez que cambia la selección (después de hidratado)
+  // Sync localStorage cuando cambia el set agregado (después de hidratado)
   useEffect(() => {
     if (!hydrated) return;
     try {
       window.localStorage.setItem(
-        SELECTED_KEY,
-        JSON.stringify(Array.from(selectedTerritories))
+        AGGREGATED_KEY,
+        JSON.stringify(Array.from(aggregatedTerritories))
       );
     } catch {
       // ignore
     }
-  }, [selectedTerritories, hydrated]);
+  }, [aggregatedTerritories, hydrated]);
 
-  // Si aparecen territorios nuevos (ej: admin reactiva uno) los agregamos al
-  // Set actual de forma transparente.
+  // Si aparecen territorios nuevos los agregamos al set de forma transparente.
   const lastActiveRef = useRef<string[]>(activeTerritoryNames);
   useEffect(() => {
     if (!hydrated) return;
     const prev = new Set(lastActiveRef.current);
     const newOnes = activeTerritoryNames.filter((n) => !prev.has(n));
     if (newOnes.length > 0) {
-      setSelectedTerritories((s) => new Set([...s, ...newOnes]));
+      setAggregatedTerritories((s) => new Set([...s, ...newOnes]));
     }
     lastActiveRef.current = activeTerritoryNames;
   }, [activeTerritoryNames, hydrated]);
 
-  const handleToggleTerritory = (name: string) => {
-    setSelectedTerritories((prev) => {
+  const handleToggleAggregated = (name: string) => {
+    setAggregatedTerritories((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
       return next;
     });
   };
-  const handleToggleAll = () => {
-    setSelectedTerritories((prev) => {
-      // Si todos están seleccionados → limpiar. Si hay alguno desmarcado o
-      // vacío → marcar todos los activos.
+  const handleToggleAllAggregated = () => {
+    setAggregatedTerritories((prev) => {
       const allSelected =
         prev.size === activeTerritoryNames.length &&
         activeTerritoryNames.every((n) => prev.has(n));
       return allSelected ? new Set() : new Set(activeTerritoryNames);
     });
-  };
-  const handleSelectOnly = (name: string) => {
-    setSelectedTerritories(new Set([name]));
   };
 
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
@@ -228,73 +224,84 @@ export function DashboardClient({
 
   const disabledTerritories = territories.filter((t) => !t.isActive);
 
-  // Mejora 7: derivación del estado agregado a partir del Set de selección.
-  // Casos optimizados:
-  //   - "all": todos los activos seleccionados → usar pre-agregados del server
-  //   - "single": exactamente 1 → tomar ese territorio directo
-  //   - "multi": 2+ pero no todos → agregar dinámicamente en cliente
-  //   - "none": 0 seleccionados → mostrar empty state
-  const selectionMode: "all" | "single" | "multi" | "none" = (() => {
-    if (selectedTerritories.size === 0) return "none";
-    if (
-      selectedTerritories.size === activeTerritoryNames.length &&
-      activeTerritoryNames.every((n) => selectedTerritories.has(n))
-    )
-      return "all";
-    if (selectedTerritories.size === 1) return "single";
-    return "multi";
+  // Si seleccionado actual está apagado, fallback a "Todos" (modo agregado)
+  const effectiveSelected = (() => {
+    if (!selectedTerritory) return "";
+    const t = territories.find((x) => x.name === selectedTerritory);
+    return t && t.isActive ? selectedTerritory : "";
   })();
-  const singleSelected: string =
-    selectionMode === "single"
-      ? Array.from(selectedTerritories)[0]
-      : "";
 
-  // KPI agregado de los territorios seleccionados (memoizado).
+  // Mejora 7: derivación del estado.
+  //   - "single": un territorio individual seleccionado
+  //   - "aggregated-all": "Todos" + set incluye TODOS los activos (pre-agregado server)
+  //   - "aggregated-custom": "Todos" + set personalizado (subset)
+  //   - "aggregated-none": "Todos" + set vacío (= empty)
+  const aggregatedAll =
+    aggregatedTerritories.size === activeTerritoryNames.length &&
+    activeTerritoryNames.every((n) => aggregatedTerritories.has(n));
+  const selectionMode:
+    | "single"
+    | "aggregated-all"
+    | "aggregated-custom"
+    | "aggregated-none" = (() => {
+    if (effectiveSelected !== "") return "single";
+    if (aggregatedTerritories.size === 0) return "aggregated-none";
+    if (aggregatedAll) return "aggregated-all";
+    return "aggregated-custom";
+  })();
+
+  // KPI agregado memoizado.
   const activeKpi: TerritoryKpi = useMemo(() => {
-    if (selectionMode === "all") return totalKpi;
-    if (selectionMode === "none") return aggregateKpis([]);
     if (selectionMode === "single") {
-      const t = territories.find((x) => x.name === singleSelected);
+      const t = territories.find((x) => x.name === effectiveSelected);
       return t?.kpi ?? aggregateKpis([]);
     }
-    return aggregateKpis(selectedKpis(territories, selectedTerritories));
-  }, [selectionMode, totalKpi, territories, selectedTerritories, singleSelected]);
+    if (selectionMode === "aggregated-all") return totalKpi;
+    if (selectionMode === "aggregated-none") return aggregateKpis([]);
+    return aggregateKpis(selectedKpis(territories, aggregatedTerritories));
+  }, [
+    selectionMode,
+    territories,
+    effectiveSelected,
+    totalKpi,
+    aggregatedTerritories,
+  ]);
 
   // Budget agregado
   const activeBudget: number = useMemo(() => {
-    if (selectionMode === "all") return totalVentaBudget;
-    if (selectionMode === "none") return 0;
     if (selectionMode === "single") {
       return (
-        territories.find((t) => t.name === singleSelected)?.ventaBudget ?? 0
+        territories.find((t) => t.name === effectiveSelected)?.ventaBudget ?? 0
       );
     }
-    return aggregateBudget(territories, selectedTerritories);
+    if (selectionMode === "aggregated-all") return totalVentaBudget;
+    if (selectionMode === "aggregated-none") return 0;
+    return aggregateBudget(territories, aggregatedTerritories);
   }, [
     selectionMode,
-    totalVentaBudget,
     territories,
-    selectedTerritories,
-    singleSelected,
+    effectiveSelected,
+    totalVentaBudget,
+    aggregatedTerritories,
   ]);
 
-  // Etiqueta legible para mostrar en el header + pasar a exports
+  // Etiqueta legible para header + exports
   const contextLabel = (() => {
-    if (selectionMode === "none") return "Sin territorios seleccionados";
-    if (selectionMode === "all") return "Todos los territorios";
-    if (selectionMode === "single") return singleSelected;
-    // multi: lista comma-separated. Si son muchos, usar "N territorios".
-    const arr = Array.from(selectedTerritories).sort();
-    if (arr.length > 4) return `${arr.length} territorios`;
-    return arr.join(", ");
+    if (selectionMode === "single") return effectiveSelected;
+    if (selectionMode === "aggregated-all") return "Todos los territorios";
+    if (selectionMode === "aggregated-none")
+      return "Todos (sin territorios incluidos)";
+    // custom: lista comma-separated. Si son muchos, "N territorios".
+    const arr = Array.from(aggregatedTerritories).sort();
+    if (arr.length > 4) return `Todos (${arr.length} territorios)`;
+    return `Todos (${arr.join(", ")})`;
   })();
 
-  // Etiqueta para los exports (más compacta — usa "Todos" en all)
   const exportTerritoryLabel = (() => {
-    if (selectionMode === "none") return "(ninguno)";
-    if (selectionMode === "all") return "Todos";
-    if (selectionMode === "single") return singleSelected;
-    return Array.from(selectedTerritories).sort().join(", ");
+    if (selectionMode === "single") return effectiveSelected;
+    if (selectionMode === "aggregated-all") return "Todos";
+    if (selectionMode === "aggregated-none") return "(ninguno)";
+    return Array.from(aggregatedTerritories).sort().join(", ");
   })();
 
   // KPI cards data (mismo cálculo de antes pero usando activeKpi/activeBudget)
@@ -350,12 +357,19 @@ export function DashboardClient({
     <div className="flex flex-1">
       <Sidebar
         territories={territories}
-        selected={selectedTerritories}
-        onToggle={handleToggleTerritory}
-        onToggleAll={handleToggleAll}
-        onSelectOnly={handleSelectOnly}
-        totalKpi={totalKpi}
-        selectedKpi={activeKpi}
+        selected={effectiveSelected}
+        onSelect={setSelectedTerritory}
+        totalKpi={
+          // Cuando "Todos" usa el subset agregado, mostramos su KPI; si no,
+          // mostramos el total del server pre-agregado.
+          selectionMode === "aggregated-custom" ||
+          selectionMode === "aggregated-none"
+            ? activeKpi
+            : totalKpi
+        }
+        aggregatedTerritories={aggregatedTerritories}
+        onToggleAggregated={handleToggleAggregated}
+        onToggleAllAggregated={handleToggleAllAggregated}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={toggleSidebar}
       />
@@ -445,27 +459,29 @@ export function DashboardClient({
           {/* Tabs */}
           <DashboardTabs active={activeTab} onChange={setActiveTab}>
             {(() => {
-              // Helper inline para resolver rows según selectionMode.
-              // En "all" usa el pre-agregado (rápido); en "single" toma directo;
-              // en "multi"/"none" agrega dinámicamente.
+              // Resolución de rows según el modo de selección.
+              //   single             → ese territorio directo
+              //   aggregated-all     → pre-agregado del server (rápido)
+              //   aggregated-custom  → agregar dinámicamente el subset
+              //   aggregated-none    → vacío
               const resolveDimRows = (
                 ds: DimensionDataset
               ): DimensionRow[] => {
-                if (selectionMode === "all") return ds.total;
-                if (selectionMode === "none") return [];
                 if (selectionMode === "single")
-                  return ds.byTerritory[singleSelected] ?? [];
+                  return ds.byTerritory[effectiveSelected] ?? [];
+                if (selectionMode === "aggregated-all") return ds.total;
+                if (selectionMode === "aggregated-none") return [];
                 return aggregateDimensionRows(
-                  rowsBySelected(ds.byTerritory, selectedTerritories)
+                  rowsBySelected(ds.byTerritory, aggregatedTerritories)
                 );
               };
               const resolvePerdidoRows = (): PerdidoRow[] => {
-                if (selectionMode === "all") return perdidos.total;
-                if (selectionMode === "none") return [];
                 if (selectionMode === "single")
-                  return perdidos.byTerritory[singleSelected] ?? [];
+                  return perdidos.byTerritory[effectiveSelected] ?? [];
+                if (selectionMode === "aggregated-all") return perdidos.total;
+                if (selectionMode === "aggregated-none") return [];
                 return aggregatePerdidoRows(
-                  rowsBySelected(perdidos.byTerritory, selectedTerritories)
+                  rowsBySelected(perdidos.byTerritory, aggregatedTerritories)
                 );
               };
 

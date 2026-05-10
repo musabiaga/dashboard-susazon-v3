@@ -1,13 +1,14 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   Layers,
   AlertTriangle,
   Building2,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings2,
   Check,
-  Square,
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 
@@ -66,17 +67,18 @@ export interface Territory {
 
 interface SidebarProps {
   territories: Territory[];
-  /** Set de territorios marcados (multi-select). Mejora 7. */
-  selected: Set<string>;
-  /** Toggle de un territorio: agrega o quita del Set. */
-  onToggle: (name: string) => void;
-  /** Marca/desmarca todos los territorios activos. */
-  onToggleAll: () => void;
-  /** Selecciona SOLO ese territorio (deselecciona todos los demás). */
-  onSelectOnly: (name: string) => void;
+  /** Selección uni-select. "" = modo "Todos" (agregado). */
+  selected: string;
+  onSelect: (name: string) => void;
+  /** KPI agregada del set "aggregatedTerritories" — se muestra junto al
+   *  item "Todos" cuando hay un subset configurado. */
   totalKpi: TerritoryKpi;
-  /** KPI agregada de la selección actual (puede ser parcial). */
-  selectedKpi: TerritoryKpi;
+  /** Mejora 7: Set de territorios que incluye el modo "Todos". */
+  aggregatedTerritories: Set<string>;
+  /** Toggle de un territorio dentro del set agregado. */
+  onToggleAggregated: (name: string) => void;
+  /** Marca/desmarca todos los activos en el set agregado. */
+  onToggleAllAggregated: () => void;
   // Estado controlado desde el padre (DashboardClient persiste en localStorage)
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -85,9 +87,13 @@ interface SidebarProps {
 /**
  * Sidebar de territorios — lista filtrada por permisos vía RLS.
  *
- * Mejora 7: multi-select con checkboxes. Click en una fila toggle ese
- * territorio. Click en "Todos" marca/desmarca a todos. Hover muestra botón
- * "Solo" para selección rápida de uno solo (deselecciona los demás).
+ * UX (Mejora 7):
+ *  - Lista inferior: uni-select. Click en un territorio muestra SOLO ese.
+ *  - Item "Todos" arriba: modo agregado. Click selecciona modo "Todos".
+ *    Junto al label, un ícono ⚙️ abre un dropdown con checkboxes para
+ *    configurar QUÉ territorios incluye ese "Todos" (ej. solo costa norte).
+ *    El subset se persiste en localStorage. La modificación NO afecta cuando
+ *    el usuario está en un territorio individual; solo el modo "Todos".
  *
  * Soporta modo `collapsed`: cuando está cerrado se reduce a una mini-tira de
  * 44px con solo el botón para reabrir. La preferencia se persiste en
@@ -96,11 +102,11 @@ interface SidebarProps {
 export function Sidebar({
   territories,
   selected,
-  onToggle,
-  onToggleAll,
-  onSelectOnly,
+  onSelect,
   totalKpi,
-  selectedKpi,
+  aggregatedTerritories,
+  onToggleAggregated,
+  onToggleAllAggregated,
   collapsed,
   onToggleCollapsed,
 }: SidebarProps) {
@@ -108,11 +114,11 @@ export function Sidebar({
   const activeTerritories = territories.filter((t) => t.isActive);
   const activeCount = activeTerritories.length;
   const disabledCount = territories.filter((t) => !t.isActive).length;
-  const selectedCount = activeTerritories.filter((t) =>
-    selected.has(t.name)
+  const aggregatedCount = activeTerritories.filter((t) =>
+    aggregatedTerritories.has(t.name)
   ).length;
-  const allSelected = activeCount > 0 && selectedCount === activeCount;
-  const noneSelected = selectedCount === 0;
+  const isCustomAggregated =
+    aggregatedCount > 0 && aggregatedCount < activeCount;
 
   // ===== Modo colapsado: mini-tira con botón =====
   if (collapsed) {
@@ -138,7 +144,7 @@ export function Sidebar({
     );
   }
 
-  // ===== Modo expandido: lista completa con checkboxes =====
+  // ===== Modo expandido: lista completa =====
   return (
     <aside
       className="flex w-64 shrink-0 flex-col border-r transition-all duration-200"
@@ -165,16 +171,8 @@ export function Sidebar({
             className="mt-1 text-[11px]"
             style={{ color: "var(--text-muted)" }}
           >
-            <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-              {selectedCount}
-            </span>{" "}
-            de {activeCount} activo{activeCount === 1 ? "" : "s"}
-            {disabledCount > 0 && (
-              <>
-                {" · "}
-                {disabledCount} apagado{disabledCount === 1 ? "" : "s"}
-              </>
-            )}
+            {total} visible{total === 1 ? "" : "s"}
+            {disabledCount > 0 && ` · ${disabledCount} apagado${disabledCount === 1 ? "" : "s"}`}
           </p>
         </div>
         <button
@@ -190,17 +188,18 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
-        {/* Toggle "Todos" — marca/desmarca todos los activos */}
-        <SidebarItem
-          label={allSelected ? "Todos" : noneSelected ? "Ninguno" : "Mixto"}
-          icon={<Layers size={14} />}
-          checkboxState={
-            allSelected ? "checked" : noneSelected ? "empty" : "partial"
-          }
-          onClick={onToggleAll}
-          disabled={false}
-          kpi={allSelected ? totalKpi : selectedKpi}
-          isToggleAll
+        {/* "Todos" — modo agregado, con ⚙️ al lado para configurar el set */}
+        <AggregatedItem
+          selected={selected === ""}
+          onClick={() => onSelect("")}
+          kpi={totalKpi}
+          territories={activeTerritories}
+          aggregated={aggregatedTerritories}
+          aggregatedCount={aggregatedCount}
+          activeCount={activeCount}
+          isCustomAggregated={isCustomAggregated}
+          onToggleAggregated={onToggleAggregated}
+          onToggleAllAggregated={onToggleAllAggregated}
         />
         <div
           className="my-2 border-t"
@@ -219,9 +218,8 @@ export function Sidebar({
           <SidebarItem
             key={t.name}
             label={t.name}
-            checkboxState={selected.has(t.name) ? "checked" : "empty"}
-            onClick={() => onToggle(t.name)}
-            onSelectOnly={t.isActive ? () => onSelectOnly(t.name) : undefined}
+            selected={selected === t.name}
+            onClick={() => onSelect(t.name)}
             disabled={!t.isActive}
             tooltip={
               !t.isActive
@@ -236,154 +234,293 @@ export function Sidebar({
   );
 }
 
-type CheckboxState = "checked" | "empty" | "partial";
-
-function SidebarItem({
-  label,
-  icon,
-  checkboxState,
+/**
+ * Item "Todos" — combina selección de modo agregado + un ⚙️ que abre el
+ * panel para configurar qué territorios suma. Visualmente se ve como un
+ * SidebarItem normal con un botón pegado al borde derecho.
+ */
+function AggregatedItem({
+  selected,
   onClick,
-  onSelectOnly,
-  disabled,
-  tooltip,
   kpi,
-  isToggleAll = false,
+  territories,
+  aggregated,
+  aggregatedCount,
+  activeCount,
+  isCustomAggregated,
+  onToggleAggregated,
+  onToggleAllAggregated,
 }: {
-  label: string;
-  icon?: React.ReactNode;
-  checkboxState: CheckboxState;
+  selected: boolean;
   onClick: () => void;
-  onSelectOnly?: () => void;
-  disabled: boolean;
-  tooltip?: string;
-  kpi?: TerritoryKpi;
-  isToggleAll?: boolean;
+  kpi: TerritoryKpi;
+  territories: Territory[];
+  aggregated: Set<string>;
+  aggregatedCount: number;
+  activeCount: number;
+  isCustomAggregated: boolean;
+  onToggleAggregated: (name: string) => void;
+  onToggleAllAggregated: () => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Cerrar dropdown al click fuera
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
   const hasKpi = kpi && kpi.venta > 0;
-  const isChecked = checkboxState === "checked";
+  const allSelected = aggregatedCount === activeCount && activeCount > 0;
+  const noneSelected = aggregatedCount === 0;
+  const subtitle = allSelected
+    ? `Todos los activos (${activeCount})`
+    : noneSelected
+      ? "Sin territorios"
+      : `${aggregatedCount} de ${activeCount}`;
+
   return (
     <div
-      className="group relative flex w-full items-stretch rounded-[var(--radius)] transition-colors"
+      ref={containerRef}
+      className="relative flex w-full items-stretch rounded-[var(--radius)] transition-colors"
       style={{
-        background: isChecked && !isToggleAll ? "var(--accent-soft)" : "transparent",
+        background: selected ? "var(--accent-soft)" : "transparent",
       }}
     >
       <button
         type="button"
         onClick={onClick}
-        title={tooltip}
-        disabled={disabled}
-        className="flex flex-1 flex-col gap-0.5 rounded-[var(--radius)] px-3 py-2 text-left transition-colors hover:bg-[var(--bg-surface-muted)] disabled:cursor-not-allowed"
+        className="flex flex-1 flex-col gap-0.5 rounded-[var(--radius)] px-3 py-2 text-left transition-colors hover:bg-[var(--bg-surface-muted)]"
         style={{
-          color: disabled
-            ? "var(--text-muted)"
-            : isChecked && !isToggleAll
-              ? "var(--accent)"
-              : "var(--text-primary)",
-          fontWeight: isChecked && !isToggleAll ? 600 : 400,
+          color: selected ? "var(--accent)" : "var(--text-primary)",
+          fontWeight: selected ? 600 : 400,
         }}
       >
         <span className="flex items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-2 truncate text-sm">
-            <CheckboxIcon state={checkboxState} disabled={disabled} />
-            {icon}
-            <span className="truncate">{label}</span>
+            <Layers size={14} />
+            <span className="truncate">Todos</span>
+            {isCustomAggregated && (
+              <span
+                className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
+                style={{
+                  background: "var(--warning-soft)",
+                  color: "var(--warning)",
+                }}
+                title="El set 'Todos' fue personalizado"
+              >
+                custom
+              </span>
+            )}
           </span>
-          {disabled && (
-            <AlertTriangle
-              size={12}
-              style={{ color: "var(--warning)" }}
-            />
-          )}
+        </span>
+        <span
+          className="text-[10px]"
+          style={{
+            color: selected ? "var(--accent)" : "var(--text-muted)",
+            opacity: 0.85,
+          }}
+        >
+          {subtitle}
         </span>
         {hasKpi && (
           <span
-            className="ml-6 flex items-baseline gap-1.5 text-[11px] tabular-nums"
+            className="flex items-baseline gap-1.5 text-[11px] tabular-nums"
             style={{
-              color:
-                isChecked && !isToggleAll
-                  ? "var(--accent)"
-                  : "var(--text-muted)",
-              opacity: disabled ? 0.5 : 1,
+              color: selected ? "var(--accent)" : "var(--text-muted)",
             }}
           >
-            <span className="font-semibold">{formatMoney(kpi!.venta)}</span>
+            <span className="font-semibold">{formatMoney(kpi.venta)}</span>
             <span style={{ color: "var(--text-muted)" }}>·</span>
-            <span>{kpi!.marginPct.toFixed(1)}%</span>
+            <span>{kpi.marginPct.toFixed(1)}%</span>
           </span>
         )}
       </button>
-      {/* Botón "Solo" — visible al hover, selecciona SOLO este territorio */}
-      {onSelectOnly && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelectOnly();
-          }}
-          aria-label={`Seleccionar solo ${label}`}
-          title={`Solo ${label}`}
-          className="my-1 mr-1 hidden items-center rounded px-2 text-[10px] font-semibold uppercase tracking-wider transition-colors group-hover:flex hover:bg-[var(--accent-soft)]"
+      {/* Botón ⚙️ — abre el dropdown de configuración del set agregado */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        aria-label="Configurar territorios incluidos en Todos"
+        title="Configurar qué territorios incluye Todos"
+        className="m-1 flex w-8 shrink-0 items-center justify-center rounded transition-colors hover:bg-[var(--bg-surface)]"
+        style={{
+          color: open
+            ? "var(--accent)"
+            : isCustomAggregated
+              ? "var(--warning)"
+              : "var(--text-muted)",
+          background: open ? "var(--bg-surface)" : "transparent",
+        }}
+      >
+        <Settings2 size={14} />
+      </button>
+
+      {/* Dropdown con checkboxes — popup absoluto */}
+      {open && (
+        <div
+          className="absolute left-0 top-full z-50 mt-1 max-h-[60vh] w-[260px] overflow-y-auto rounded-[var(--radius-lg)] border shadow-lg"
           style={{
-            color: "var(--accent)",
+            background: "var(--bg-surface)",
+            borderColor: "var(--border-strong)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
           }}
         >
-          Solo
-        </button>
+          {/* Header del dropdown */}
+          <div
+            className="flex items-center justify-between gap-2 border-b px-3 py-2"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--bg-surface-muted)",
+            }}
+          >
+            <div className="flex flex-col">
+              <span
+                className="text-[10px] font-semibold uppercase tracking-wider"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Configurar &quot;Todos&quot;
+              </span>
+              <span
+                className="text-[10px]"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {aggregatedCount} de {activeCount} marcados
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onToggleAllAggregated}
+              className="rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors hover:bg-[var(--bg-surface)]"
+              style={{
+                color: "var(--accent)",
+                background: "var(--accent-soft)",
+              }}
+            >
+              {allSelected ? "Limpiar" : "Marcar todos"}
+            </button>
+          </div>
+          {/* Lista de checkboxes */}
+          <div className="py-1">
+            {territories.map((t) => {
+              const checked = aggregated.has(t.name);
+              return (
+                <button
+                  key={t.name}
+                  type="button"
+                  onClick={() => onToggleAggregated(t.name)}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-[var(--bg-surface-muted)]"
+                  style={{
+                    color: checked
+                      ? "var(--text-primary)"
+                      : "var(--text-secondary)",
+                    fontWeight: checked ? 600 : 400,
+                  }}
+                >
+                  <span
+                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border"
+                    style={{
+                      borderColor: checked ? "var(--accent)" : "var(--border)",
+                      background: checked ? "var(--accent)" : "transparent",
+                    }}
+                  >
+                    {checked && (
+                      <Check size={11} style={{ color: "white" }} strokeWidth={3} />
+                    )}
+                  </span>
+                  <span className="truncate flex-1">{t.name}</span>
+                  <span
+                    className="text-[10px] tabular-nums"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {formatMoney(t.kpi.venta)}
+                  </span>
+                </button>
+              );
+            })}
+            {territories.length === 0 && (
+              <div
+                className="px-3 py-2 text-xs italic"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Sin territorios activos.
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-function CheckboxIcon({
-  state,
+function SidebarItem({
+  label,
+  selected,
+  onClick,
   disabled,
+  tooltip,
+  kpi,
 }: {
-  state: CheckboxState;
+  label: string;
+  selected: boolean;
+  onClick: () => void;
   disabled: boolean;
+  tooltip?: string;
+  kpi?: TerritoryKpi;
 }) {
-  // Tamaño consistente para alineación del texto. Color según estado.
-  const color = disabled
-    ? "var(--text-muted)"
-    : state === "checked"
-      ? "var(--accent)"
-      : state === "partial"
-        ? "var(--accent)"
-        : "var(--text-muted)";
-  if (state === "checked") {
-    return (
-      <span
-        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border"
-        style={{
-          background: color,
-          borderColor: color,
-        }}
-      >
-        <Check size={11} style={{ color: "white" }} strokeWidth={3} />
-      </span>
-    );
-  }
-  if (state === "partial") {
-    return (
-      <span
-        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border"
-        style={{
-          background: color,
-          borderColor: color,
-        }}
-      >
-        <span
-          className="h-0.5 w-2.5 rounded-sm"
-          style={{ background: "white" }}
-        />
-      </span>
-    );
-  }
+  const hasKpi = kpi && kpi.venta > 0;
   return (
-    <Square
-      size={16}
-      strokeWidth={1.5}
-      style={{ color, flexShrink: 0 }}
-    />
+    <button
+      type="button"
+      onClick={onClick}
+      title={tooltip}
+      className="flex w-full flex-col gap-0.5 rounded-[var(--radius)] px-3 py-2 text-left transition-colors"
+      style={{
+        background: selected ? "var(--accent-soft)" : "transparent",
+        color: selected
+          ? "var(--accent)"
+          : disabled
+          ? "var(--text-muted)"
+          : "var(--text-primary)",
+        fontWeight: selected ? 600 : 400,
+      }}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-2 truncate text-sm">
+          <span className="truncate">{label}</span>
+        </span>
+        {disabled && (
+          <AlertTriangle
+            size={12}
+            style={{ color: "var(--warning)" }}
+          />
+        )}
+      </span>
+      {hasKpi && (
+        <span
+          className="flex items-baseline gap-1.5 text-[11px] tabular-nums"
+          style={{
+            color: selected ? "var(--accent)" : "var(--text-muted)",
+            opacity: disabled ? 0.5 : 1,
+          }}
+        >
+          <span className="font-semibold">{formatMoney(kpi!.venta)}</span>
+          <span style={{ color: "var(--text-muted)" }}>·</span>
+          <span>{kpi!.marginPct.toFixed(1)}%</span>
+        </span>
+      )}
+    </button>
   );
 }
