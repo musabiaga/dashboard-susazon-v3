@@ -377,6 +377,10 @@ export function DashboardClient({
                     topNChart={10}
                     topNTable={50}
                     showKg
+                    enableMultiSelect
+                    selectionStorageKey="clientes-selected"
+                    multiSelectMaxItems={15}
+                    multiSelectPlaceholder="Buscar cliente…"
                   />
                 );
               }

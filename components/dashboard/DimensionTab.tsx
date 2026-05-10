@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatMoney, formatKilos } from "@/lib/format";
 import {
   GroupedBarChart,
   type GroupedBarSeries,
 } from "@/components/dashboard/GroupedBarChart";
+import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
 
 export interface DimensionRow {
   name: string;
@@ -39,6 +40,16 @@ interface Props {
   /** Si true, agrega 4 columnas extra de KG en la tabla (kg24, kg25, kg26, var % kg).
    *  Solo se activa cuando los rows traen k24/k25/k26 poblados. Default false. */
   showKg?: boolean;
+  /** Si true, agrega un buscador con multi-select arriba del chart. La selección
+   *  override el Top N (sólo afecta el chart, la tabla mantiene Top N). */
+  enableMultiSelect?: boolean;
+  /** Key de localStorage para persistir la selección entre sesiones. Requerido
+   *  cuando enableMultiSelect=true. */
+  selectionStorageKey?: string;
+  /** Máximo de items seleccionables en el multi-select. Default 15. */
+  multiSelectMaxItems?: number;
+  /** Placeholder del buscador (ej. "Buscar cliente…"). */
+  multiSelectPlaceholder?: string;
 }
 
 /**
@@ -64,15 +75,68 @@ export function DimensionTab({
   topNChart = 10,
   topNTable = null,
   showKg = false,
+  enableMultiSelect = false,
+  selectionStorageKey,
+  multiSelectMaxItems = 15,
+  multiSelectPlaceholder = "Buscar…",
 }: Props) {
+  // Selección custom (multi-select). Vacía = comportamiento default Top N.
+  // Persistencia en localStorage si selectionStorageKey está definido.
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  useEffect(() => {
+    if (!enableMultiSelect || !selectionStorageKey) return;
+    try {
+      const raw = window.localStorage.getItem(selectionStorageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setSelectedItems(parsed.filter((s) => typeof s === "string"));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [enableMultiSelect, selectionStorageKey]);
+  const updateSelected = (next: string[]) => {
+    const trimmed = next.slice(0, multiSelectMaxItems);
+    setSelectedItems(trimmed);
+    if (!selectionStorageKey) return;
+    try {
+      window.localStorage.setItem(
+        selectionStorageKey,
+        JSON.stringify(trimmed)
+      );
+    } catch {
+      // ignore
+    }
+  };
+
   const sorted = useMemo(
     () => [...rows].sort((a, b) => b.v26 - a.v26),
     [rows]
   );
-  const top = useMemo(
-    () => (topNChart == null ? sorted : sorted.slice(0, topNChart)),
-    [sorted, topNChart]
+
+  // Items disponibles para el multi-select (todos los nombres únicos)
+  const availableItems = useMemo(
+    () => sorted.map((r) => r.name),
+    [sorted]
   );
+
+  const isCustomMode = enableMultiSelect && selectedItems.length > 0;
+
+  // Items del chart:
+  //  - Custom: respeta orden de selección del usuario, mapea a rows reales
+  //  - Default: top N por venta del mes actual
+  const top = useMemo(() => {
+    if (isCustomMode) {
+      const byName = new Map(rows.map((r) => [r.name, r]));
+      return selectedItems
+        .map((name) => byName.get(name))
+        .filter((r): r is DimensionRow => r != null);
+    }
+    return topNChart == null ? sorted : sorted.slice(0, topNChart);
+  }, [isCustomMode, selectedItems, rows, sorted, topNChart]);
+
   const tableRows = useMemo(
     () => (topNTable == null ? sorted : sorted.slice(0, topNTable)),
     [sorted, topNTable]
@@ -95,7 +159,7 @@ export function DimensionTab({
           boxShadow: "var(--shadow-card)",
         }}
       >
-        {top.length === 0 ? (
+        {top.length === 0 && !enableMultiSelect ? (
           <p
             className="py-12 text-center text-sm"
             style={{ color: "var(--text-muted)" }}
@@ -104,26 +168,61 @@ export function DimensionTab({
           </p>
         ) : (
           <>
-            <h3
-              className="mb-2 text-xs font-semibold uppercase tracking-wider"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {topNChart == null
-                ? `${dimensionLabelPlural} · ${monthLabel26}`
-                : `Top ${top.length} ${dimensionLabelPlural} · ${monthLabel26}`}
-            </h3>
-            <GroupedBarChart
-              data={top.map((r) => ({
-                name: r.name,
-                v24: r.v24,
-                v25: r.v25,
-                v26: r.v26,
-              }))}
-              series={series}
-              height={520}
-              xAngle={-30}
-              xLabelHeight={130}
-            />
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-col gap-0.5">
+                <h3
+                  className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {isCustomMode
+                    ? `${top.length} ${dimensionLabelPlural} seleccionado${top.length === 1 ? "" : "s"} · ${monthLabel26}`
+                    : topNChart == null
+                      ? `${dimensionLabelPlural} · ${monthLabel26}`
+                      : `Top ${top.length} ${dimensionLabelPlural} · ${monthLabel26}`}
+                </h3>
+                {isCustomMode && (
+                  <span
+                    className="text-[10px]"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Modo personalizado · selección custom override Top default
+                  </span>
+                )}
+              </div>
+              {enableMultiSelect && (
+                <MultiSelectChips
+                  options={availableItems}
+                  selected={selectedItems}
+                  onChange={updateSelected}
+                  maxItems={multiSelectMaxItems}
+                  placeholder={multiSelectPlaceholder}
+                  emptyLabel="Top default"
+                />
+              )}
+            </div>
+            {top.length === 0 ? (
+              <p
+                className="py-12 text-center text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {isCustomMode
+                  ? "Sin data para los items seleccionados en este mes."
+                  : "Sin data del mes actual."}
+              </p>
+            ) : (
+              <GroupedBarChart
+                data={top.map((r) => ({
+                  name: r.name,
+                  v24: r.v24,
+                  v25: r.v25,
+                  v26: r.v26,
+                }))}
+                series={series}
+                height={520}
+                xAngle={-30}
+                xLabelHeight={130}
+              />
+            )}
           </>
         )}
       </div>
