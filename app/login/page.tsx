@@ -150,24 +150,18 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* InCom + subtítulo — debajo del logo */}
+          {/* Subtítulo "INTELIGENCIA COMERCIAL SUSAZÓN®" — 2x más grande
+              que antes. Sin el "InCom" duplicado (ya está dentro del escudo). */}
           <div className="login-hero-text mt-6 text-center">
-            <h1
-              className="text-6xl font-bold tracking-tight text-white xl:text-7xl"
+            <p
+              className="text-sm font-semibold uppercase tracking-[0.45em] text-white/90 xl:text-xl xl:tracking-[0.55em]"
               style={{
-                fontFamily: "var(--font-bebas), sans-serif",
-                letterSpacing: "0.04em",
-                textShadow: "0 4px 24px rgba(237,104,8,0.35)",
+                fontFamily: "var(--font-montserrat), sans-serif",
+                textShadow: "0 2px 16px rgba(237,104,8,0.3)",
               }}
             >
-              InCom
-            </h1>
-            <p
-              className="mt-2 text-xs font-semibold uppercase tracking-[0.5em] text-white/85 xl:text-sm xl:tracking-[0.55em]"
-              style={{ fontFamily: "var(--font-montserrat), sans-serif" }}
-            >
               Inteligencia Comercial Susazón
-              <span className="ml-0.5 align-super text-[8px] xl:text-[10px]">®</span>
+              <span className="ml-0.5 align-super text-[10px] xl:text-sm">®</span>
             </p>
           </div>
         </div>
@@ -179,9 +173,9 @@ export default function LoginPage() {
       </section>
 
       {/* ============ FORM DERECHO (40%) ============ */}
-      <section className="flex w-full items-center justify-center px-4 py-12 lg:w-[480px] lg:px-8 xl:w-[540px]">
+      <section className="flex w-full items-center justify-center px-4 py-12 lg:w-[520px] lg:px-8 xl:w-[580px]">
         <div
-          className={`login-form-card w-full max-w-sm ${mounted ? "is-loaded" : ""}`}
+          className={`login-form-card w-full max-w-md ${mounted ? "is-loaded" : ""}`}
         >
           {/* Logo InCom (visible solo en mobile cuando el hero está oculto) */}
           <div className="mb-8 flex flex-col items-center gap-3 lg:hidden">
@@ -205,13 +199,14 @@ export default function LoginPage() {
           </div>
 
           {/* Logo Susazón — branding del cliente. Auto-switch entre marrón
-              (fondos claros) y blanco (fondos oscuros) según el theme. */}
-          <div className="mb-8 flex justify-center">
+              (fondos claros) y blanco (fondos oscuros) según el theme.
+              6x más grande que antes: antes h-14 (56px), ahora hasta h-80 (320px). */}
+          <div className="mb-6 flex justify-center">
             <SusazonLogo
               surface="page"
-              width={240}
-              height={120}
-              className="h-14 w-auto opacity-90 transition-opacity hover:opacity-100"
+              width={720}
+              height={405}
+              className="h-auto w-full max-w-[360px] opacity-95 transition-opacity hover:opacity-100 lg:max-w-[400px] xl:max-w-[440px]"
               priority
             />
           </div>

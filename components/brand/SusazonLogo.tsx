@@ -36,8 +36,14 @@ const HEADER_DARK_THEMES = new Set([
   "stock-market",
   "liquid-glass",
 ]);
-/** Themes con --bg-page oscuro (logo blanco para contrastar) */
-const PAGE_DARK_THEMES = new Set(["liquid-glass"]);
+/** Themes con --bg-page oscuro (logo blanco para contrastar).
+ *  Incluye: supabase-orange (#0a0a0a), stock-market (#0a1124),
+ *  liquid-glass (transparent sobre body oscuro). */
+const PAGE_DARK_THEMES = new Set([
+  "supabase-orange",
+  "stock-market",
+  "liquid-glass",
+]);
 
 export function SusazonLogo({
   variant,
