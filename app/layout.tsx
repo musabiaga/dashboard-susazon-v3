@@ -16,10 +16,33 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard Comercial · Grupo Susazón",
+  metadataBase: new URL("https://www.dashboardcomercialsusazon.com"),
+  title: "InCom · Dashboard Comercial Susazón",
   description:
-    "Plataforma de uso restringido — monitoreo de ventas, márgenes y volúmenes por territorio. Acceso solo para personal autorizado.",
+    "Inteligencia Comercial — monitoreo de ventas, márgenes y volúmenes por territorio. Plataforma de uso restringido para personal autorizado.",
+  applicationName: "InCom · Dashboard Comercial Susazón",
+  authors: [{ name: "Grupo Susazón" }],
+  keywords: ["dashboard", "ventas", "Susazón", "InCom", "inteligencia comercial"],
   robots: { index: false, follow: false },
+  // Next.js 16 detecta automáticamente app/icon.png, app/apple-icon.png,
+  // app/opengraph-image.png y app/twitter-image.png. No hace falta declarar
+  // explícitamente icons aquí; el File-based Metadata API genera los
+  // <link rel="icon"> y <meta property="og:image"> al build.
+  openGraph: {
+    type: "website",
+    locale: "es_MX",
+    url: "https://www.dashboardcomercialsusazon.com",
+    title: "InCom · Dashboard Comercial Susazón",
+    description:
+      "Inteligencia Comercial — monitoreo de ventas, márgenes y volúmenes por territorio.",
+    siteName: "InCom",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "InCom · Dashboard Comercial Susazón",
+    description:
+      "Inteligencia Comercial — monitoreo de ventas, márgenes y volúmenes por territorio.",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
