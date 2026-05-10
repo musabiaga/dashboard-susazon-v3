@@ -183,14 +183,36 @@ export function ProductosTab({
                   const m24 = r.m24 ?? 0;
                   const m25 = r.m25 ?? 0;
                   const m26 = r.m26 ?? 0;
+                  // Acumulados al día N (Mejora 2)
+                  const v24AlDia = Math.min(r.v24, r.v24_alDia ?? r.v24);
+                  const v25AlDia = Math.min(r.v25, r.v25_alDia ?? r.v25);
+                  const v26AlDia = Math.min(r.v26, r.v26_alDia ?? r.v26);
+                  const k24AlDia = Math.min(r.k24 ?? 0, r.k24_alDia ?? r.k24 ?? 0);
+                  const k25AlDia = Math.min(r.k25 ?? 0, r.k25_alDia ?? r.k25 ?? 0);
+                  const k26AlDia = Math.min(r.k26 ?? 0, r.k26_alDia ?? r.k26 ?? 0);
                   return {
                     name: r.name,
+                    // Cierre del mes
                     venta24: r.v24,
                     venta25: r.v25,
                     venta26: r.v26,
                     kg24: r.k24 ?? 0,
                     kg25: r.k25 ?? 0,
                     kg26: r.k26 ?? 0,
+                    // Al día N (segmento sólido)
+                    venta24_alDia: v24AlDia,
+                    venta25_alDia: v25AlDia,
+                    venta26_alDia: v26AlDia,
+                    kg24_alDia: k24AlDia,
+                    kg25_alDia: k25AlDia,
+                    kg26_alDia: k26AlDia,
+                    // Resto hasta cierre (segmento translúcido)
+                    __rest_venta24: Math.max(0, r.v24 - v24AlDia),
+                    __rest_venta25: Math.max(0, r.v25 - v25AlDia),
+                    __rest_venta26: Math.max(0, r.v26 - v26AlDia),
+                    __rest_kg24: Math.max(0, (r.k24 ?? 0) - k24AlDia),
+                    __rest_kg25: Math.max(0, (r.k25 ?? 0) - k25AlDia),
+                    __rest_kg26: Math.max(0, (r.k26 ?? 0) - k26AlDia),
                     margen24: m24,
                     margen25: m25,
                     margen26: m26,
@@ -247,26 +269,60 @@ export function ProductosTab({
                   wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
                   iconType="rect"
                 />
-                {/* 3 series de barras Kilos (eje izquierdo) */}
+                {/* 3 series de barras Kilos APILADAS (Mejora 2 día-vs-día):
+                    cada año se compone de "al día N" (sólido) + "resto hasta
+                    cierre" (translúcido). Cada año tiene su propio stackId
+                    para que las barras NO se apilen entre años, sino solo
+                    los 2 segmentos del mismo año. */}
                 <Bar
                   yAxisId="left"
-                  dataKey="kg24"
+                  dataKey="kg24_alDia"
+                  stackId="stack-kg24"
                   name={`Kilos ${monthLabel24}`}
-                  fill="rgba(148, 163, 184, 0.7)"
+                  fill="rgba(148, 163, 184, 0.85)"
+                  radius={[0, 0, 0, 0]}
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="__rest_kg24"
+                  stackId="stack-kg24"
+                  name={`Kilos ${monthLabel24}`}
+                  legendType="none"
+                  fill="rgba(148, 163, 184, 0.28)"
                   radius={[2, 2, 0, 0]}
                 />
                 <Bar
                   yAxisId="left"
-                  dataKey="kg25"
+                  dataKey="kg25_alDia"
+                  stackId="stack-kg25"
                   name={`Kilos ${monthLabel25}`}
                   fill="rgba(59, 130, 246, 0.85)"
+                  radius={[0, 0, 0, 0]}
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="__rest_kg25"
+                  stackId="stack-kg25"
+                  name={`Kilos ${monthLabel25}`}
+                  legendType="none"
+                  fill="rgba(59, 130, 246, 0.28)"
                   radius={[2, 2, 0, 0]}
                 />
                 <Bar
                   yAxisId="left"
-                  dataKey="kg26"
+                  dataKey="kg26_alDia"
+                  stackId="stack-kg26"
                   name={`Kilos ${monthLabel26}`}
                   fill="rgba(16, 185, 129, 0.85)"
+                  radius={[0, 0, 0, 0]}
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="__rest_kg26"
+                  stackId="stack-kg26"
+                  name={`Kilos ${monthLabel26}`}
+                  legendType="none"
+                  fill="rgba(16, 185, 129, 0.28)"
                   radius={[2, 2, 0, 0]}
                 />
                 {/* 3 series de lineas Venta/Pesos (eje derecho) */}
@@ -434,11 +490,8 @@ function ProductosTooltip({
 }) {
   if (!active || !payload || payload.length === 0) return null;
 
-  const ventaItems = payload.filter((p) => p.name?.startsWith("Venta"));
-  const kgItems = payload.filter((p) => p.name?.startsWith("Kilos"));
-
-  // Recharts inyecta el row completo en payload[0].payload — usamos eso para
-  // sacar margen $ y margen % aunque NO estén graficados (decisión 2.a).
+  // Recharts inyecta el row completo en payload[0].payload — lo usamos para
+  // leer cualquier campo del data row (cierre, al-día, margen, etc.).
   const row = (payload[0] as TooltipPayloadItem & {
     payload?: Record<string, number | string>;
   })?.payload;
@@ -448,20 +501,33 @@ function ProductosTooltip({
     return typeof v === "number" ? v : null;
   };
 
-  // YoY delta para Venta 26 vs 25
-  const v25 = ventaItems.find((p) => p.dataKey === "venta25")?.value;
-  const v26 = ventaItems.find((p) => p.dataKey === "venta26")?.value;
+  // YoY delta sobre acumulados AL DÍA N (comparativo equitativo, Mejora 2)
+  const v25AlDia = num("venta25_alDia") ?? num("venta25");
+  const v26AlDia = num("venta26_alDia") ?? num("venta26");
   const yoyDelta =
-    typeof v25 === "number" && v25 > 0 && typeof v26 === "number"
-      ? ((v26 - v25) / v25) * 100
+    v25AlDia != null && v25AlDia > 0 && v26AlDia != null
+      ? ((v26AlDia - v25AlDia) / v25AlDia) * 100
       : null;
 
-  // Precio/kg del año actual (26)
-  const k26 = kgItems.find((p) => p.dataKey === "kg26")?.value;
+  // Precio/kg del año actual (al día N)
+  const k26AlDia = num("kg26_alDia") ?? num("kg26");
   const pricePerKg =
-    typeof v26 === "number" && typeof k26 === "number" && k26 > 0
-      ? v26 / k26
+    v26AlDia != null && k26AlDia != null && k26AlDia > 0
+      ? v26AlDia / k26AlDia
       : null;
+
+  // Helper: ¿el campo "al día" tiene un valor distinto al cierre? (para
+  // mostrar referencia "cierre $X" al lado del al-día)
+  const ventaItems = [
+    { key: "venta24", aldiaKey: "venta24_alDia", label: "24", color: "#94a3b8" },
+    { key: "venta25", aldiaKey: "venta25_alDia", label: "25", color: "#3b82f6" },
+    { key: "venta26", aldiaKey: "venta26_alDia", label: "26", color: "#f59e0b" },
+  ];
+  const kgItems = [
+    { key: "kg24", aldiaKey: "kg24_alDia", label: "24", color: "rgba(148, 163, 184, 0.85)" },
+    { key: "kg25", aldiaKey: "kg25_alDia", label: "25", color: "rgba(59, 130, 246, 0.85)" },
+    { key: "kg26", aldiaKey: "kg26_alDia", label: "26", color: "rgba(16, 185, 129, 0.85)" },
+  ];
 
   // Margen $ y margen % por año (NO graficados, sólo tooltip)
   const margenItems = [
@@ -514,51 +580,77 @@ function ProductosTooltip({
       </div>
 
       {/* Sección Pesos */}
-      {ventaItems.length > 0 && (
-        <div className="px-3 py-2">
-          <div
-            className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Pesos ($)
-          </div>
-          {ventaItems.map((p) => (
-            <Row
-              key={p.name}
-              color={p.color ?? "var(--text-muted)"}
-              label={p.name?.replace("Venta ", "") ?? ""}
+      <div className="px-3 py-2">
+        <div
+          className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Pesos ($) · al mismo día laboral
+        </div>
+        {ventaItems.map((p) => {
+          const alDia = num(p.aldiaKey);
+          const cierre = num(p.key);
+          if (alDia == null && cierre == null) return null;
+          const showAlDia = alDia != null && cierre != null;
+          return (
+            <RowDual
+              key={p.key}
+              color={p.color}
+              label={p.label}
               value={
-                typeof p.value === "number" ? formatMoney(p.value) : "—"
+                showAlDia
+                  ? formatMoney(alDia)
+                  : cierre != null
+                    ? formatMoney(cierre)
+                    : "—"
+              }
+              valueSecondary={
+                showAlDia && cierre > 0 && cierre !== alDia
+                  ? `cierre ${formatMoney(cierre)}`
+                  : undefined
               }
             />
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
       {/* Sección Kilos */}
-      {kgItems.length > 0 && (
+      <div
+        className="px-3 py-2"
+        style={{ borderTop: "1px solid var(--border)" }}
+      >
         <div
-          className="px-3 py-2"
-          style={{ borderTop: "1px solid var(--border)" }}
+          className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-muted)" }}
         >
-          <div
-            className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Kilos
-          </div>
-          {kgItems.map((p) => (
-            <Row
-              key={p.name}
-              color={p.color ?? "var(--text-muted)"}
-              label={p.name?.replace("Kilos ", "") ?? ""}
+          Kilos · al mismo día laboral
+        </div>
+        {kgItems.map((p) => {
+          const alDia = num(p.aldiaKey);
+          const cierre = num(p.key);
+          if (alDia == null && cierre == null) return null;
+          const showAlDia = alDia != null && cierre != null;
+          return (
+            <RowDual
+              key={p.key}
+              color={p.color}
+              label={p.label}
               value={
-                typeof p.value === "number" ? formatKilos(p.value) : "—"
+                showAlDia
+                  ? formatKilos(alDia)
+                  : cierre != null
+                    ? formatKilos(cierre)
+                    : "—"
+              }
+              valueSecondary={
+                showAlDia && cierre > 0 && cierre !== alDia
+                  ? `cierre ${formatKilos(cierre)}`
+                  : undefined
               }
             />
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
       {/* Sección Margen $ (NO graficado, solo en tooltip) */}
       {hasMargenData && (
@@ -654,6 +746,46 @@ function Row({
         style={{ color: "var(--text-primary)" }}
       >
         {value}
+      </span>
+    </div>
+  );
+}
+
+function RowDual({
+  color,
+  label,
+  value,
+  valueSecondary,
+}: {
+  color: string;
+  label: string;
+  value: string;
+  valueSecondary?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-0.5">
+      <span className="flex items-center gap-2">
+        <span
+          className="inline-block h-2.5 w-2.5 rounded-sm"
+          style={{ background: color }}
+        />
+        <span style={{ color: "var(--text-secondary)" }}>{label}</span>
+      </span>
+      <span className="flex items-baseline gap-1.5">
+        <span
+          className="font-semibold"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {value}
+        </span>
+        {valueSecondary && (
+          <span
+            className="text-[10px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {valueSecondary}
+          </span>
+        )}
       </span>
     </div>
   );

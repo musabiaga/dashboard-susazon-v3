@@ -9,7 +9,11 @@ import type {
 } from "@/components/dashboard/Sidebar";
 import type { DimensionRow } from "@/components/dashboard/DimensionTab";
 import type { PerdidoRow } from "@/components/dashboard/PerdidosTab";
-import { countBizDays, getMexicoCityDateParts } from "@/lib/business-days";
+import {
+  countBizDays,
+  findCalendarDayForBizDays,
+  getMexicoCityDateParts,
+} from "@/lib/business-days";
 
 export interface DimensionDataset {
   byTerritory: Record<string, DimensionRow[]>;
@@ -55,6 +59,107 @@ function withMarginPct(k: TerritoryKpi): TerritoryKpi {
  * (anio, mes, territorio, dim_value, total_venta). Aggrega por territorio
  * y total (sumando across territorios).
  */
+/**
+ * Versión "al día N" de buildDimDataset: agrega rows del view diario a los
+ * campos `*_alDia` de DimensionRow. Asume que el dataset base ya fue
+ * construido con buildDimDataset (cierre del mes); este merge ENCIMA los
+ * acumulados al día.
+ *
+ * Si una dimensión existe en al-día pero no en cierre, se agrega como
+ * row nueva con cierre=0.
+ */
+function mergeAlDiaIntoDataset<
+  T extends {
+    territorio: string;
+    anio: number;
+    total_venta: number | string | null;
+    total_kg?: number | string | null;
+    total_margen?: number | string | null;
+  },
+>(
+  base: DimensionDataset,
+  alDiaRows: T[] | null,
+  getName: (r: T) => string,
+  cy: number
+): DimensionDataset {
+  // Reconstruir índices para mergear
+  const byTerrIdx = new Map<string, Map<string, DimensionRow>>();
+  for (const [terr, rs] of Object.entries(base.byTerritory)) {
+    const m = new Map<string, DimensionRow>();
+    for (const r of rs) m.set(r.name, r);
+    byTerrIdx.set(terr, m);
+  }
+  const totalIdx = new Map<string, DimensionRow>();
+  for (const r of base.total) totalIdx.set(r.name, r);
+
+  for (const row of alDiaRows ?? []) {
+    const name = getName(row);
+    const v = Number(row.total_venta) || 0;
+    const k = Number(row.total_kg ?? 0) || 0;
+    const mg = Number(row.total_margen ?? 0) || 0;
+
+    // Por territorio
+    let terrMap = byTerrIdx.get(row.territorio);
+    if (!terrMap) {
+      terrMap = new Map();
+      byTerrIdx.set(row.territorio, terrMap);
+    }
+    const cur = terrMap.get(name) ?? {
+      name, v24: 0, v25: 0, v26: 0,
+      k24: 0, k25: 0, k26: 0,
+      m24: 0, m25: 0, m26: 0,
+      v24_alDia: 0, v25_alDia: 0, v26_alDia: 0,
+      k24_alDia: 0, k25_alDia: 0, k26_alDia: 0,
+      m24_alDia: 0, m25_alDia: 0, m26_alDia: 0,
+    };
+    if (row.anio === cy - 2) {
+      cur.v24_alDia = v;
+      cur.k24_alDia = k;
+      cur.m24_alDia = mg;
+    } else if (row.anio === cy - 1) {
+      cur.v25_alDia = v;
+      cur.k25_alDia = k;
+      cur.m25_alDia = mg;
+    } else if (row.anio === cy) {
+      cur.v26_alDia = v;
+      cur.k26_alDia = k;
+      cur.m26_alDia = mg;
+    }
+    terrMap.set(name, cur);
+
+    // Total (sumando todos los territorios)
+    const tcur = totalIdx.get(name) ?? {
+      name, v24: 0, v25: 0, v26: 0,
+      k24: 0, k25: 0, k26: 0,
+      m24: 0, m25: 0, m26: 0,
+      v24_alDia: 0, v25_alDia: 0, v26_alDia: 0,
+      k24_alDia: 0, k25_alDia: 0, k26_alDia: 0,
+      m24_alDia: 0, m25_alDia: 0, m26_alDia: 0,
+    };
+    if (row.anio === cy - 2) {
+      tcur.v24_alDia = (tcur.v24_alDia ?? 0) + v;
+      tcur.k24_alDia = (tcur.k24_alDia ?? 0) + k;
+      tcur.m24_alDia = (tcur.m24_alDia ?? 0) + mg;
+    } else if (row.anio === cy - 1) {
+      tcur.v25_alDia = (tcur.v25_alDia ?? 0) + v;
+      tcur.k25_alDia = (tcur.k25_alDia ?? 0) + k;
+      tcur.m25_alDia = (tcur.m25_alDia ?? 0) + mg;
+    } else if (row.anio === cy) {
+      tcur.v26_alDia = (tcur.v26_alDia ?? 0) + v;
+      tcur.k26_alDia = (tcur.k26_alDia ?? 0) + k;
+      tcur.m26_alDia = (tcur.m26_alDia ?? 0) + mg;
+    }
+    totalIdx.set(name, tcur);
+  }
+
+  return {
+    byTerritory: Object.fromEntries(
+      Array.from(byTerrIdx.entries()).map(([t, m]) => [t, Array.from(m.values())])
+    ),
+    total: Array.from(totalIdx.values()),
+  };
+}
+
 function buildDimDataset<
   T extends {
     territorio: string;
@@ -276,6 +381,94 @@ export default async function DashboardPage({
       .eq("mes", currentMonth),
   ]);
 
+  // ============ Queries "al día N" (Mejora 2: comparativos día-vs-día) ============
+  // Para cada año comparativo (2024, 2025) calculamos el día calendario tal
+  // que countBizDays(year, month, day) === elapsedBizDays_2026. Esto asegura
+  // que estamos comparando el MISMO número de días hábiles entre años.
+  // Para 2026 el cutoff es daysCurrent (el día calendario actual).
+  const cutoff24 = findCalendarDayForBizDays(
+    currentYear - 2,
+    currentMonth,
+    elapsedBizDays
+  );
+  const cutoff25 = findCalendarDayForBizDays(
+    currentYear - 1,
+    currentMonth,
+    elapsedBizDays
+  );
+  const cutoff26 = daysCurrent;
+
+  // 4 dimensiones × 3 años = 12 queries paralelas.
+  const [
+    { data: grupoAlDia24 }, { data: grupoAlDia25 }, { data: grupoAlDia26 },
+    { data: skuAlDia24 }, { data: skuAlDia25 }, { data: skuAlDia26 },
+    { data: clienteAlDia24 }, { data: clienteAlDia25 }, { data: clienteAlDia26 },
+    { data: vendedorAlDia24 }, { data: vendedorAlDia25 }, { data: vendedorAlDia26 },
+  ] = await Promise.all([
+    // Grupo
+    supabase.from("kpi_grupo_diario")
+      .select("territorio, grupo, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24),
+    supabase.from("kpi_grupo_diario")
+      .select("territorio, grupo, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
+    supabase.from("kpi_grupo_diario")
+      .select("territorio, grupo, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
+    // SKU
+    supabase.from("kpi_sku_diario")
+      .select("territorio, sku, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24),
+    supabase.from("kpi_sku_diario")
+      .select("territorio, sku, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
+    supabase.from("kpi_sku_diario")
+      .select("territorio, sku, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
+    // Cliente
+    supabase.from("kpi_cliente_diario")
+      .select("territorio, cliente, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24),
+    supabase.from("kpi_cliente_diario")
+      .select("territorio, cliente, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
+    supabase.from("kpi_cliente_diario")
+      .select("territorio, cliente, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
+    // Vendedor
+    supabase.from("kpi_vendedor_diario")
+      .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24),
+    supabase.from("kpi_vendedor_diario")
+      .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
+    supabase.from("kpi_vendedor_diario")
+      .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
+  ]);
+
+  // Combinar las 3 queries de cada dimensión en 1 array para mergeAlDia
+  const grupoAlDiaAll = [
+    ...(grupoAlDia24 ?? []),
+    ...(grupoAlDia25 ?? []),
+    ...(grupoAlDia26 ?? []),
+  ];
+  const skuAlDiaAll = [
+    ...(skuAlDia24 ?? []),
+    ...(skuAlDia25 ?? []),
+    ...(skuAlDia26 ?? []),
+  ];
+  const clienteAlDiaAll = [
+    ...(clienteAlDia24 ?? []),
+    ...(clienteAlDia25 ?? []),
+    ...(clienteAlDia26 ?? []),
+  ];
+  const vendedorAlDiaAll = [
+    ...(vendedorAlDia24 ?? []),
+    ...(vendedorAlDia25 ?? []),
+    ...(vendedorAlDia26 ?? []),
+  ];
+
   // Fetch cliente data para tab Perdidos via vista kpi_cliente_perdidos
   // (pre-agregada con mes actual y YTD, ambas dimensiones venta+kg).
   const { data: clientePerdidosRows } = await supabase
@@ -285,28 +478,56 @@ export default async function DashboardPage({
     )
     .in("anio", [currentYear - 1, currentYear]);
 
-  // Build datasets para grupos, clientes y vendedores via helper genérico
-  const grupos = buildDimDataset(
+  // Build datasets para grupos, clientes y vendedores via helper genérico.
+  // Después mergeamos los acumulados "al día N" para los charts con
+  // sombreado YoY día-vs-día (Mejora 2).
+  const gruposBase = buildDimDataset(
     grupoRowsRaw,
     (r) => r.grupo,
     currentYear
   );
-  const clientes = buildDimDataset(
+  const grupos = mergeAlDiaIntoDataset(
+    gruposBase,
+    grupoAlDiaAll,
+    (r: { grupo: string }) => r.grupo,
+    currentYear
+  );
+
+  const clientesBase = buildDimDataset(
     clienteRowsRaw,
     (r) => r.cliente,
     currentYear
   );
+  const clientes = mergeAlDiaIntoDataset(
+    clientesBase,
+    clienteAlDiaAll,
+    (r: { cliente: string }) => r.cliente,
+    currentYear
+  );
   // Vendedores: 2 datasets para soportar toggle Sus/Suve
   // Separados (con sufijo): replica V2.2, una fila por (vendedor, empresa)
-  const vendedoresSeparados = buildDimDataset(
+  const vendedoresSeparadosBase = buildDimDataset(
     vendedorRowsRaw,
     (r) => `${r.vendedor} (${r.empresa === 0 ? "Sus" : "Suve"})`,
     currentYear
   );
+  const vendedoresSeparados = mergeAlDiaIntoDataset(
+    vendedoresSeparadosBase,
+    vendedorAlDiaAll,
+    (r: { vendedor: string; empresa: number }) =>
+      `${r.vendedor} (${r.empresa === 0 ? "Sus" : "Suve"})`,
+    currentYear
+  );
   // Unidos (sin sufijo): aggrega ambas empresas por persona
-  const vendedoresUnidos = buildDimDataset(
+  const vendedoresUnidosBase = buildDimDataset(
     vendedorRowsRaw,
     (r) => r.vendedor,
+    currentYear
+  );
+  const vendedoresUnidos = mergeAlDiaIntoDataset(
+    vendedoresUnidosBase,
+    vendedorAlDiaAll,
+    (r: { vendedor: string }) => r.vendedor,
     currentYear
   );
   const vendedores = {
@@ -475,10 +696,16 @@ export default async function DashboardPage({
   const skusTotal: DimensionRow[] = Array.from(totalSkusMap.entries()).map(
     ([name, data]) => ({ name, ...data })
   );
-  const skus: DimensionDataset = {
-    byTerritory: skusByTerritory,
-    total: skusTotal,
-  };
+  // Mergear acumulados al-día N para los charts con sombreado YoY (Mejora 2)
+  const skus: DimensionDataset = mergeAlDiaIntoDataset(
+    {
+      byTerritory: skusByTerritory,
+      total: skusTotal,
+    },
+    skuAlDiaAll,
+    (r: { sku: string }) => r.sku,
+    currentYear
+  );
 
   // states es la fuente de verdad para la lista completa de territorios.
   const uniqueNames = (states ?? []).map((s) => s.territory_name);

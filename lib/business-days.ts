@@ -76,6 +76,29 @@ export function listBizDays(year: number, month: number): number[] {
 }
 
 /**
+ * Encuentra el día calendario tal que `countBizDays(year, month, day) === targetBizDays`.
+ *
+ * Útil para comparativos día-vs-día entre años: si hoy es día hábil 6 de mayo
+ * 2026, buscamos cuál fue el día calendario donde se cumplían exactamente 6
+ * días hábiles en mayo 2025 (puede ser 7, 8 o 9 según feriados/domingos).
+ *
+ * Si `targetBizDays` excede el total de días hábiles del mes, devuelve el
+ * último día calendario del mes.
+ */
+export function findCalendarDayForBizDays(
+  year: number,
+  month: number,
+  targetBizDays: number
+): number {
+  if (targetBizDays <= 0) return 0;
+  const lastDay = new Date(year, month, 0).getDate();
+  for (let d = 1; d <= lastDay; d++) {
+    if (countBizDays(year, month, d) >= targetBizDays) return d;
+  }
+  return lastDay;
+}
+
+/**
  * Devuelve año/mes/día actual en zona horaria America/Mexico_City (UTC-6).
  *
  * IMPORTANTE: Vercel corre los Server Components en UTC. Si usamos

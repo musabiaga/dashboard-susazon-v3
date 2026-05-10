@@ -44,6 +44,10 @@ interface Props {
    *  Permiten enriquecer el tooltip con margen absoluto sin cargar más al
    *  chart. */
   marginAmountSeries?: GroupedBarSeries[];
+  /** Mapping series.key → key del campo "al-día" en data. Si se pasa, las
+   *  barras se renderizan como apiladas (segmento sólido al-día + segmento
+   *  translúcido del resto hasta cierre). Mejora 2 día-vs-día. */
+  alDiaKeyByCierre?: Record<string, string>;
 }
 
 /**
@@ -53,6 +57,17 @@ interface Props {
  * Cuando se pasan `marginPctSeries`, agrega líneas de margen % en eje Y
  * secundario derecho. El tooltip muestra venta + margen $ + margen %.
  */
+/** Convierte un color hex (#RRGGBB) a su versión rgba con alpha. Si recibe
+ *  un color que no es hex, devuelve el original. */
+function hexToRgba(hex: string, alpha: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const r = parseInt(m[1].slice(0, 2), 16);
+  const g = parseInt(m[1].slice(2, 4), 16);
+  const b = parseInt(m[1].slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 export function GroupedBarChart({
   data,
   series,
@@ -63,8 +78,11 @@ export function GroupedBarChart({
   legendVerticalAlign = "top",
   marginPctSeries,
   marginAmountSeries,
+  alDiaKeyByCierre,
 }: Props) {
   const hasMargin = (marginPctSeries?.length ?? 0) > 0;
+  const hasAlDia =
+    alDiaKeyByCierre != null && Object.keys(alDiaKeyByCierre).length > 0;
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -131,16 +149,48 @@ export function GroupedBarChart({
           }}
           iconType="rect"
         />
-        {series.map((s) => (
-          <Bar
-            key={s.key}
-            yAxisId="left"
-            dataKey={s.key}
-            name={s.label}
-            fill={s.color}
-            radius={[2, 2, 0, 0]}
-          />
-        ))}
+        {hasAlDia
+          ? // Modo apilado: cada año es 2 segmentos (al-día sólido + resto
+            //  translúcido). Cada año tiene su propio stackId para que las
+            //  barras de distintos años queden separadas (no apiladas entre sí).
+            series.flatMap((s) => {
+              const alDiaKey = alDiaKeyByCierre![s.key] ?? s.key;
+              const restKey = `__rest_${s.key}`;
+              return [
+                <Bar
+                  key={`${s.key}-aldia`}
+                  yAxisId="left"
+                  dataKey={alDiaKey}
+                  stackId={`stack-${s.key}`}
+                  name={s.label}
+                  fill={s.color}
+                  radius={[0, 0, 0, 0]}
+                />,
+                <Bar
+                  key={`${s.key}-rest`}
+                  yAxisId="left"
+                  dataKey={restKey}
+                  stackId={`stack-${s.key}`}
+                  // Usamos el mismo color pero translúcido para "resto hasta
+                  // cierre del mes" del año comparativo. Mismo nombre que la
+                  // serie principal para no duplicar legend.
+                  name={s.label}
+                  legendType="none"
+                  fill={hexToRgba(s.color, 0.28)}
+                  radius={[2, 2, 0, 0]}
+                />,
+              ];
+            })
+          : series.map((s) => (
+              <Bar
+                key={s.key}
+                yAxisId="left"
+                dataKey={s.key}
+                name={s.label}
+                fill={s.color}
+                radius={[2, 2, 0, 0]}
+              />
+            ))}
         {hasMargin &&
           marginPctSeries!.map((s) => (
             <Line
@@ -233,22 +283,38 @@ function GroupedBarTooltip({
         </div>
       </div>
 
-      {/* Sección Venta */}
+      {/* Sección Venta — al día N (oscuro) + cierre (translúcido) si Mejora 2 activa */}
       <div className="px-3 py-2">
         <div
           className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
           style={{ color: "var(--text-muted)" }}
         >
-          Venta
+          Venta {row && row["v24_alDia"] != null ? "· al mismo día laboral" : ""}
         </div>
         {ventaSeries.map((s) => {
-          const v = num(s.key);
+          // Si hay al-día, mostramos al-día como valor principal y cierre
+          // como referencia translúcida al lado.
+          const alDiaKey = `${s.key}_alDia`;
+          const alDia = num(alDiaKey);
+          const cierre = num(s.key);
+          const showAlDia = alDia != null && cierre != null;
           return (
             <Row
               key={s.key}
               color={s.color}
               label={s.label}
-              value={v != null ? yFormatter(v) : "—"}
+              value={
+                showAlDia
+                  ? yFormatter(alDia)
+                  : cierre != null
+                    ? yFormatter(cierre)
+                    : "—"
+              }
+              valueSecondary={
+                showAlDia && cierre > 0 && cierre !== alDia
+                  ? `cierre ${yFormatter(cierre)}`
+                  : undefined
+              }
             />
           );
         })}
@@ -313,10 +379,15 @@ function Row({
   color,
   label,
   value,
+  valueSecondary,
 }: {
   color: string;
   label: string;
   value: string;
+  /** Texto secundario que aparece debajo o al lado en color tenue.
+   *  Útil para mostrar "cierre $X" como referencia cuando el valor
+   *  principal es "al día N". */
+  valueSecondary?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-0.5">
@@ -327,11 +398,21 @@ function Row({
         />
         <span style={{ color: "var(--text-secondary)" }}>{label}</span>
       </span>
-      <span
-        className="font-semibold"
-        style={{ color: "var(--text-primary)" }}
-      >
-        {value}
+      <span className="flex items-baseline gap-1.5">
+        <span
+          className="font-semibold"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {value}
+        </span>
+        {valueSecondary && (
+          <span
+            className="text-[10px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {valueSecondary}
+          </span>
+        )}
       </span>
     </div>
   );

@@ -10,6 +10,7 @@ import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
 
 export interface DimensionRow {
   name: string;
+  // Cierre del mes (mes completo de cada año). 2026 = mes en curso.
   v24: number;
   v25: number;
   v26: number;
@@ -20,6 +21,20 @@ export interface DimensionRow {
   m24?: number;
   m25?: number;
   m26?: number;
+  // ===== Acumulado al "mismo día laboral" del mes 2026 actual (Mejora 2) =====
+  // Para 2026 = lo facturado hasta hoy (igual que v26 cuando el mes está
+  // en curso; igual que cierre cuando ya pasó).
+  // Para 2024 y 2025: acumulado al día calendario equivalente al día hábil
+  // que llevamos en 2026. Permite comparativos día-vs-día equitativos.
+  v24_alDia?: number;
+  v25_alDia?: number;
+  v26_alDia?: number;
+  k24_alDia?: number;
+  k25_alDia?: number;
+  k26_alDia?: number;
+  m24_alDia?: number;
+  m25_alDia?: number;
+  m26_alDia?: number;
   // Tab Vendedores y Clientes pueden traer info extra
   empresa?: string; // "Sus" | "Suve" para Vendedores
 }
@@ -234,23 +249,46 @@ export function DimensionTab({
                   const m24 = r.m24 ?? 0;
                   const m25 = r.m25 ?? 0;
                   const m26 = r.m26 ?? 0;
+                  // Acumulados al día N (Mejora 2). Si por alguna razón
+                  // al-día > cierre (no debería), nos quedamos con cierre.
+                  const v24AlDia = Math.min(r.v24, r.v24_alDia ?? r.v24);
+                  const v25AlDia = Math.min(r.v25, r.v25_alDia ?? r.v25);
+                  const v26AlDia = Math.min(r.v26, r.v26_alDia ?? r.v26);
                   return {
                     name: r.name,
+                    // Cierre del mes (segmento total)
                     v24: r.v24,
                     v25: r.v25,
                     v26: r.v26,
+                    // Al día N (segmento sólido inferior)
+                    v24_alDia: v24AlDia,
+                    v25_alDia: v25AlDia,
+                    v26_alDia: v26AlDia,
+                    // "Resto hasta cierre" (segmento translúcido superior)
+                    __rest_v24: Math.max(0, r.v24 - v24AlDia),
+                    __rest_v25: Math.max(0, r.v25 - v25AlDia),
+                    __rest_v26: Math.max(0, r.v26 - v26AlDia),
+                    // Margen $ y margen % (van al tooltip)
                     m24,
                     m25,
                     m26,
-                    // Margen % por año (margen / venta * 100). Si venta = 0, null.
                     mp24: r.v24 > 0 ? (m24 / r.v24) * 100 : 0,
                     mp25: r.v25 > 0 ? (m25 / r.v25) * 100 : 0,
                     mp26: r.v26 > 0 ? (m26 / r.v26) * 100 : 0,
+                    // KG (al tooltip)
+                    k24: r.k24 ?? 0,
+                    k25: r.k25 ?? 0,
+                    k26: r.k26 ?? 0,
                   };
                 })}
                 series={series}
                 marginAmountSeries={marginAmountSeries}
                 marginPctSeries={marginPctSeries}
+                alDiaKeyByCierre={{
+                  v24: "v24_alDia",
+                  v25: "v25_alDia",
+                  v26: "v26_alDia",
+                }}
                 height={520}
                 xAngle={-30}
                 xLabelHeight={130}
