@@ -481,13 +481,15 @@ export default async function DashboardPage({
   ];
 
   // Fetch cliente data para tab Perdidos via vista kpi_cliente_perdidos
-  // (pre-agregada con mes actual y YTD, ambas dimensiones venta+kg).
+  // (pre-agregada con mes actual y YTD: venta + kg + margen).
+  // Traemos 3 años: 2024 (informativo, columna extra en tabla), 2025
+  // (referencia base de status), 2026 (mes actual).
   const { data: clientePerdidosRows } = await supabase
     .from("kpi_cliente_perdidos")
     .select(
-      "anio, no_cliente, cliente, vendedor, territorio, mes_venta, mes_kg, ytd_venta, ytd_kg"
+      "anio, no_cliente, cliente, vendedor, territorio, mes_venta, mes_kg, mes_margen, ytd_venta, ytd_kg, ytd_margen"
     )
-    .in("anio", [currentYear - 1, currentYear]);
+    .in("anio", [currentYear - 2, currentYear - 1, currentYear]);
 
   // Build datasets para grupos, clientes y vendedores via helper genérico.
   // Después mergeamos los acumulados "al día N" para los charts con
@@ -547,36 +549,59 @@ export default async function DashboardPage({
   };
 
   // ============ Perdidos (Tab Perdidos) ============
-  // Aggregate por (territorio, no_cliente) — 2 anios → 1 row con 8 numeros.
-  // Status (perdido/declive) se calcula en el componente segun la dimension
-  // seleccionada (mes vs YTD).
+  // Aggregate por (territorio, no_cliente) — 3 anios (2024/2025/2026) con
+  // venta + kg + margen, dimensiones mes y ytd.
+  //   - 2024: SOLO informativo (columna extra en tabla)
+  //   - 2025: referencia base para calcular status
+  //   - 2026: mes actual
   const cy = currentYear;
   const py = currentYear - 1;
+  const py2 = currentYear - 2;
 
   type ClienteAcc = {
     cliente: string;
     vendedor: string;
+    mes_venta_2024: number;
     mes_venta_2025: number;
     mes_venta_2026: number;
+    mes_kg_2024: number;
     mes_kg_2025: number;
     mes_kg_2026: number;
+    mes_margen_2024: number;
+    mes_margen_2025: number;
+    mes_margen_2026: number;
+    ytd_venta_2024: number;
     ytd_venta_2025: number;
     ytd_venta_2026: number;
+    ytd_kg_2024: number;
     ytd_kg_2025: number;
     ytd_kg_2026: number;
+    ytd_margen_2024: number;
+    ytd_margen_2025: number;
+    ytd_margen_2026: number;
   };
 
   const emptyAcc = (cliente: string, vendedor: string): ClienteAcc => ({
     cliente,
     vendedor,
+    mes_venta_2024: 0,
     mes_venta_2025: 0,
     mes_venta_2026: 0,
+    mes_kg_2024: 0,
     mes_kg_2025: 0,
     mes_kg_2026: 0,
+    mes_margen_2024: 0,
+    mes_margen_2025: 0,
+    mes_margen_2026: 0,
+    ytd_venta_2024: 0,
     ytd_venta_2025: 0,
     ytd_venta_2026: 0,
+    ytd_kg_2024: 0,
     ytd_kg_2025: 0,
     ytd_kg_2026: 0,
+    ytd_margen_2024: 0,
+    ytd_margen_2025: 0,
+    ytd_margen_2026: 0,
   });
 
   const perdidosByTerrCliente = new Map<string, Map<string, ClienteAcc>>();
@@ -592,18 +617,31 @@ export default async function DashboardPage({
       emptyAcc(row.cliente ?? row.no_cliente, row.vendedor ?? "(sin vendedor)");
     const mv = Number(row.mes_venta) || 0;
     const mk = Number(row.mes_kg) || 0;
+    const mm = Number(row.mes_margen ?? 0) || 0;
     const yv = Number(row.ytd_venta) || 0;
     const yk = Number(row.ytd_kg) || 0;
-    if (row.anio === py) {
+    const ym = Number(row.ytd_margen ?? 0) || 0;
+    if (row.anio === py2) {
+      cur.mes_venta_2024 = mv;
+      cur.mes_kg_2024 = mk;
+      cur.mes_margen_2024 = mm;
+      cur.ytd_venta_2024 = yv;
+      cur.ytd_kg_2024 = yk;
+      cur.ytd_margen_2024 = ym;
+    } else if (row.anio === py) {
       cur.mes_venta_2025 = mv;
       cur.mes_kg_2025 = mk;
+      cur.mes_margen_2025 = mm;
       cur.ytd_venta_2025 = yv;
       cur.ytd_kg_2025 = yk;
+      cur.ytd_margen_2025 = ym;
     } else if (row.anio === cy) {
       cur.mes_venta_2026 = mv;
       cur.mes_kg_2026 = mk;
+      cur.mes_margen_2026 = mm;
       cur.ytd_venta_2026 = yv;
       cur.ytd_kg_2026 = yk;
+      cur.ytd_margen_2026 = ym;
     }
     terrMap.set(row.no_cliente, cur);
   }
@@ -612,14 +650,27 @@ export default async function DashboardPage({
     no_cliente: id,
     cliente: c.cliente,
     vendedor: c.vendedor,
+    // 2024 (informativo)
+    mes_venta_2024: c.mes_venta_2024,
+    mes_kg_2024: c.mes_kg_2024,
+    mes_margen_2024: c.mes_margen_2024,
+    ytd_venta_2024: c.ytd_venta_2024,
+    ytd_kg_2024: c.ytd_kg_2024,
+    ytd_margen_2024: c.ytd_margen_2024,
+    // 2025 (referencia base)
     mes_venta_2025: c.mes_venta_2025,
-    mes_venta_2026: c.mes_venta_2026,
     mes_kg_2025: c.mes_kg_2025,
-    mes_kg_2026: c.mes_kg_2026,
+    mes_margen_2025: c.mes_margen_2025,
     ytd_venta_2025: c.ytd_venta_2025,
-    ytd_venta_2026: c.ytd_venta_2026,
     ytd_kg_2025: c.ytd_kg_2025,
+    ytd_margen_2025: c.ytd_margen_2025,
+    // 2026 (mes actual)
+    mes_venta_2026: c.mes_venta_2026,
+    mes_kg_2026: c.mes_kg_2026,
+    mes_margen_2026: c.mes_margen_2026,
+    ytd_venta_2026: c.ytd_venta_2026,
     ytd_kg_2026: c.ytd_kg_2026,
+    ytd_margen_2026: c.ytd_margen_2026,
   });
 
   const perdidosByTerritory: Record<string, PerdidoRow[]> = {};
@@ -630,14 +681,27 @@ export default async function DashboardPage({
     );
     for (const [id, c] of clienteMap) {
       const cur = totalCliente.get(id) ?? emptyAcc(c.cliente, c.vendedor);
+      // 2024
+      cur.mes_venta_2024 += c.mes_venta_2024;
+      cur.mes_kg_2024 += c.mes_kg_2024;
+      cur.mes_margen_2024 += c.mes_margen_2024;
+      cur.ytd_venta_2024 += c.ytd_venta_2024;
+      cur.ytd_kg_2024 += c.ytd_kg_2024;
+      cur.ytd_margen_2024 += c.ytd_margen_2024;
+      // 2025
       cur.mes_venta_2025 += c.mes_venta_2025;
-      cur.mes_venta_2026 += c.mes_venta_2026;
       cur.mes_kg_2025 += c.mes_kg_2025;
-      cur.mes_kg_2026 += c.mes_kg_2026;
+      cur.mes_margen_2025 += c.mes_margen_2025;
       cur.ytd_venta_2025 += c.ytd_venta_2025;
-      cur.ytd_venta_2026 += c.ytd_venta_2026;
       cur.ytd_kg_2025 += c.ytd_kg_2025;
+      cur.ytd_margen_2025 += c.ytd_margen_2025;
+      // 2026
+      cur.mes_venta_2026 += c.mes_venta_2026;
+      cur.mes_kg_2026 += c.mes_kg_2026;
+      cur.mes_margen_2026 += c.mes_margen_2026;
+      cur.ytd_venta_2026 += c.ytd_venta_2026;
       cur.ytd_kg_2026 += c.ytd_kg_2026;
+      cur.ytd_margen_2026 += c.ytd_margen_2026;
       totalCliente.set(id, cur);
     }
   }
@@ -653,7 +717,7 @@ export default async function DashboardPage({
   // Construir Map<no_cliente, Map<anio, {venta, kg}>> con acumulado AL MISMO
   // DÍA LABORAL del mes 2026 actual. Por territorio (para byTerritory) y
   // total (sumando todos los territorios).
-  type AlDiaCliente = { v: number; k: number };
+  type AlDiaCliente = { v: number; k: number; m: number };
   const alDiaByTerrCliAnio = new Map<
     string,
     Map<string, Map<number, AlDiaCliente>>
@@ -664,6 +728,7 @@ export default async function DashboardPage({
     if (!row.no_cliente) continue;
     const v = Number(row.total_venta) || 0;
     const k = Number(row.total_kg ?? 0) || 0;
+    const mg = Number(row.total_margen ?? 0) || 0;
     // Por territorio
     let terrMap = alDiaByTerrCliAnio.get(row.territorio);
     if (!terrMap) {
@@ -675,9 +740,10 @@ export default async function DashboardPage({
       cliMap = new Map();
       terrMap.set(row.no_cliente, cliMap);
     }
-    const cur = cliMap.get(row.anio) ?? { v: 0, k: 0 };
+    const cur = cliMap.get(row.anio) ?? { v: 0, k: 0, m: 0 };
     cur.v += v;
     cur.k += k;
+    cur.m += mg;
     cliMap.set(row.anio, cur);
     // Total (sumando across territorios)
     let totMap = alDiaTotalCliAnio.get(row.no_cliente);
@@ -685,33 +751,34 @@ export default async function DashboardPage({
       totMap = new Map();
       alDiaTotalCliAnio.set(row.no_cliente, totMap);
     }
-    const tcur = totMap.get(row.anio) ?? { v: 0, k: 0 };
+    const tcur = totMap.get(row.anio) ?? { v: 0, k: 0, m: 0 };
     tcur.v += v;
     tcur.k += k;
+    tcur.m += mg;
     totMap.set(row.anio, tcur);
   }
 
-  // Mergear al-día en cada PerdidoRow
-  for (const [terr, rows] of Object.entries(perdidos.byTerritory)) {
-    const terrMap = alDiaByTerrCliAnio.get(terr);
-    for (const r of rows) {
-      const cliMap = terrMap?.get(r.no_cliente);
-      const a25 = cliMap?.get(currentYear - 1);
-      const a26 = cliMap?.get(currentYear);
-      r.mes_venta_alDia_2025 = a25?.v ?? 0;
-      r.mes_venta_alDia_2026 = a26?.v ?? 0;
-      r.mes_kg_alDia_2025 = a25?.k ?? 0;
-      r.mes_kg_alDia_2026 = a26?.k ?? 0;
-    }
-  }
-  for (const r of perdidos.total) {
-    const cliMap = alDiaTotalCliAnio.get(r.no_cliente);
+  // Mergear al-día en cada PerdidoRow (3 años: 2024, 2025, 2026 + margen)
+  const applyAlDia = (r: PerdidoRow, cliMap: Map<number, AlDiaCliente> | undefined) => {
+    const a24 = cliMap?.get(currentYear - 2);
     const a25 = cliMap?.get(currentYear - 1);
     const a26 = cliMap?.get(currentYear);
+    r.mes_venta_alDia_2024 = a24?.v ?? 0;
     r.mes_venta_alDia_2025 = a25?.v ?? 0;
     r.mes_venta_alDia_2026 = a26?.v ?? 0;
+    r.mes_kg_alDia_2024 = a24?.k ?? 0;
     r.mes_kg_alDia_2025 = a25?.k ?? 0;
     r.mes_kg_alDia_2026 = a26?.k ?? 0;
+    r.mes_margen_alDia_2024 = a24?.m ?? 0;
+    r.mes_margen_alDia_2025 = a25?.m ?? 0;
+    r.mes_margen_alDia_2026 = a26?.m ?? 0;
+  };
+  for (const [terr, rows] of Object.entries(perdidos.byTerritory)) {
+    const terrMap = alDiaByTerrCliAnio.get(terr);
+    for (const r of rows) applyAlDia(r, terrMap?.get(r.no_cliente));
+  }
+  for (const r of perdidos.total) {
+    applyAlDia(r, alDiaTotalCliAnio.get(r.no_cliente));
   }
 
   // ============ SKUs (Tab Productos) ============

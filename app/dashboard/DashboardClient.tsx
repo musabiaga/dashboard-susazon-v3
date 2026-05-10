@@ -389,11 +389,27 @@ export function DashboardClient({
                   effectiveSelected === ""
                     ? perdidos.total
                     : perdidos.byTerritory[effectiveSelected] ?? [];
+                // Cuando estamos en "Todos" del sidebar pasamos TAMBIÉN
+                // perdidos.byTerritory para que el tab pueda hacer su propio
+                // multi-select de territorios. Cuando estamos en un territorio
+                // específico, ese filtro queda desactivado (solo se ve ese).
+                const showTerritoryFilter = effectiveSelected === "";
                 return (
                   <PerdidosTab
                     rows={perdidoRows}
                     monthShortYY={monthShortYY}
                     prevMonthShortYY={prevMonthShortYY}
+                    byTerritory={
+                      showTerritoryFilter ? perdidos.byTerritory : undefined
+                    }
+                    availableTerritories={
+                      showTerritoryFilter
+                        ? territories
+                            .filter((t) => t.isActive)
+                            .map((t) => t.name)
+                            .sort()
+                        : undefined
+                    }
                   />
                 );
               }

@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertOctagon,
   TrendingDown,
   AlertTriangle,
   Search,
   X,
+  MapPin,
+  ChevronDown,
+  Check,
 } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { formatMoney, formatKilos } from "@/lib/format";
 
 export type PerdidoStatus = "perdido" | "declive" | "nuevo" | "estable";
@@ -57,32 +61,53 @@ export interface PerdidoRow {
   no_cliente: string;
   cliente: string;
   vendedor: string;
-  // Mes actual cierre completo (mes_2025 = todo el mes 2025; mes_2026 = lo que llevamos)
+  // ===== 2024 (informativo) — cierre completo y al-día =====
+  mes_venta_2024?: number;
+  mes_kg_2024?: number;
+  mes_margen_2024?: number;
+  ytd_venta_2024?: number;
+  ytd_kg_2024?: number;
+  ytd_margen_2024?: number;
+  mes_venta_alDia_2024?: number;
+  mes_kg_alDia_2024?: number;
+  mes_margen_alDia_2024?: number;
+  // ===== 2025 (referencia base para status) =====
+  // Mes cierre completo
   mes_venta_2025: number;
-  mes_venta_2026: number;
   mes_kg_2025: number;
-  mes_kg_2026: number;
-  // YTD cierre completo (ytd_2025 = Ene-mes_actual 2025 todo cerrado;
-  //                     ytd_2026 = Ene-hoy 2026 parcial)
+  mes_margen_2025?: number;
+  // YTD cierre completo (Ene-mes_actual 2025)
   ytd_venta_2025: number;
-  ytd_venta_2026: number;
   ytd_kg_2025: number;
-  ytd_kg_2026: number;
-  // ===== Al MISMO DÍA LABORAL del mes 2026 actual (Mejora 2 Commit C) =====
-  // Para 2025: acumulado del mes hasta el día calendario equivalente al
-  // día hábil que llevamos en 2026. Permite comparativos día-vs-día.
-  // Para 2026: igual que mes_venta_2026 (lo que llevamos hoy).
+  ytd_margen_2025?: number;
+  // Al MISMO DÍA LABORAL del 2026 (acumulado del mes 2025 hasta el día
+  // calendario equivalente). Permite comparativos día-vs-día equitativos.
   mes_venta_alDia_2025?: number;
-  mes_venta_alDia_2026?: number;
   mes_kg_alDia_2025?: number;
+  mes_margen_alDia_2025?: number;
+  // ===== 2026 (mes actual / YTD parcial) =====
+  mes_venta_2026: number;
+  mes_kg_2026: number;
+  mes_margen_2026?: number;
+  ytd_venta_2026: number;
+  ytd_kg_2026: number;
+  ytd_margen_2026?: number;
+  mes_venta_alDia_2026?: number;
   mes_kg_alDia_2026?: number;
+  mes_margen_alDia_2026?: number;
 }
 
 interface Props {
   rows: PerdidoRow[];
-  monthShortYY: string; // "Abr 26"
-  prevMonthShortYY: string; // "Abr 25"
+  monthShortYY: string; // "May 26"
+  prevMonthShortYY: string; // "May 25"
   topNTable?: number; // default 100
+  /** Cuando se muestra "Todos los territorios" en el sidebar, el padre pasa
+   *  los rows agrupados por territorio para que el tab pueda hacer su propio
+   *  multi-select de territorios. Si undefined, no se muestra el filtro. */
+  byTerritory?: Record<string, PerdidoRow[]>;
+  /** Lista de territorios activos disponibles (orden alfabético). */
+  availableTerritories?: string[];
 }
 
 interface Computed {
@@ -90,10 +115,14 @@ interface Computed {
   vendedor: string;
   no_cliente: string;
   status: PerdidoStatus;
+  v24: number; // 2024 al-día/ytd según dim — solo informativo
+  k24: number;
   v25: number;
   v26: number;
   k25: number;
   k26: number;
+  m25: number; // margen 2025 al-día (referencia)
+  m26: number; // margen 2026 al-día (actual)
   declinePct: number;
 }
 
@@ -130,11 +159,86 @@ function computeStatus(v25: number, v26: number): {
  *      declive = v26 < v25 (strict, excluye perdidos)
  */
 export function PerdidosTab({
-  rows,
+  rows: rowsProp,
   monthShortYY,
   prevMonthShortYY,
   topNTable = 100,
+  byTerritory,
+  availableTerritories,
 }: Props) {
+  // Multi-select de territorios. Solo activo cuando el padre nos pasa
+  // byTerritory (= sidebar en "Todos"). Default: TODOS los territorios
+  // activos seleccionados (= comportamiento original sin filtro).
+  const allTerritoriesAvailable = !!byTerritory && !!availableTerritories;
+  const [selectedTerritories, setSelectedTerritories] = useState<Set<string>>(
+    () => new Set(availableTerritories ?? [])
+  );
+  // Re-sincronizar la selección si cambia la lista de territorios disponibles
+  // (ej: el admin apaga uno). Evitamos romper la selección actual; solo
+  // agregamos los nuevos como activos por default.
+  const lastTerritoriesRef = useRef<string[]>(availableTerritories ?? []);
+  useEffect(() => {
+    if (!availableTerritories) return;
+    const prev = lastTerritoriesRef.current;
+    const prevSet = new Set(prev);
+    const news = availableTerritories.filter((t) => !prevSet.has(t));
+    if (news.length > 0) {
+      setSelectedTerritories((s) => new Set([...s, ...news]));
+    }
+    lastTerritoriesRef.current = availableTerritories;
+  }, [availableTerritories]);
+
+  // Rows efectivos: si tenemos filtro de territorios, recalculamos
+  // sumando solo los seleccionados; si no, usamos rowsProp directo.
+  const rows = useMemo<PerdidoRow[]>(() => {
+    if (!allTerritoriesAvailable) return rowsProp;
+    if (selectedTerritories.size === availableTerritories!.length) {
+      // Todos seleccionados → equivalente al total agregado
+      return rowsProp;
+    }
+    if (selectedTerritories.size === 0) return [];
+    // Suma de los territorios seleccionados (por no_cliente)
+    const acc = new Map<string, PerdidoRow>();
+    const addAll = (rs: PerdidoRow[]) => {
+      for (const r of rs) {
+        const cur = acc.get(r.no_cliente);
+        if (!cur) {
+          acc.set(r.no_cliente, { ...r });
+          continue;
+        }
+        // Sumar todos los campos numéricos (3 años × mes/ytd × venta/kg/margen +
+        // los al-día). Mantener cliente/vendedor del primero.
+        const fields: (keyof PerdidoRow)[] = [
+          "mes_venta_2024", "mes_kg_2024", "mes_margen_2024",
+          "ytd_venta_2024", "ytd_kg_2024", "ytd_margen_2024",
+          "mes_venta_alDia_2024", "mes_kg_alDia_2024", "mes_margen_alDia_2024",
+          "mes_venta_2025", "mes_kg_2025", "mes_margen_2025",
+          "ytd_venta_2025", "ytd_kg_2025", "ytd_margen_2025",
+          "mes_venta_alDia_2025", "mes_kg_alDia_2025", "mes_margen_alDia_2025",
+          "mes_venta_2026", "mes_kg_2026", "mes_margen_2026",
+          "ytd_venta_2026", "ytd_kg_2026", "ytd_margen_2026",
+          "mes_venta_alDia_2026", "mes_kg_alDia_2026", "mes_margen_alDia_2026",
+        ];
+        for (const f of fields) {
+          const a = (cur[f] as number | undefined) ?? 0;
+          const b = (r[f] as number | undefined) ?? 0;
+          (cur as unknown as Record<string, unknown>)[f] = a + b;
+        }
+      }
+    };
+    for (const t of selectedTerritories) {
+      const tr = byTerritory![t];
+      if (tr) addAll(tr);
+    }
+    return Array.from(acc.values());
+  }, [
+    allTerritoriesAvailable,
+    rowsProp,
+    selectedTerritories,
+    byTerritory,
+    availableTerritories,
+  ]);
+
   const [dim, setDim] = useState<PerdidoDim>("mes");
   // Buscador: filtra por substring en cliente y/o vendedor (case-insensitive).
   // Vacío = comportamiento default (Top 100 perdidos+declive).
@@ -211,27 +315,49 @@ export function PerdidosTab({
   const computed: Computed[] = useMemo(() => {
     const out: Computed[] = [];
     for (const r of rows) {
+      const mesAlDia24 = r.mes_venta_alDia_2024 ?? 0;
       const mesAlDia25 = r.mes_venta_alDia_2025 ?? 0;
       const mesAlDia26 = r.mes_venta_alDia_2026 ?? r.mes_venta_2026;
+      const mesKgAlDia24 = r.mes_kg_alDia_2024 ?? 0;
       const mesKgAlDia25 = r.mes_kg_alDia_2025 ?? 0;
       const mesKgAlDia26 = r.mes_kg_alDia_2026 ?? r.mes_kg_2026;
+      const mesMargenAlDia25 = r.mes_margen_alDia_2025 ?? 0;
+      const mesMargenAlDia26 = r.mes_margen_alDia_2026 ?? r.mes_margen_2026 ?? 0;
 
-      // YTD al-día (ajuste con la fórmula explicada arriba)
+      // YTD al-día (al ytd cerrado le quito mes 2025 cierre y le pongo mes
+      // 2025 al-día → quedo con Ene-(mismo día actual) de 2025/2024)
+      const ytdAlDia24 = Math.max(
+        0,
+        (r.ytd_venta_2024 ?? 0) - (r.mes_venta_2024 ?? 0) + mesAlDia24
+      );
       const ytdAlDia25 = Math.max(
         0,
         r.ytd_venta_2025 - r.mes_venta_2025 + mesAlDia25
       );
       const ytdAlDia26 = r.ytd_venta_2026; // ya es Ene-hoy
+      const ytdKgAlDia24 = Math.max(
+        0,
+        (r.ytd_kg_2024 ?? 0) - (r.mes_kg_2024 ?? 0) + mesKgAlDia24
+      );
       const ytdKgAlDia25 = Math.max(
         0,
         r.ytd_kg_2025 - r.mes_kg_2025 + mesKgAlDia25
       );
       const ytdKgAlDia26 = r.ytd_kg_2026;
+      const ytdMargenAlDia25 = Math.max(
+        0,
+        (r.ytd_margen_2025 ?? 0) - (r.mes_margen_2025 ?? 0) + mesMargenAlDia25
+      );
+      const ytdMargenAlDia26 = r.ytd_margen_2026 ?? 0;
 
+      const v24 = dim === "mes" ? mesAlDia24 : ytdAlDia24;
       const v25 = dim === "mes" ? mesAlDia25 : ytdAlDia25;
       const v26 = dim === "mes" ? mesAlDia26 : ytdAlDia26;
+      const k24 = dim === "mes" ? mesKgAlDia24 : ytdKgAlDia24;
       const k25 = dim === "mes" ? mesKgAlDia25 : ytdKgAlDia25;
       const k26 = dim === "mes" ? mesKgAlDia26 : ytdKgAlDia26;
+      const m25 = dim === "mes" ? mesMargenAlDia25 : ytdMargenAlDia25;
+      const m26 = dim === "mes" ? mesMargenAlDia26 : ytdMargenAlDia26;
 
       // Status calculado en la métrica activa (pesos o kilos)
       const baseRef = metric === "pesos" ? v25 : k25;
@@ -243,10 +369,14 @@ export function PerdidosTab({
         cliente: r.cliente,
         vendedor: r.vendedor,
         status,
+        v24,
+        k24,
         v25,
         v26,
         k25,
         k26,
+        m25,
+        m26,
         declinePct,
       });
     }
@@ -300,6 +430,77 @@ export function PerdidosTab({
     return { perdidos, declive30, totalDeclive: declives.length };
   }, [computed]);
 
+  // ============ Datos para la Dona + Loss Cards ============
+  // - Dona: 3 segmentos (Estable + Declive + Nuevo) sobre venta 2026 al-día
+  //   (Perdido NO va en dona porque su valor 2026 = 0).
+  // - Loss Perdido: venta perdida = venta 2025 al-día de los Perdidos
+  // - Loss Declive: venta perdida = (v25 - v26) de los Declive (la porción
+  //   que dejaron de vender)
+  // - pctVenta = pérdida / total venta 2025 al-día (todos los clientes)
+  const donutData = useMemo(() => {
+    let estVal = 0, decVal = 0, nuevoVal = 0;
+    let estCount = 0, decCount = 0, nuevoCount = 0, perdidoCount = 0;
+    // Acumuladores de pérdidas (Perdido + Declive) en la métrica activa
+    let perdidoLossVenta = 0, perdidoLossMargen = 0, perdidoLossKg = 0;
+    let decliveLossVenta = 0, decliveLossMargen = 0, decliveLossKg = 0;
+    // Total venta 2025 al-día — base para el % de pérdida
+    let total2025Venta = 0;
+
+    for (const r of computed) {
+      total2025Venta += r.v25;
+      if (r.status === "estable") {
+        estVal += metric === "pesos" ? r.v26 : r.k26;
+        estCount++;
+      } else if (r.status === "declive") {
+        decVal += metric === "pesos" ? r.v26 : r.k26;
+        decCount++;
+        // Pérdida = lo que dejaron de vender = v25 - v26 (siempre positivo
+        // porque están en declive)
+        decliveLossVenta += Math.max(0, r.v25 - r.v26);
+        decliveLossMargen += Math.max(0, r.m25 - r.m26);
+        decliveLossKg += Math.max(0, r.k25 - r.k26);
+      } else if (r.status === "nuevo") {
+        nuevoVal += metric === "pesos" ? r.v26 : r.k26;
+        nuevoCount++;
+      } else if (r.status === "perdido") {
+        perdidoCount++;
+        // Pérdida = TODA la venta 2025 al-día (porque en 2026 = 0)
+        perdidoLossVenta += r.v25;
+        perdidoLossMargen += r.m25;
+        perdidoLossKg += r.k25;
+      }
+    }
+
+    const segmentsAll: DonutSegment[] = [
+      { status: "estable" as PerdidoStatus, value: estVal, count: estCount },
+      { status: "declive" as PerdidoStatus, value: decVal, count: decCount },
+      { status: "nuevo" as PerdidoStatus, value: nuevoVal, count: nuevoCount },
+    ];
+    const segments: DonutSegment[] = segmentsAll.filter((s) => s.value > 0);
+
+    return {
+      segments,
+      lossPerdido: {
+        count: perdidoCount,
+        venta: perdidoLossVenta,
+        margen: perdidoLossMargen,
+        kg: perdidoLossKg,
+        pctVenta: total2025Venta > 0
+          ? (perdidoLossVenta / total2025Venta) * 100
+          : 0,
+      },
+      lossDeclive: {
+        count: decCount,
+        venta: decliveLossVenta,
+        margen: decliveLossMargen,
+        kg: decliveLossKg,
+        pctVenta: total2025Venta > 0
+          ? (decliveLossVenta / total2025Venta) * 100
+          : 0,
+      },
+    };
+  }, [computed, metric]);
+
   const dimLabel =
     dim === "mes"
       ? `Mes ${monthShortYY}`
@@ -309,11 +510,31 @@ export function PerdidosTab({
 
   return (
     <div className="space-y-4">
-      {/* Toggles */}
+      {/* Toggles + filtro de territorios */}
       <div className="flex flex-wrap items-center justify-end gap-3">
+        {allTerritoriesAvailable && (
+          <TerritoryFilter
+            available={availableTerritories!}
+            selected={selectedTerritories}
+            onChange={setSelectedTerritories}
+          />
+        )}
         <MetricToggle value={metric} onChange={switchMetric} />
         <DimToggle value={dim} onChange={setDim} monthShortYY={monthShortYY} />
       </div>
+
+      {/* Dona de status + alertas laterales */}
+      {donutData.segments.length > 0 && (
+        <StatusDonut
+          segments={donutData.segments}
+          metric={metric}
+          totalLabel={
+            metric === "pesos" ? "Venta actual" : "Kilos actuales"
+          }
+          lossPerdido={donutData.lossPerdido}
+          lossDeclive={donutData.lossDeclive}
+        />
+      )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -498,26 +719,30 @@ export function PerdidosTab({
                   <Th>Cliente</Th>
                   <Th>Vendedor</Th>
                   <Th align="center">Status</Th>
-                  {metric === "pesos" ? (
-                    <>
-                      <Th align="right">{labelPrev} $</Th>
-                      <Th align="right">{labelCurr} $</Th>
-                      <Th align="right">Var $ %</Th>
-                    </>
-                  ) : (
-                    <>
-                      <Th align="right">{labelPrev} kg</Th>
-                      <Th align="right">{labelCurr} kg</Th>
-                      <Th align="right">Var kg %</Th>
-                    </>
-                  )}
+                  {/* 2024 — informativo (gris muted, antes de 2025) */}
+                  <Th align="right" subtle>
+                    {prevMonthShortYY.replace(/\d+/, "24")} {metric === "pesos" ? "$" : "kg"}
+                  </Th>
+                  {/* 2025 — referencia base */}
+                  <Th align="right">
+                    {labelPrev} {metric === "pesos" ? "$" : "kg"}
+                  </Th>
+                  {/* 2026 — actual */}
+                  <Th align="right">
+                    {labelCurr} {metric === "pesos" ? "$" : "kg"}
+                  </Th>
+                  {/* Var % vs último año (2025) */}
+                  <Th align="right">
+                    Var {metric === "pesos" ? "$" : "kg"} % vs 25
+                  </Th>
                 </tr>
               </thead>
               <tbody>
                 {tableRows.map((r, i) => {
-                  // Var % en la métrica activa
+                  // Var % en la métrica activa (siempre vs 2025)
                   const refV = metric === "pesos" ? r.v25 : r.k25;
                   const curV = metric === "pesos" ? r.v26 : r.k26;
+                  const ref24V = metric === "pesos" ? r.v24 : r.k24;
                   const varPct =
                     refV > 0 ? ((curV - refV) / refV) * 100 : null;
                   const varColor =
@@ -549,6 +774,9 @@ export function PerdidosTab({
                       </Td>
                       <Td align="center">
                         <StatusBadge status={r.status} />
+                      </Td>
+                      <Td align="right" subtle>
+                        {ref24V > 0 ? fmt(ref24V) : "—"}
                       </Td>
                       <Td align="right">{fmt(refV)}</Td>
                       <Td align="right">{fmt(curV)}</Td>
@@ -749,16 +977,20 @@ function StatusBadge({ status }: { status: PerdidoStatus }) {
 function Th({
   children,
   align = "left",
+  subtle = false,
 }: {
   children: React.ReactNode;
   align?: "left" | "right" | "center";
+  /** Color tenue + borde dashed izquierdo para distinguir columnas auxiliares (ej. 2024 informativo) */
+  subtle?: boolean;
 }) {
   return (
     <th
       className={`border-b px-3 py-2 font-semibold uppercase tracking-wider text-[10px] text-${align}`}
       style={{
         borderColor: "var(--border)",
-        color: "var(--text-secondary)",
+        color: subtle ? "var(--text-muted)" : "var(--text-secondary)",
+        borderLeft: subtle ? "1px dashed var(--border)" : undefined,
       }}
     >
       {children}
@@ -771,21 +1003,437 @@ function Td({
   align = "left",
   color,
   bold = false,
+  subtle = false,
 }: {
   children: React.ReactNode;
   align?: "left" | "right" | "center";
   color?: string;
   bold?: boolean;
+  subtle?: boolean;
 }) {
   return (
     <td
       className={`px-3 py-2 text-${align}`}
       style={{
-        color: color ?? "var(--text-primary)",
+        color: color ?? (subtle ? "var(--text-secondary)" : "var(--text-primary)"),
         fontWeight: bold ? 600 : 400,
+        borderLeft: subtle ? "1px dashed var(--border)" : undefined,
       }}
     >
       {children}
     </td>
+  );
+}
+
+// ============================================================
+// TerritoryFilter — dropdown con checkboxes (Mejora Perdidos)
+// ============================================================
+function TerritoryFilter({
+  available,
+  selected,
+  onChange,
+}: {
+  available: string[];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const total = available.length;
+  const selCount = selected.size;
+  const allSelected = selCount === total;
+  const noneSelected = selCount === 0;
+
+  function toggleOne(t: string) {
+    const next = new Set(selected);
+    if (next.has(t)) next.delete(t);
+    else next.add(t);
+    onChange(next);
+  }
+  function selectAll() {
+    onChange(new Set(available));
+  }
+  function clearAll() {
+    onChange(new Set());
+  }
+
+  const label = allSelected
+    ? `Todos los territorios (${total})`
+    : noneSelected
+      ? "Ningún territorio"
+      : `${selCount} de ${total} territorios`;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 rounded-[var(--radius)] border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--bg-surface-muted)]"
+        style={{
+          background: "var(--bg-surface)",
+          borderColor: "var(--border)",
+          color: "var(--text-primary)",
+          minWidth: 220,
+        }}
+      >
+        <MapPin size={14} style={{ color: "var(--text-secondary)" }} />
+        <span className="flex-1 text-left">{label}</span>
+        {!allSelected && !noneSelected && (
+          <span
+            className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+            style={{
+              background: "var(--warning-soft)",
+              color: "var(--warning)",
+            }}
+          >
+            Filtro
+          </span>
+        )}
+        <ChevronDown
+          size={14}
+          style={{
+            color: "var(--text-secondary)",
+            transform: open ? "rotate(180deg)" : "none",
+            transition: "transform 0.15s ease",
+          }}
+        />
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full z-50 mt-1 max-h-80 w-72 overflow-y-auto rounded-[var(--radius-lg)] border shadow-lg"
+          style={{
+            background: "var(--bg-surface)",
+            borderColor: "var(--border-strong)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
+          }}
+        >
+          {/* Acciones rápidas */}
+          <div
+            className="flex items-center justify-between gap-2 border-b px-3 py-2"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <button
+              type="button"
+              onClick={selectAll}
+              className="text-[11px] font-medium hover:underline"
+              style={{ color: "var(--accent)" }}
+            >
+              Seleccionar todos
+            </button>
+            <span style={{ color: "var(--text-muted)" }}>·</span>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="text-[11px] font-medium hover:underline"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Limpiar
+            </button>
+          </div>
+          {/* Lista de territorios */}
+          {available.map((t) => {
+            const checked = selected.has(t);
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => toggleOne(t)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-[var(--bg-surface-muted)]"
+                style={{
+                  color: checked ? "var(--text-primary)" : "var(--text-secondary)",
+                  fontWeight: checked ? 600 : 400,
+                }}
+              >
+                <span
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded border"
+                  style={{
+                    borderColor: checked ? "var(--accent)" : "var(--border)",
+                    background: checked ? "var(--accent)" : "transparent",
+                  }}
+                >
+                  {checked && (
+                    <Check size={11} style={{ color: "white" }} />
+                  )}
+                </span>
+                <span>{t}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// StatusDonut — gráfica de dona con % por status
+// ============================================================
+interface DonutSegment {
+  status: PerdidoStatus;
+  value: number; // venta en pesos o kilos según métrica activa
+  count: number; // número de clientes en ese status
+}
+
+function StatusDonut({
+  segments,
+  metric,
+  totalLabel,
+  lossPerdido,
+  lossDeclive,
+}: {
+  /** 3 segmentos: Estable, Declive, Nuevo (Perdido NO va en la dona —
+   *  no tiene venta en 2026; aparece en alerta lateral) */
+  segments: DonutSegment[];
+  metric: PerdidoMetric;
+  /** Label del centro: "Total venta actual" o "Total KG actual" */
+  totalLabel: string;
+  /** Pérdidas calculadas (clientes Perdidos): venta, margen, kg */
+  lossPerdido: {
+    count: number;
+    venta: number;
+    margen: number;
+    kg: number;
+    pctVenta: number; // % vs venta base 2025 al-día
+  };
+  /** Pérdidas calculadas (clientes Declive): mismo formato */
+  lossDeclive: {
+    count: number;
+    venta: number;
+    margen: number;
+    kg: number;
+    pctVenta: number;
+  };
+}) {
+  const total = segments.reduce((s, x) => s + x.value, 0);
+  const fmt = metric === "pesos" ? formatMoney : formatKilos;
+  const dataForChart = segments.map((s) => ({
+    name: STATUS_CONFIG[s.status].label,
+    value: s.value,
+    color: STATUS_CONFIG[s.status].color,
+    status: s.status,
+    count: s.count,
+  }));
+
+  return (
+    <div
+      className="rounded-[var(--radius-lg)] border p-4"
+      style={{
+        background: "var(--bg-surface)",
+        borderColor: "var(--border)",
+      }}
+    >
+      <h3
+        className="mb-3 text-xs font-semibold uppercase tracking-wider"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        Composición por Status · {metric === "pesos" ? "Venta $" : "Kilos"}
+      </h3>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* Dona */}
+        <div className="relative flex flex-col items-center justify-center">
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie
+                data={dataForChart}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={90}
+                paddingAngle={2}
+                strokeWidth={0}
+              >
+                {dataForChart.map((d) => (
+                  <Cell key={d.status} fill={d.color} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+          {/* Centro */}
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <span
+              className="text-[10px] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {totalLabel}
+            </span>
+            <span
+              className="mt-0.5 text-base font-bold tabular-nums"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {fmt(total)}
+            </span>
+          </div>
+          {/* Leyenda inferior */}
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+            {dataForChart.map((d) => {
+              const pct = total > 0 ? (d.value / total) * 100 : 0;
+              return (
+                <span
+                  key={d.status}
+                  className="flex items-center gap-1.5 text-[11px]"
+                >
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-sm"
+                    style={{ background: d.color }}
+                  />
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    {d.name}
+                  </span>
+                  <span
+                    className="font-semibold tabular-nums"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {pct.toFixed(1)}%
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Alerta lateral con pérdidas (Perdido + Declive) */}
+        <div className="flex flex-col gap-2">
+          <LossCard
+            title="Venta perdida"
+            subtitle={`${lossPerdido.count} cliente${lossPerdido.count === 1 ? "" : "s"} dejaron de comprar`}
+            tone="danger"
+            metric={metric}
+            venta={lossPerdido.venta}
+            margen={lossPerdido.margen}
+            kg={lossPerdido.kg}
+            pctVenta={lossPerdido.pctVenta}
+          />
+          <LossCard
+            title="Venta en declive"
+            subtitle={`${lossDeclive.count} cliente${lossDeclive.count === 1 ? "" : "s"} compran menos`}
+            tone="warning"
+            metric={metric}
+            venta={lossDeclive.venta}
+            margen={lossDeclive.margen}
+            kg={lossDeclive.kg}
+            pctVenta={lossDeclive.pctVenta}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LossCard({
+  title,
+  subtitle,
+  tone,
+  metric,
+  venta,
+  margen,
+  kg,
+  pctVenta,
+}: {
+  title: string;
+  subtitle: string;
+  tone: "danger" | "warning";
+  metric: PerdidoMetric;
+  venta: number;
+  margen: number;
+  kg: number;
+  pctVenta: number;
+}) {
+  const colorBg = tone === "danger" ? "var(--danger-soft)" : "var(--warning-soft)";
+  const colorAccent = tone === "danger" ? "var(--danger)" : "var(--warning)";
+  const marginPct = venta > 0 ? (margen / venta) * 100 : 0;
+  return (
+    <div
+      className="rounded-[var(--radius)] border px-3 py-2.5"
+      style={{
+        background: colorBg,
+        borderColor: colorAccent,
+      }}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span
+          className="text-[11px] font-bold uppercase tracking-wider"
+          style={{ color: colorAccent }}
+        >
+          {title}
+        </span>
+        <span
+          className="text-[11px] font-bold tabular-nums"
+          style={{ color: colorAccent }}
+        >
+          ▼ {pctVenta.toFixed(1)}%
+        </span>
+      </div>
+      <div
+        className="mt-0.5 text-[10px]"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        {subtitle}
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] tabular-nums">
+        <LossStat label="Venta $" value={formatMoney(venta)} highlighted={metric === "pesos"} />
+        <LossStat label="Margen $" value={formatMoney(margen)} subValue={`${marginPct.toFixed(1)}%`} />
+        <LossStat label="Kilos" value={formatKilos(kg)} highlighted={metric === "kilos"} />
+      </div>
+    </div>
+  );
+}
+
+function LossStat({
+  label,
+  value,
+  subValue,
+  highlighted = false,
+}: {
+  label: string;
+  value: string;
+  subValue?: string;
+  highlighted?: boolean;
+}) {
+  return (
+    <div
+      className="rounded-[var(--radius-sm)] px-1.5 py-1"
+      style={{
+        background: highlighted ? "rgba(255,255,255,0.5)" : "transparent",
+      }}
+    >
+      <div
+        className="text-[9px] font-medium uppercase tracking-wider"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {label}
+      </div>
+      <div
+        className="mt-0.5 font-semibold"
+        style={{ color: "var(--text-primary)" }}
+      >
+        {value}
+      </div>
+      {subValue && (
+        <div
+          className="text-[10px]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {subValue}
+        </div>
+      )}
+    </div>
   );
 }
