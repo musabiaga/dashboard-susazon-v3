@@ -49,6 +49,7 @@ export function VendedoresTab({
         dimensionLabel="Vendedor"
         dimensionLabelPlural="Vendedores"
         topNChart={topN}
+        showKg
       />
     </div>
   );

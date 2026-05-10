@@ -257,7 +257,7 @@ export default async function DashboardPage({
       .eq("mes", currentMonth),
     supabase
       .from("kpi_vendedor_summary")
-      .select("territorio, vendedor, empresa, anio, total_venta")
+      .select("territorio, vendedor, empresa, anio, total_venta, total_kg")
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
   ]);
