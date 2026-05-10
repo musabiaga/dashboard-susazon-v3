@@ -61,6 +61,7 @@ function buildDimDataset<
     anio: number;
     total_venta: number | string | null;
     total_kg?: number | string | null;
+    total_margen?: number | string | null;
   },
 >(
   rows: T[] | null,
@@ -83,18 +84,25 @@ function buildDimDataset<
       k24: 0,
       k25: 0,
       k26: 0,
+      m24: 0,
+      m25: 0,
+      m26: 0,
     };
     const v = Number(row.total_venta) || 0;
     const k = Number(row.total_kg ?? 0) || 0;
+    const mg = Number(row.total_margen ?? 0) || 0;
     if (row.anio === cy - 2) {
       cur.v24 = v;
       cur.k24 = k;
+      cur.m24 = mg;
     } else if (row.anio === cy - 1) {
       cur.v25 = v;
       cur.k25 = k;
+      cur.m25 = mg;
     } else if (row.anio === cy) {
       cur.v26 = v;
       cur.k26 = k;
+      cur.m26 = mg;
     }
     m.set(name, cur);
   }
@@ -111,6 +119,9 @@ function buildDimDataset<
         k24: 0,
         k25: 0,
         k26: 0,
+        m24: 0,
+        m25: 0,
+        m26: 0,
       };
       cur.v24 += r.v24;
       cur.v25 += r.v25;
@@ -118,6 +129,9 @@ function buildDimDataset<
       cur.k24 = (cur.k24 ?? 0) + (r.k24 ?? 0);
       cur.k25 = (cur.k25 ?? 0) + (r.k25 ?? 0);
       cur.k26 = (cur.k26 ?? 0) + (r.k26 ?? 0);
+      cur.m24 = (cur.m24 ?? 0) + (r.m24 ?? 0);
+      cur.m25 = (cur.m25 ?? 0) + (r.m25 ?? 0);
+      cur.m26 = (cur.m26 ?? 0) + (r.m26 ?? 0);
       totalMap.set(r.name, cur);
     }
   }
@@ -242,22 +256,22 @@ export default async function DashboardPage({
   ] = await Promise.all([
     supabase
       .from("kpi_grupo_summary")
-      .select("territorio, grupo, anio, total_venta, total_kg")
+      .select("territorio, grupo, anio, total_venta, total_kg, total_margen")
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
     supabase
       .from("kpi_sku_summary")
-      .select("territorio, sku, anio, total_venta, total_kg")
+      .select("territorio, sku, anio, total_venta, total_kg, total_margen")
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
     supabase
       .from("kpi_cliente_summary")
-      .select("territorio, no_cliente, cliente, anio, total_venta, total_kg")
+      .select("territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
     supabase
       .from("kpi_vendedor_summary")
-      .select("territorio, vendedor, empresa, anio, total_venta, total_kg")
+      .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
   ]);
@@ -404,12 +418,13 @@ export default async function DashboardPage({
   };
 
   // ============ SKUs (Tab Productos) ============
-  // Necesitamos venta y kilos por SKU x territorio x año (mes filter).
+  // Necesitamos venta, kilos y margen por SKU x territorio x año (mes filter).
   const skusByTerritoryMap = new Map<
     string,
     Map<string, {
       v24: number; v25: number; v26: number;
       k24: number; k25: number; k26: number;
+      m24: number; m25: number; m26: number;
     }>
   >();
   for (const row of skuRowsRaw ?? []) {
@@ -421,12 +436,14 @@ export default async function DashboardPage({
     const cur = terrMap.get(row.sku) ?? {
       v24: 0, v25: 0, v26: 0,
       k24: 0, k25: 0, k26: 0,
+      m24: 0, m25: 0, m26: 0,
     };
     const v = Number(row.total_venta) || 0;
     const k = Number(row.total_kg) || 0;
-    if (row.anio === currentYear - 2) { cur.v24 = v; cur.k24 = k; }
-    else if (row.anio === currentYear - 1) { cur.v25 = v; cur.k25 = k; }
-    else if (row.anio === currentYear) { cur.v26 = v; cur.k26 = k; }
+    const mg = Number(row.total_margen) || 0;
+    if (row.anio === currentYear - 2) { cur.v24 = v; cur.k24 = k; cur.m24 = mg; }
+    else if (row.anio === currentYear - 1) { cur.v25 = v; cur.k25 = k; cur.m25 = mg; }
+    else if (row.anio === currentYear) { cur.v26 = v; cur.k26 = k; cur.m26 = mg; }
     terrMap.set(row.sku, cur);
   }
 
@@ -436,6 +453,7 @@ export default async function DashboardPage({
     {
       v24: number; v25: number; v26: number;
       k24: number; k25: number; k26: number;
+      m24: number; m25: number; m26: number;
     }
   >();
   for (const [terr, skuMap] of skusByTerritoryMap) {
@@ -446,9 +464,11 @@ export default async function DashboardPage({
       const cur = totalSkusMap.get(name) ?? {
         v24: 0, v25: 0, v26: 0,
         k24: 0, k25: 0, k26: 0,
+        m24: 0, m25: 0, m26: 0,
       };
       cur.v24 += data.v24; cur.v25 += data.v25; cur.v26 += data.v26;
       cur.k24 += data.k24; cur.k25 += data.k25; cur.k26 += data.k26;
+      cur.m24 += data.m24; cur.m25 += data.m25; cur.m26 += data.m26;
       totalSkusMap.set(name, cur);
     }
   }

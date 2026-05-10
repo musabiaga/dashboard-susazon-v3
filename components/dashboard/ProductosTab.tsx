@@ -107,10 +107,16 @@ export function ProductosTab({
     return sorted.slice(0, topNChart);
   }, [isCustomMode, selectedSkus, rows, sorted, topNChart]);
 
-  const tableRows = useMemo(
-    () => sorted.slice(0, topNTable),
-    [sorted, topNTable]
-  );
+  // Tabla:
+  //  - Custom mode (con selección): solo los items seleccionados, mismo
+  //    orden que el chart (coherente para análisis)
+  //  - Default: top N por venta del mes actual
+  const tableRows = useMemo(() => {
+    if (isCustomMode) {
+      return top;
+    }
+    return sorted.slice(0, topNTable);
+  }, [isCustomMode, top, sorted, topNTable]);
 
   return (
     <div className="space-y-4">
@@ -169,15 +175,30 @@ export function ProductosTab({
             </div>
             <ResponsiveContainer width="100%" height={560}>
               <ComposedChart
-                data={top.map((r) => ({
-                  name: r.name,
-                  venta24: r.v24,
-                  venta25: r.v25,
-                  venta26: r.v26,
-                  kg24: r.k24 ?? 0,
-                  kg25: r.k25 ?? 0,
-                  kg26: r.k26 ?? 0,
-                }))}
+                data={top.map((r) => {
+                  // margen $ y margen % por año (solo para tooltip — Productos
+                  // no grafica margen por la decisión 2.a aprobada por Mauricio:
+                  // mantener chart limpio con Pesos+Kilos y poner margen sólo
+                  // en el tooltip para no agregar 3er eje Y).
+                  const m24 = r.m24 ?? 0;
+                  const m25 = r.m25 ?? 0;
+                  const m26 = r.m26 ?? 0;
+                  return {
+                    name: r.name,
+                    venta24: r.v24,
+                    venta25: r.v25,
+                    venta26: r.v26,
+                    kg24: r.k24 ?? 0,
+                    kg25: r.k25 ?? 0,
+                    kg26: r.k26 ?? 0,
+                    margen24: m24,
+                    margen25: m25,
+                    margen26: m26,
+                    margenPct24: r.v24 > 0 ? (m24 / r.v24) * 100 : 0,
+                    margenPct25: r.v25 > 0 ? (m25 / r.v25) * 100 : 0,
+                    margenPct26: r.v26 > 0 ? (m26 / r.v26) * 100 : 0,
+                  };
+                })}
                 margin={{ top: 8, right: 30, bottom: 0, left: 30 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -416,6 +437,17 @@ function ProductosTooltip({
   const ventaItems = payload.filter((p) => p.name?.startsWith("Venta"));
   const kgItems = payload.filter((p) => p.name?.startsWith("Kilos"));
 
+  // Recharts inyecta el row completo en payload[0].payload — usamos eso para
+  // sacar margen $ y margen % aunque NO estén graficados (decisión 2.a).
+  const row = (payload[0] as TooltipPayloadItem & {
+    payload?: Record<string, number | string>;
+  })?.payload;
+  const num = (key: string): number | null => {
+    if (!row) return null;
+    const v = row[key];
+    return typeof v === "number" ? v : null;
+  };
+
   // YoY delta para Venta 26 vs 25
   const v25 = ventaItems.find((p) => p.dataKey === "venta25")?.value;
   const v26 = ventaItems.find((p) => p.dataKey === "venta26")?.value;
@@ -430,6 +462,19 @@ function ProductosTooltip({
     typeof v26 === "number" && typeof k26 === "number" && k26 > 0
       ? v26 / k26
       : null;
+
+  // Margen $ y margen % por año (NO graficados, sólo tooltip)
+  const margenItems = [
+    { key: "margen24", label: "24", color: "rgba(148, 163, 184, 0.7)" },
+    { key: "margen25", label: "25", color: "#3b82f6" },
+    { key: "margen26", label: "26", color: "#10b981" },
+  ];
+  const margenPctItems = [
+    { key: "margenPct24", label: "24", color: "rgba(148, 163, 184, 0.7)" },
+    { key: "margenPct25", label: "25", color: "#3b82f6" },
+    { key: "margenPct26", label: "26", color: "#10b981" },
+  ];
+  const hasMargenData = margenItems.some((m) => num(m.key) != null);
 
   return (
     <div
@@ -512,6 +557,58 @@ function ProductosTooltip({
               }
             />
           ))}
+        </div>
+      )}
+
+      {/* Sección Margen $ (NO graficado, solo en tooltip) */}
+      {hasMargenData && (
+        <div
+          className="px-3 py-2"
+          style={{ borderTop: "1px solid var(--border)" }}
+        >
+          <div
+            className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Margen $
+          </div>
+          {margenItems.map((m) => {
+            const v = num(m.key);
+            return (
+              <Row
+                key={m.key}
+                color={m.color}
+                label={m.label}
+                value={v != null ? formatMoney(v) : "—"}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Sección Margen % (NO graficado, solo en tooltip) */}
+      {hasMargenData && (
+        <div
+          className="px-3 py-2"
+          style={{ borderTop: "1px solid var(--border)" }}
+        >
+          <div
+            className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Margen %
+          </div>
+          {margenPctItems.map((m) => {
+            const v = num(m.key);
+            return (
+              <Row
+                key={m.key}
+                color={m.color}
+                label={m.label}
+                value={v != null ? `${v.toFixed(1)}%` : "—"}
+              />
+            );
+          })}
         </div>
       )}
 

@@ -137,15 +137,34 @@ export function DimensionTab({
     return topNChart == null ? sorted : sorted.slice(0, topNChart);
   }, [isCustomMode, selectedItems, rows, sorted, topNChart]);
 
-  const tableRows = useMemo(
-    () => (topNTable == null ? sorted : sorted.slice(0, topNTable)),
-    [sorted, topNTable]
-  );
+  // Tabla:
+  //  - Si está en modo personalizado (con selección custom) → tabla muestra
+  //    SOLO los items seleccionados (mismo orden que el chart, coherente).
+  //  - Si modo default → topNTable como antes.
+  const tableRows = useMemo(() => {
+    if (isCustomMode) {
+      return top;
+    }
+    return topNTable == null ? sorted : sorted.slice(0, topNTable);
+  }, [isCustomMode, top, sorted, topNTable]);
 
   const series: GroupedBarSeries[] = [
     { key: "v24", label: monthLabel24, color: "#94a3b8" },
     { key: "v25", label: monthLabel25, color: "#3b82f6" },
     { key: "v26", label: monthLabel26, color: "#10b981" },
+  ];
+
+  // Series de margen para chart + tooltip. Las labels añaden "Margen" para
+  // distinguir de las barras de venta en la leyenda.
+  const marginAmountSeries: GroupedBarSeries[] = [
+    { key: "m24", label: `Margen ${monthLabel24}`, color: "#94a3b8" },
+    { key: "m25", label: `Margen ${monthLabel25}`, color: "#3b82f6" },
+    { key: "m26", label: `Margen ${monthLabel26}`, color: "#10b981" },
+  ];
+  const marginPctSeries: GroupedBarSeries[] = [
+    { key: "mp24", label: `Margen % ${monthLabel24}`, color: "#94a3b8" },
+    { key: "mp25", label: `Margen % ${monthLabel25}`, color: "#3b82f6" },
+    { key: "mp26", label: `Margen % ${monthLabel26}`, color: "#10b981" },
   ];
 
   return (
@@ -211,13 +230,27 @@ export function DimensionTab({
               </p>
             ) : (
               <GroupedBarChart
-                data={top.map((r) => ({
-                  name: r.name,
-                  v24: r.v24,
-                  v25: r.v25,
-                  v26: r.v26,
-                }))}
+                data={top.map((r) => {
+                  const m24 = r.m24 ?? 0;
+                  const m25 = r.m25 ?? 0;
+                  const m26 = r.m26 ?? 0;
+                  return {
+                    name: r.name,
+                    v24: r.v24,
+                    v25: r.v25,
+                    v26: r.v26,
+                    m24,
+                    m25,
+                    m26,
+                    // Margen % por año (margen / venta * 100). Si venta = 0, null.
+                    mp24: r.v24 > 0 ? (m24 / r.v24) * 100 : 0,
+                    mp25: r.v25 > 0 ? (m25 / r.v25) * 100 : 0,
+                    mp26: r.v26 > 0 ? (m26 / r.v26) * 100 : 0,
+                  };
+                })}
                 series={series}
+                marginAmountSeries={marginAmountSeries}
+                marginPctSeries={marginPctSeries}
                 height={520}
                 xAngle={-30}
                 xLabelHeight={130}

@@ -14,6 +14,8 @@ interface Props {
   monthLabel26: string;
 }
 
+const VENDEDORES_SELECTION_KEY = "vendedores-selected";
+
 /**
  * Tab Vendedores con toggle:
  *  - Default "Separados": cada vendedor con sufijo (Sus)/(Suve) — replica V2.2.
@@ -21,6 +23,11 @@ interface Props {
  *  - Toggle "Unir Sus+Suve": agrega ambas empresas en una fila por persona.
  *
  * Internamente delega en DimensionTab pasando rows distintos según el modo.
+ *
+ * Multi-select: cuando cambia el toggle Sus/Suve, los nombres de vendedores
+ * cambian (con/sin sufijo) → al cambiar el toggle, limpiamos la selección
+ * persistida en localStorage para evitar chips inválidos (decisión A
+ * aprobada por Mauricio).
  */
 export function VendedoresTab({
   rowsSeparados,
@@ -31,6 +38,23 @@ export function VendedoresTab({
 }: Props) {
   const [merged, setMerged] = useState(false);
   const [topN, setTopN] = useState<10 | 20 | null>(20);
+  // Bumpear este key cuando cambia el modo Sus/Suve fuerza al DimensionTab
+  // a re-leer localStorage. Como además limpiamos el storage antes, la
+  // selección queda vacía en el modo nuevo.
+  const [selectionVersion, setSelectionVersion] = useState(0);
+
+  const handleMergedChange = (next: boolean) => {
+    if (next === merged) return;
+    // Limpiar selección persistida (decisión A: cambiar toggle limpia selección)
+    try {
+      window.localStorage.removeItem(VENDEDORES_SELECTION_KEY);
+    } catch {
+      // ignore
+    }
+    setMerged(next);
+    setSelectionVersion((v) => v + 1); // fuerza remount del DimensionTab
+  };
+
   const rows = merged ? rowsUnidos : rowsSeparados;
 
   return (
@@ -38,10 +62,13 @@ export function VendedoresTab({
       {/* Toggles */}
       <div className="flex flex-wrap items-center justify-end gap-3">
         <TopNToggle value={topN} onChange={setTopN} />
-        <MergeToggle merged={merged} onChange={setMerged} />
+        <MergeToggle merged={merged} onChange={handleMergedChange} />
       </div>
 
       <DimensionTab
+        // Key dinámico: fuerza remount cuando el toggle Sus/Suve cambia, así
+        // el estado interno de selección del DimensionTab se reinicia.
+        key={`vendedores-${merged ? "unidos" : "separados"}-${selectionVersion}`}
         rows={rows}
         monthLabel24={monthLabel24}
         monthLabel25={monthLabel25}
@@ -50,6 +77,10 @@ export function VendedoresTab({
         dimensionLabelPlural="Vendedores"
         topNChart={topN}
         showKg
+        enableMultiSelect
+        selectionStorageKey={VENDEDORES_SELECTION_KEY}
+        multiSelectMaxItems={15}
+        multiSelectPlaceholder="Buscar vendedor…"
       />
     </div>
   );

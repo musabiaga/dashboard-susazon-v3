@@ -1,8 +1,9 @@
 "use client";
 
 import {
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -35,14 +36,22 @@ interface Props {
   xLabelHeight?: number;
   /** Posición de la leyenda. Default "top" para no robarle plot area al chart. */
   legendVerticalAlign?: "top" | "bottom";
+  /** Series de margen % opcionales. Si se pasan, se renderizan como líneas en
+   *  un eje Y secundario derecho. Mismo color que sus barras de venta para
+   *  facilitar la lectura visual. */
+  marginPctSeries?: GroupedBarSeries[];
+  /** Series de margen $ opcionales (NO se grafican, solo van al tooltip).
+   *  Permiten enriquecer el tooltip con margen absoluto sin cargar más al
+   *  chart. */
+  marginAmountSeries?: GroupedBarSeries[];
 }
 
 /**
  * Bar chart agrupado reusable. Cada item de `data` tiene `name` (eje X)
  * + N campos correspondientes a las series (Abr 24, Abr 25, Abr 26, etc.).
  *
- * Soluciona el bug del V2.2 donde el eje X mostraba "$0, $1, $2..." porque
- * Chart.js no recibia labels — Recharts usa `dataKey="name"` explicitamente.
+ * Cuando se pasan `marginPctSeries`, agrega líneas de margen % en eje Y
+ * secundario derecho. El tooltip muestra venta + margen $ + margen %.
  */
 export function GroupedBarChart({
   data,
@@ -52,15 +61,18 @@ export function GroupedBarChart({
   xAngle = -30,
   xLabelHeight = 90,
   legendVerticalAlign = "top",
+  marginPctSeries,
+  marginAmountSeries,
 }: Props) {
+  const hasMargin = (marginPctSeries?.length ?? 0) > 0;
+
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart
+      <ComposedChart
         data={data}
-        // top mas grande si legend esta arriba para no traslapar
         margin={{
           top: legendVerticalAlign === "top" ? 8 : 20,
-          right: 30,
+          right: hasMargin ? 50 : 30,
           bottom: 0,
           left: 30,
         }}
@@ -76,13 +88,36 @@ export function GroupedBarChart({
           stroke="var(--border-strong)"
         />
         <YAxis
+          yAxisId="left"
           tick={{ fontSize: 11, fill: "var(--text-secondary)" }}
           stroke="var(--border-strong)"
           tickFormatter={yFormatter}
         />
+        {hasMargin && (
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            tick={{ fontSize: 11, fill: "var(--text-secondary)" }}
+            stroke="var(--border-strong)"
+            tickFormatter={(v) => `${v.toFixed(0)}%`}
+            domain={[0, "auto"]}
+            label={{
+              value: "Margen %",
+              angle: 90,
+              position: "insideRight",
+              style: { fill: "var(--text-muted)", fontSize: 10 },
+            }}
+          />
+        )}
         <Tooltip
           content={(props) => (
-            <GroupedBarTooltip {...props} yFormatter={yFormatter} />
+            <GroupedBarTooltip
+              {...props}
+              yFormatter={yFormatter}
+              ventaSeries={series}
+              marginAmountSeries={marginAmountSeries}
+              marginPctSeries={marginPctSeries}
+            />
           )}
           cursor={{ fill: "rgba(0,0,0,0.04)" }}
         />
@@ -90,31 +125,52 @@ export function GroupedBarChart({
           verticalAlign={legendVerticalAlign}
           align="center"
           height={28}
-          wrapperStyle={{ fontSize: 12, paddingBottom: legendVerticalAlign === "top" ? 8 : 0 }}
+          wrapperStyle={{
+            fontSize: 12,
+            paddingBottom: legendVerticalAlign === "top" ? 8 : 0,
+          }}
           iconType="rect"
         />
         {series.map((s) => (
           <Bar
             key={s.key}
+            yAxisId="left"
             dataKey={s.key}
             name={s.label}
             fill={s.color}
             radius={[2, 2, 0, 0]}
           />
         ))}
-      </BarChart>
+        {hasMargin &&
+          marginPctSeries!.map((s) => (
+            <Line
+              key={s.key}
+              yAxisId="right"
+              type="monotone"
+              dataKey={s.key}
+              name={s.label}
+              stroke={s.color}
+              strokeWidth={2}
+              strokeDasharray="4 3"
+              dot={{ r: 3, strokeWidth: 1, fill: "white" }}
+              connectNulls
+            />
+          ))}
+      </ComposedChart>
     </ResponsiveContainer>
   );
 }
 
 // ============================================================
-// Custom tooltip — dot, label, value tabular right-aligned
+// Custom tooltip — secciones Venta, Margen $, Margen %
 // ============================================================
 interface TooltipItem {
   name?: string | number;
-  // Recharts TooltipPayloadEntry tiene value: ValueType = string | number | (string|number)[]
   value?: number | string | readonly (string | number)[];
   color?: string;
+  // Recharts permite dataKey como función (objeto → valor); aceptamos pero
+  // sólo leemos el `payload` directamente para sacar valores por key.
+  dataKey?: string | number | ((obj: unknown) => unknown);
 }
 
 function GroupedBarTooltip({
@@ -122,20 +178,32 @@ function GroupedBarTooltip({
   payload,
   label,
   yFormatter,
+  ventaSeries,
+  marginAmountSeries,
+  marginPctSeries,
 }: {
   active?: boolean;
   payload?: readonly TooltipItem[];
   label?: string | number;
   yFormatter: (value: number) => string;
+  ventaSeries: GroupedBarSeries[];
+  marginAmountSeries?: GroupedBarSeries[];
+  marginPctSeries?: GroupedBarSeries[];
 }) {
   if (!active || !payload || payload.length === 0) return null;
 
-  // Ordenar series con valor numerico, dejando ceros al final
-  const sorted = [...payload].sort((a, b) => {
-    const av = typeof a.value === "number" ? a.value : 0;
-    const bv = typeof b.value === "number" ? b.value : 0;
-    return bv - av;
-  });
+  // Recharts inyecta el row completo en cada item del payload (.payload).
+  // Lo usamos para sacar margen $ aunque no esté graficado.
+  const row = (payload[0] as TooltipItem & {
+    payload?: Record<string, number | string>;
+  })?.payload;
+
+  // Helper: número desde row
+  const num = (key: string): number | null => {
+    if (!row) return null;
+    const v = row[key];
+    return typeof v === "number" ? v : null;
+  };
 
   return (
     <div
@@ -143,11 +211,12 @@ function GroupedBarTooltip({
       style={{
         background: "var(--bg-surface)",
         borderColor: "var(--border-strong)",
-        minWidth: 240,
-        maxWidth: 360,
+        minWidth: 260,
+        maxWidth: 380,
         boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
       }}
     >
+      {/* Header */}
       <div
         className="px-3 py-2"
         style={{
@@ -156,34 +225,114 @@ function GroupedBarTooltip({
         }}
       >
         <div
-          className="text-[11px] font-bold uppercase tracking-wider"
+          className="truncate text-[11px] font-bold uppercase tracking-wider"
           style={{ color: "var(--text-primary)" }}
+          title={String(label)}
         >
           {label}
         </div>
       </div>
+
+      {/* Sección Venta */}
       <div className="px-3 py-2">
-        {sorted.map((p) => (
-          <div
-            key={p.name}
-            className="flex items-center justify-between gap-4 py-0.5"
-          >
-            <span className="flex items-center gap-2">
-              <span
-                className="inline-block h-2.5 w-2.5 rounded-sm"
-                style={{ background: p.color ?? "var(--text-muted)" }}
-              />
-              <span style={{ color: "var(--text-secondary)" }}>{p.name}</span>
-            </span>
-            <span
-              className="font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {typeof p.value === "number" ? yFormatter(p.value) : "—"}
-            </span>
-          </div>
-        ))}
+        <div
+          className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Venta
+        </div>
+        {ventaSeries.map((s) => {
+          const v = num(s.key);
+          return (
+            <Row
+              key={s.key}
+              color={s.color}
+              label={s.label}
+              value={v != null ? yFormatter(v) : "—"}
+            />
+          );
+        })}
       </div>
+
+      {/* Sección Margen $ */}
+      {marginAmountSeries && marginAmountSeries.length > 0 && (
+        <div
+          className="px-3 py-2"
+          style={{ borderTop: "1px solid var(--border)" }}
+        >
+          <div
+            className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Margen $
+          </div>
+          {marginAmountSeries.map((s) => {
+            const v = num(s.key);
+            return (
+              <Row
+                key={s.key}
+                color={s.color}
+                label={s.label}
+                value={v != null ? yFormatter(v) : "—"}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Sección Margen % */}
+      {marginPctSeries && marginPctSeries.length > 0 && (
+        <div
+          className="px-3 py-2"
+          style={{ borderTop: "1px solid var(--border)" }}
+        >
+          <div
+            className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Margen %
+          </div>
+          {marginPctSeries.map((s) => {
+            const v = num(s.key);
+            return (
+              <Row
+                key={s.key}
+                color={s.color}
+                label={s.label}
+                value={v != null ? `${v.toFixed(1)}%` : "—"}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Row({
+  color,
+  label,
+  value,
+}: {
+  color: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-0.5">
+      <span className="flex items-center gap-2">
+        <span
+          className="inline-block h-2.5 w-2.5 rounded-sm"
+          style={{ background: color }}
+        />
+        <span style={{ color: "var(--text-secondary)" }}>{label}</span>
+      </span>
+      <span
+        className="font-semibold"
+        style={{ color: "var(--text-primary)" }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
