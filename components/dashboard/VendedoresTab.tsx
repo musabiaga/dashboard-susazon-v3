@@ -16,6 +16,8 @@ interface Props {
   exportTerritory?: string;
   /** Etiqueta de periodo para el resumen del Excel (ej "Mayo 2026"). */
   exportPeriodLabel?: string;
+  /** Permiso para descargar Excel (default false). */
+  canExportExcel?: boolean;
 }
 
 const VENDEDORES_SELECTION_KEY = "vendedores-selected";
@@ -41,6 +43,7 @@ export function VendedoresTab({
   monthLabel26,
   exportTerritory = "",
   exportPeriodLabel,
+  canExportExcel = false,
 }: Props) {
   const [merged, setMerged] = useState(false);
   const [topN, setTopN] = useState<10 | 20 | null>(20);
@@ -90,6 +93,7 @@ export function VendedoresTab({
         exportTabName={merged ? "Vendedores_Unidos" : "Vendedores_Separados"}
         exportPeriodLabel={exportPeriodLabel}
         exportTerritory={exportTerritory}
+        canExportExcel={canExportExcel}
       />
     </div>
   );

@@ -12,6 +12,7 @@ interface InviteBody {
   role: "admin" | "director" | "gerente_regional" | "vendedor";
   allowed_territories: string[] | null;
   can_edit_ptto: boolean;
+  can_export_excel?: boolean;
 }
 
 /**
@@ -55,6 +56,12 @@ export async function POST(request: NextRequest) {
       ? null
       : Array.from(new Set(body.allowed_territories.map((t) => t.trim())));
   const canEditPtto = body.can_edit_ptto;
+  // Default: admin/director sí pueden exportar Excel; gerente/vendedor no.
+  // El admin puede override en el form de invite.
+  const canExportExcel =
+    typeof body.can_export_excel === "boolean"
+      ? body.can_export_excel
+      : role === "admin" || role === "director";
 
   const admin = createSupabaseAdminClient();
 
@@ -96,12 +103,13 @@ export async function POST(request: NextRequest) {
         role,
         allowed_territories: allowedTerritories,
         can_edit_ptto: canEditPtto,
+        can_export_excel: canExportExcel,
         is_active: true,
       },
       { onConflict: "user_id" }
     )
     .select(
-      "user_id, email, full_name, role, allowed_territories, can_edit_ptto, is_active, last_login, created_at"
+      "user_id, email, full_name, role, allowed_territories, can_edit_ptto, can_export_excel, is_active, last_login, created_at"
     )
     .single();
 

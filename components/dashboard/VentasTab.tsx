@@ -41,6 +41,8 @@ interface Props {
   exportTerritory?: string;
   /** Etiqueta de periodo para el resumen del Excel. */
   exportPeriodLabel?: string;
+  /** Permiso para descargar Excel (default false). */
+  canExportExcel?: boolean;
 }
 
 /**
@@ -56,6 +58,7 @@ export function VentasTab({
   cutoffMonth,
   exportTerritory = "",
   exportPeriodLabel,
+  canExportExcel = false,
 }: Props) {
   const chartData = useMemo(() => {
     // Index por (anio, mes) → MonthlyPoint
@@ -322,6 +325,7 @@ export function VentasTab({
       <div className="flex flex-wrap items-center justify-end gap-3">
         <ExportExcelButton
           onExport={handleExportExcel}
+          canExport={canExportExcel}
           title="Exportar 12 meses de Ventas a Excel"
         />
       </div>

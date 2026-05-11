@@ -38,6 +38,8 @@ interface Props {
   exportTerritory?: string;
   /** Etiqueta de periodo para el resumen (ej. "Mayo 2026"). */
   exportPeriodLabel?: string;
+  /** Permiso para descargar Excel (default false). */
+  canExportExcel?: boolean;
 }
 
 /**
@@ -57,6 +59,7 @@ export function ProductosTab({
   topNTable = 50,
   exportTerritory = "",
   exportPeriodLabel,
+  canExportExcel = false,
 }: Props) {
   const [topNChart, setTopNChart] = useState<10 | 15>(topNChartDefault);
 
@@ -306,6 +309,7 @@ export function ProductosTab({
         <ExportExcelButton
           onExport={handleExportExcel}
           disabled={tableRows.length === 0}
+          canExport={canExportExcel}
           title={
             tableRows.length === 0
               ? "Sin filas para exportar"

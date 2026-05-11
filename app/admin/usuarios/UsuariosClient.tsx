@@ -38,6 +38,7 @@ export interface UserRow {
   // null = todos
   allowed_territories: string[] | null;
   can_edit_ptto: boolean;
+  can_export_excel: boolean;
   is_active: boolean;
   last_login: string | null;
   created_at: string;
@@ -238,6 +239,7 @@ export function UsuariosClient({ initial, territories }: Props) {
                 <Th>Rol</Th>
                 <Th>Territorios</Th>
                 <Th align="center">PTTO</Th>
+                <Th align="center">Excel</Th>
                 <Th align="center">Estado</Th>
                 <Th>Último login</Th>
                 <Th align="right">Acciones</Th>
@@ -297,6 +299,17 @@ export function UsuariosClient({ initial, territories }: Props) {
                     </Td>
                     <Td align="center">
                       {u.can_edit_ptto ? (
+                        <CheckCircle2
+                          size={14}
+                          style={{ color: "var(--success)" }}
+                          className="mx-auto"
+                        />
+                      ) : (
+                        <span style={{ color: "var(--text-muted)" }}>—</span>
+                      )}
+                    </Td>
+                    <Td align="center">
+                      {u.can_export_excel ? (
                         <CheckCircle2
                           size={14}
                           style={{ color: "var(--success)" }}
@@ -391,6 +404,7 @@ interface FormPayload {
   role: RoleKey;
   allowed_territories: string[] | null; // null = todos
   can_edit_ptto: boolean;
+  can_export_excel: boolean;
 }
 
 function UserFormModal({
@@ -419,6 +433,11 @@ function UserFormModal({
   );
   const [canEditPtto, setCanEditPtto] = useState(
     user?.can_edit_ptto ?? false
+  );
+  const [canExportExcel, setCanExportExcel] = useState(
+    // Default: si es admin/director, sí puede; si no, false
+    user?.can_export_excel ??
+      (user?.role === "admin" || user?.role === "director")
   );
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -450,6 +469,7 @@ function UserFormModal({
       role,
       allowed_territories: allTerritories ? null : selected,
       can_edit_ptto: canEditPtto,
+      can_export_excel: canExportExcel,
     });
   }
 
@@ -631,6 +651,18 @@ function UserFormModal({
               onChange={(e) => setCanEditPtto(e.target.checked)}
             />
             <span>Puede editar PTTO (presupuestos)</span>
+          </label>
+
+          <label
+            className="flex items-center gap-2 text-sm"
+            style={{ color: "var(--text-primary)" }}
+          >
+            <input
+              type="checkbox"
+              checked={canExportExcel}
+              onChange={(e) => setCanExportExcel(e.target.checked)}
+            />
+            <span>Puede descargar Excel desde los tabs</span>
           </label>
 
           {localError && (

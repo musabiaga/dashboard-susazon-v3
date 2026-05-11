@@ -59,6 +59,8 @@ interface Props {
   /** Territorio activo del dashboard. "" = todos los territorios visibles
    *  (el RLS de Supabase filtra automáticamente por permisos del usuario). */
   territorio?: string;
+  /** Permiso para descargar Excel (default false). */
+  canExportExcel?: boolean;
 }
 
 export function TrackingDiarioTab({
@@ -71,6 +73,7 @@ export function TrackingDiarioTab({
   elapsedBizDays,
   totalBizDays,
   territorio = "",
+  canExportExcel = false,
 }: Props) {
   // ============ Estado de expansión de filas (Mejora 1) ============
   // Al hacer click en la flecha de un día, se hace fetch lazy a
@@ -533,6 +536,7 @@ export function TrackingDiarioTab({
         <ExportExcelButton
           onExport={handleExportExcel}
           disabled={tableRows.length === 0}
+          canExport={canExportExcel}
           title={
             tableRows.length === 0
               ? "Sin filas para exportar"

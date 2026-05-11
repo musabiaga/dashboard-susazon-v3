@@ -19,13 +19,21 @@ export function ExportExcelButton({
   label = "Exportar Excel",
   disabled = false,
   title,
+  canExport = true,
 }: {
   onExport: () => Promise<void> | void;
   label?: string;
   disabled?: boolean;
   /** Tooltip nativo (atributo title del botón) */
   title?: string;
+  /** Si false, el botón NO se renderiza. Permiso de usuario controlado
+   *  desde users_permissions.can_export_excel (default true para back-compat
+   *  con llamadas sin la prop). */
+  canExport?: boolean;
 }) {
+  // Sin permiso → no renderizar nada. UX limpia, no genera fricción.
+  if (!canExport) return null;
+
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {

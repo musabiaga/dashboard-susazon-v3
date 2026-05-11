@@ -74,6 +74,8 @@ interface DashboardClientProps {
   todayYear: number;
   /** Mes "hoy" CDMX 1-12 (para el MonthSelector). */
   todayMonth: number;
+  /** Permiso para descargar Excel desde los tabs (de users_permissions.can_export_excel). */
+  canExportExcel: boolean;
 }
 
 /**
@@ -109,6 +111,7 @@ export function DashboardClient({
   isHistorical,
   todayYear,
   todayMonth,
+  canExportExcel,
 }: DashboardClientProps) {
   // Selección uni-select del sidebar: "" = modo "Todos", o nombre = single.
   // No persiste — cada sesión arranca en "Todos" para mantener UX previa.
@@ -497,6 +500,7 @@ export function DashboardClient({
                     elapsedBizDays={elapsedBizDays}
                     totalBizDays={totalBizDays}
                     territorio={exportTerritoryLabel}
+                    canExportExcel={canExportExcel}
                   />
                 );
               }
@@ -508,6 +512,7 @@ export function DashboardClient({
                     cutoffMonth={currentMonth}
                     exportTerritory={exportTerritoryLabel}
                     exportPeriodLabel={monthShortYY}
+                    canExportExcel={canExportExcel}
                   />
                 );
               }
@@ -525,6 +530,7 @@ export function DashboardClient({
                     exportTabName="GrupoProducto"
                     exportPeriodLabel={monthShortYY}
                     exportTerritory={exportTerritoryLabel}
+                    canExportExcel={canExportExcel}
                   />
                 );
               }
@@ -537,6 +543,7 @@ export function DashboardClient({
                     monthLabel26={monthShortYY}
                     exportTerritory={exportTerritoryLabel}
                     exportPeriodLabel={monthShortYY}
+                    canExportExcel={canExportExcel}
                   />
                 );
               }
@@ -559,6 +566,7 @@ export function DashboardClient({
                     exportTabName="Clientes"
                     exportPeriodLabel={monthShortYY}
                     exportTerritory={exportTerritoryLabel}
+                    canExportExcel={canExportExcel}
                   />
                 );
               }
@@ -571,6 +579,7 @@ export function DashboardClient({
                     monthShortYY={monthShortYY}
                     prevMonthShortYY={prevMonthShortYY}
                     currentTerritory={exportTerritoryLabel}
+                    canExportExcel={canExportExcel}
                   />
                 );
               }
@@ -584,6 +593,7 @@ export function DashboardClient({
                     monthLabel26={monthShortYY}
                     exportPeriodLabel={monthShortYY}
                     exportTerritory={exportTerritoryLabel}
+                    canExportExcel={canExportExcel}
                   />
                 );
               }

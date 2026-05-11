@@ -18,7 +18,7 @@ export default async function UsuariosAdminPage() {
   const { data: users } = await supabase
     .from("users_permissions")
     .select(
-      "user_id, email, full_name, role, allowed_territories, can_edit_ptto, is_active, last_login, created_at"
+      "user_id, email, full_name, role, allowed_territories, can_edit_ptto, can_export_excel, is_active, last_login, created_at"
     )
     .order("created_at", { ascending: true });
 
@@ -40,6 +40,7 @@ export default async function UsuariosAdminPage() {
     role: u.role as RoleKey,
     allowed_territories: u.allowed_territories ?? null,
     can_edit_ptto: u.can_edit_ptto,
+    can_export_excel: u.can_export_excel,
     is_active: u.is_active,
     last_login:
       lastSignInMap.get(u.user_id) ?? u.last_login ?? null,

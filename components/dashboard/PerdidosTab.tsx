@@ -108,6 +108,8 @@ interface Props {
    *  agregado). Usado en el resumen del Excel y en la etiqueta de
    *  cada cliente cuando hay multi-territorio. */
   currentTerritory?: string;
+  /** Permiso para descargar Excel (default false). */
+  canExportExcel?: boolean;
 }
 
 interface Computed {
@@ -164,6 +166,7 @@ export function PerdidosTab({
   prevMonthShortYY,
   topNTable = 100,
   currentTerritory = "",
+  canExportExcel = false,
 }: Props) {
   // Mejora 7: multi-select de territorios ahora vive en el sidebar global.
   // Aquí solo recibimos los rows ya agregados (DashboardClient hace la
@@ -771,6 +774,7 @@ export function PerdidosTab({
         <ExportExcelButton
           onExport={handleExportExcel}
           disabled={tableRows.length === 0}
+          canExport={canExportExcel}
           title={
             tableRows.length === 0
               ? "Sin filas para exportar"

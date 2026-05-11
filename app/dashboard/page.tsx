@@ -271,7 +271,7 @@ export default async function DashboardPage({
   // Cargar permisos del usuario
   const { data: permissions } = await supabase
     .from("users_permissions")
-    .select("full_name, role, allowed_territories, can_edit_ptto")
+    .select("full_name, role, allowed_territories, can_edit_ptto, can_export_excel")
     .eq("user_id", user.id)
     .single();
 
@@ -1123,6 +1123,7 @@ export default async function DashboardPage({
         isHistorical={isHistorical}
         todayYear={today.year}
         todayMonth={today.month}
+        canExportExcel={permissions?.can_export_excel ?? false}
       />
     </div>
   );

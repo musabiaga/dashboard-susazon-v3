@@ -8,6 +8,7 @@ interface UpdateBody {
   role?: "admin" | "director" | "gerente_regional" | "vendedor";
   allowed_territories?: string[] | null;
   can_edit_ptto?: boolean;
+  can_export_excel?: boolean;
   is_active?: boolean;
 }
 
@@ -77,6 +78,9 @@ export async function POST(request: NextRequest) {
   if (typeof body.can_edit_ptto === "boolean") {
     update.can_edit_ptto = body.can_edit_ptto;
   }
+  if (typeof body.can_export_excel === "boolean") {
+    update.can_export_excel = body.can_export_excel;
+  }
   if (typeof body.is_active === "boolean") {
     update.is_active = body.is_active;
   }
@@ -94,7 +98,7 @@ export async function POST(request: NextRequest) {
   const { data: before } = await admin
     .from("users_permissions")
     .select(
-      "email, role, allowed_territories, can_edit_ptto, is_active, full_name"
+      "email, role, allowed_territories, can_edit_ptto, can_export_excel, is_active, full_name"
     )
     .eq("user_id", body.user_id)
     .single();
@@ -111,7 +115,7 @@ export async function POST(request: NextRequest) {
     .update(update)
     .eq("user_id", body.user_id)
     .select(
-      "user_id, email, full_name, role, allowed_territories, can_edit_ptto, is_active, last_login, created_at"
+      "user_id, email, full_name, role, allowed_territories, can_edit_ptto, can_export_excel, is_active, last_login, created_at"
     )
     .single();
 

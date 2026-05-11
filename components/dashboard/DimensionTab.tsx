@@ -78,6 +78,8 @@ interface Props {
   exportPeriodLabel?: string;
   /** Territorio activo para resumen + filename del Excel. "" = "Todos". */
   exportTerritory?: string;
+  /** Permiso para descargar Excel (default false). */
+  canExportExcel?: boolean;
 }
 
 /**
@@ -110,6 +112,7 @@ export function DimensionTab({
   exportTabName,
   exportPeriodLabel,
   exportTerritory = "",
+  canExportExcel = false,
 }: Props) {
   // Selección custom (multi-select). Vacía = comportamiento default Top N.
   // Persistencia en localStorage si selectionStorageKey está definido.
@@ -394,11 +397,12 @@ export function DimensionTab({
   return (
     <div className="space-y-4">
       {/* Toolbar superior: solo botón export (alineado a la derecha) */}
-      {handleExportExcel && (
+      {handleExportExcel && canExportExcel && (
         <div className="flex flex-wrap items-center justify-end gap-3">
           <ExportExcelButton
             onExport={handleExportExcel}
             disabled={tableRows.length === 0}
+            canExport={canExportExcel}
             title={
               tableRows.length === 0
                 ? "Sin filas para exportar"
