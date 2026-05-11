@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LogOut, BarChart3, Database, Shield } from "lucide-react";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
 import { SusazonLogo } from "@/components/brand/SusazonLogo";
+import { InstructivoButton } from "@/components/dashboard/InstructivoButton";
 
 interface HeaderProps {
   userName?: string;
@@ -16,6 +17,9 @@ interface HeaderProps {
   canEditData?: boolean;
   // Si true, muestra el link a /admin (solo rol admin).
   isAdmin?: boolean;
+  // Si true, muestra el botón Instructivo (controlado por admin desde
+  // app_settings.instructivo_visible).
+  instructivoVisible?: boolean;
 }
 
 export function Header({
@@ -25,6 +29,7 @@ export function Header({
   showLogout = true,
   canEditData = false,
   isAdmin = false,
+  instructivoVisible = false,
 }: HeaderProps) {
   const pathname = usePathname();
 
@@ -97,6 +102,8 @@ export function Header({
             )}
           </div>
         )}
+
+        <InstructivoButton visible={instructivoVisible} />
 
         <ThemeSelector />
 

@@ -8,6 +8,7 @@ interface DashboardHeaderProps {
   userRole: string;
   canEditData?: boolean;
   isAdmin?: boolean;
+  instructivoVisible?: boolean;
 }
 
 export function DashboardHeader({
@@ -15,6 +16,7 @@ export function DashboardHeader({
   userRole,
   canEditData = false,
   isAdmin = false,
+  instructivoVisible = false,
 }: DashboardHeaderProps) {
   const router = useRouter();
 
@@ -31,6 +33,7 @@ export function DashboardHeader({
       onLogout={handleLogout}
       canEditData={canEditData}
       isAdmin={isAdmin}
+      instructivoVisible={instructivoVisible}
     />
   );
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getMexicoCityDateParts } from "@/lib/business-days";
+import { getAppSettings } from "@/lib/app-settings";
 import { DashboardHeader } from "../dashboard/DashboardHeader";
 import { LoaderClient } from "./LoaderClient";
 import {
@@ -38,6 +39,8 @@ export default async function CargarDatosPage({
   if (!perms || !["admin", "director"].includes(perms.role)) {
     redirect("/dashboard");
   }
+
+  const appSettings = await getAppSettings();
 
   const sp = await searchParams;
   // Año actual en CDMX (UTC-6). Server corre en UTC, ver lib/business-days.ts.
@@ -92,6 +95,7 @@ export default async function CargarDatosPage({
         userRole={roleLabel(perms.role)}
         canEditData={true}
         isAdmin={perms.role === "admin"}
+        instructivoVisible={appSettings.instructivoVisible}
       />
       <main className="flex-1 p-6">
         <div className="mx-auto max-w-6xl space-y-6">

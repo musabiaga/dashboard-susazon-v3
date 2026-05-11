@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MapPin, Users, FileClock } from "lucide-react";
+import { MapPin, Users, FileClock, Settings } from "lucide-react";
 
 const TABS = [
   { href: "/admin/territorios", label: "Territorios", icon: MapPin },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
   { href: "/admin/audit", label: "Audit Log", icon: FileClock },
+  { href: "/admin/configuracion", label: "Configuración", icon: Settings },
 ] as const;
 
 export function AdminTabs() {

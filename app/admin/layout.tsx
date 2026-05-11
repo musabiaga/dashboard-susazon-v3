@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAppSettings } from "@/lib/app-settings";
 import { DashboardHeader } from "../dashboard/DashboardHeader";
 import { AdminTabs } from "./AdminTabs";
 
@@ -32,6 +33,8 @@ export default async function AdminLayout({
     redirect("/dashboard");
   }
 
+  const appSettings = await getAppSettings();
+
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg-page)]">
       <DashboardHeader
@@ -39,6 +42,7 @@ export default async function AdminLayout({
         userRole="Administrador"
         canEditData={true}
         isAdmin={true}
+        instructivoVisible={appSettings.instructivoVisible}
       />
       <main className="flex-1 p-6">
         <div className="mx-auto max-w-6xl space-y-4">

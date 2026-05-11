@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAppSettings } from "@/lib/app-settings";
 import { DashboardHeader } from "./DashboardHeader";
 import { DashboardClient } from "./DashboardClient";
 import type {
@@ -268,12 +269,15 @@ export default async function DashboardPage({
     redirect("/login");
   }
 
-  // Cargar permisos del usuario
-  const { data: permissions } = await supabase
-    .from("users_permissions")
-    .select("full_name, role, allowed_territories, can_edit_ptto, can_export_excel")
-    .eq("user_id", user.id)
-    .single();
+  // Cargar permisos del usuario + settings globales en paralelo
+  const [{ data: permissions }, appSettings] = await Promise.all([
+    supabase
+      .from("users_permissions")
+      .select("full_name, role, allowed_territories, can_edit_ptto, can_export_excel")
+      .eq("user_id", user.id)
+      .single(),
+    getAppSettings(),
+  ]);
 
   // "Hoy" en zona horaria CDMX (UTC-6). Vercel corre en UTC, entonces si
   // usamos `new Date()` directo, después de las 6pm CDMX el server ya cree
@@ -1098,6 +1102,7 @@ export default async function DashboardPage({
           ["admin", "director"].includes(permissions.role)
         }
         isAdmin={permissions?.role === "admin"}
+        instructivoVisible={appSettings.instructivoVisible}
       />
 
       <DashboardClient
