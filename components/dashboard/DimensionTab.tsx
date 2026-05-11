@@ -531,17 +531,35 @@ export function DimensionTab({
             borderColor: "var(--border)",
           }}
         >
+          {/* Leyenda explícita: la tabla muestra acumulado AL MISMO DÍA
+              (consistente con el chart). Antes mostraba cierre completo,
+              causando incongruencia con tooltips del chart. */}
+          <div
+            className="border-b px-3 py-1.5 text-[10px] uppercase tracking-wider"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--bg-surface-muted)",
+              color: "var(--text-muted)",
+            }}
+          >
+            <span style={{ color: "var(--text-secondary)" }}>
+              ⓘ Valores al mismo día laboral
+            </span>
+            <span className="ml-2">
+              (comparativos día-vs-día equitativos entre años)
+            </span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm tabular-nums">
               <thead>
                 <tr style={{ background: "var(--bg-surface-muted)" }}>
                   <Th>{dimensionLabel}</Th>
-                  {/* Pesos */}
+                  {/* Pesos — al-día */}
                   <Th align="right">{monthLabel24}</Th>
                   <Th align="right">{monthLabel25}</Th>
                   <Th align="right">{monthLabel26}</Th>
                   <Th align="right">Var %</Th>
-                  {/* KG (opcional) */}
+                  {/* KG (opcional) — al-día */}
                   {showKg && (
                     <>
                       <Th align="right" subtle>{`KG ${monthLabel24}`}</Th>
@@ -554,13 +572,18 @@ export function DimensionTab({
               </thead>
               <tbody>
                 {tableRows.map((r, i) => {
+                  // === Mostrar SIEMPRE al-día (coherente con tooltip del chart) ===
+                  // Si al-día no existe (data vieja sin Mejora 2), fallback a cierre.
+                  const v24Show = r.v24_alDia ?? r.v24;
+                  const v25Show = r.v25_alDia ?? r.v25;
+                  const v26Show = r.v26_alDia ?? r.v26;
+                  const k24Show = r.k24_alDia ?? r.k24 ?? 0;
+                  const k25Show = r.k25_alDia ?? r.k25 ?? 0;
+                  const k26Show = r.k26_alDia ?? r.k26 ?? 0;
                   const varPct =
-                    r.v25 > 0 ? ((r.v26 - r.v25) / r.v25) * 100 : null;
-                  const k24 = r.k24 ?? 0;
-                  const k25 = r.k25 ?? 0;
-                  const k26 = r.k26 ?? 0;
+                    v25Show > 0 ? ((v26Show - v25Show) / v25Show) * 100 : null;
                   const varKgPct =
-                    k25 > 0 ? ((k26 - k25) / k25) * 100 : null;
+                    k25Show > 0 ? ((k26Show - k25Show) / k25Show) * 100 : null;
                   return (
                     <tr
                       key={r.name + i}
@@ -572,9 +595,9 @@ export function DimensionTab({
                       }}
                     >
                       <Td>{r.name}</Td>
-                      <Td align="right">{formatMoney(r.v24)}</Td>
-                      <Td align="right">{formatMoney(r.v25)}</Td>
-                      <Td align="right">{formatMoney(r.v26)}</Td>
+                      <Td align="right">{formatMoney(v24Show)}</Td>
+                      <Td align="right">{formatMoney(v25Show)}</Td>
+                      <Td align="right">{formatMoney(v26Show)}</Td>
                       <Td
                         align="right"
                         bold
@@ -592,9 +615,9 @@ export function DimensionTab({
                       </Td>
                       {showKg && (
                         <>
-                          <Td align="right" subtle>{formatKilos(k24)}</Td>
-                          <Td align="right" subtle>{formatKilos(k25)}</Td>
-                          <Td align="right" subtle>{formatKilos(k26)}</Td>
+                          <Td align="right" subtle>{formatKilos(k24Show)}</Td>
+                          <Td align="right" subtle>{formatKilos(k25Show)}</Td>
+                          <Td align="right" subtle>{formatKilos(k26Show)}</Td>
                           <Td
                             align="right"
                             bold
