@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<instructivo version="2.0" fecha="2026-05-10" idioma="es-MX">
+<instructivo version="1.3" fecha="2026-05-01" idioma="es-MX">
 
   <contexto>
-    <proyecto>Dashboard Comercial Susazón V3.0 — InCom (versión 3.3.0)</proyecto>
+    <proyecto>Dashboard Comercial Susazón V3.0 (versión 1.3.0)</proyecto>
     <propietario>Mauricio Usabiaga, Director de Operaciones, Grupo Susazón</propietario>
     <empresa>Grupo Susazón (incluye marca Susazón y marca Suve)</empresa>
     <usuarios_finales>15 personas internas (admin, director, gerente regional, vendedor)</usuarios_finales>
@@ -18,24 +18,19 @@
       el V3.0 esté siendo evaluado. Útil como referencia de fórmulas y lógica de negocio.
     </predecesor>
     <estado_actual>
-      EN PRODUCCIÓN versión 3.3.0. Deploy live en Vercel desde repo privado
+      EN PRODUCCIÓN versión 1.3.0. Deploy live en Vercel desde repo privado
       github.com/musabiaga/dashboard-susazon-v3. URL canonical:
       https://www.dashboardcomercialsusazon.com (custom domain GoDaddy → Vercel).
+      Fallback: https://dashboard-susazon-v3-44sp.vercel.app.
 
-      ~90 commits totales tras Mejora 7, 12 migraciones Supabase, 337K filas de datos
-      comerciales (Ene 2024 - May 2026). 14/15 usuarios autorizados en prod (admins +
-      directores + gerentes + vendedores).
+      ~55 commits totales tras la fase 3, 10 migraciones Supabase, 337,398 filas de datos
+      comerciales (Ene 2024 - May 2026). Solo el admin (Mauricio) está creado en prod; los
+      otros 14 usuarios pendientes de invitar cuando esté la lista final.
 
-      Stack actualizado: Custom SMTP via Resend (free 3,000/mes), helper TZ CDMX,
-      Run-Rate hábiles, selector mes 24 meses. NUEVO (2026-05-10):
-      - Branding "InCom — Inteligencia Comercial Susazón®" (favicon, apple-icon,
-        OG image 1200×630, Twitter card).
-      - Login rediseño split-screen con escudo InCom + aurora animado + logo Susazón.
-      - Multi-select global de territorios en sidebar (item "Todos" con ⚙️ configurable).
-      - Export Excel en los 7 tabs (exceljs lazy-loaded).
-      - Día-vs-día YoY con precisión 100% (4 vistas SQL diarias).
-      - Lazy endpoint clientes/día en Tracking Diario.
-      - Helpers de agregación dinámica en cliente (lib/aggregate.ts).
+      Stack actualizado: Custom SMTP via Resend (free 3,000/mes) bypasseando rate limit del
+      email default de Supabase. Helper getMexicoCityDateParts() en lib/business-days.ts
+      normaliza "hoy" a TZ CDMX (Vercel corre en UTC). Run-Rate ahora unificado a días
+      hábiles. Selector de mes en dashboard permite consultar hasta 24 meses pasados.
     </estado_actual>
     <urls>
       <url tipo="canonical">https://www.dashboardcomercialsusazon.com</url>
@@ -219,25 +214,7 @@
       <archivo path="008_kpi_dimension_views.sql" descripcion="5 vistas dimension (familia, grupo, sku, vendedor, cliente)" />
       <archivo path="009_vendedor_with_empresa.sql" descripcion="Recreate kpi_vendedor_summary con empresa column para toggle Sus/Suve" />
       <archivo path="010_kpi_cliente_perdidos.sql" descripcion="Vista kpi_cliente_perdidos para tab Perdidos (mes + YTD pre-agregados)" />
-      <archivo path="011_kpi_diario_dimensiones.sql" descripcion="4 vistas diarias (grupo, sku, cliente, vendedor) para día-vs-día YoY (Mejora 2)" />
-      <archivo path="012_kpi_cliente_perdidos_margen.sql" descripcion="Agrega mes_margen + ytd_margen al final de kpi_cliente_perdidos (CREATE OR REPLACE solo permite append)" />
     </directorio>
-
-    <directorio nombre="app/api/dashboard/" descripcion="API routes específicas del dashboard (post Mejora 1)">
-      <archivo path="app/api/dashboard/clientes-dia/route.ts" descripcion="Endpoint lazy para clientes de un día específico (expand row Tracking Diario). Cache HTTP 60s. RLS via security_invoker" />
-    </directorio>
-
-    <archivo path="lib/aggregate.ts" descripcion="(Mejora 7) Helpers puros: aggregateKpis, aggregateDimensionRows, aggregatePerdidoRows, aggregateBudget, selectedKpis, rowsBySelected. Agregación dinámica multi-territorio en cliente" />
-    <archivo path="lib/export-excel.ts" descripcion="(Mejora 6) Generador Excel reusable con exceljs. Bloque resumen + header bold + freeze panes + zebra + row TOTAL + numFmt nativo. Lazy import" />
-    <archivo path="components/dashboard/ExportExcelButton.tsx" descripcion="(Mejora 6) Botón Export Excel reusable con loading state + error alert" />
-    <archivo path="app/icon.png" descripcion="(Branding) Favicon 48×48 escudo InCom transparente" />
-    <archivo path="app/apple-icon.png" descripcion="(Branding) Apple touch icon 180×180 sobre fondo oscuro" />
-    <archivo path="app/opengraph-image.png" descripcion="(Branding) OG image 1200×630 con escudo InCom sobre gradient naranja" />
-    <archivo path="app/twitter-image.png" descripcion="(Branding) Twitter card (copia del OG)" />
-    <archivo path="public/incom-logo.png" descripcion="(Branding) Logo InCom original 1254×1254 con fondo papel (source)" />
-    <archivo path="public/incom-mark.png" descripcion="(Branding) Escudo InCom 256×256 fondo transparente" />
-    <archivo path="public/incom-mark@2x.png" descripcion="(Branding) Escudo InCom 512×512 retina" />
-    <archivo path="public/incom-mark@4x.png" descripcion="(Branding) Escudo InCom 1024×1024 para hero del login" />
 
     <archivo path="proxy.ts" descripcion="Middleware Next.js 16 — auth check + redirect" />
     <archivo path=".env.local" descripcion="Secrets (NO commit). Ver SECRETS_DASHBOARD_V3.txt privado" />

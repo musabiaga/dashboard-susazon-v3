@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Comercial Susazón · Guía Visual</title>
+<style>
+  /* =========================================
+     LIQUID GLASS DESIGN SYSTEM
+     Inspirado en Apple Liquid Glass / iOS 26
+     ========================================= */
+  :root {
+    /* Aurora background palette */
+    --aurora-1: #1e1b4b;     /* deep indigo */
+    --aurora-2: #312e81;     /* indigo-900 */
+    --aurora-3: #4c1d95;     /* purple-900 */
+    --aurora-4: #1e3a8a;     /* blue-900 */
+    --aurora-5: #581c87;     /* purple-800 */
+
+    /* Glass surfaces */
+    --glass-bg: rgba(255, 255, 255, 0.08);
+    --glass-bg-strong: rgba(255, 255, 255, 0.12);
+    --glass-border: rgba(255, 255, 255, 0.18);
+    --glass-border-strong: rgba(255, 255, 255, 0.28);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.32);
+    --glass-shadow-strong: 0 12px 48px 0 rgba(0, 0, 0, 0.42);
+
+    /* Text */
+    --text-primary: rgba(255, 255, 255, 0.96);
+    --text-secondary: rgba(255, 255, 255, 0.68);
+    --text-muted: rgba(255, 255, 255, 0.45);
+
+    /* Accents */
+    --accent-orange: #ED6808;     /* Susazón orange */
+    --accent-orange-soft: rgba(237, 104, 8, 0.18);
+    --accent-blue: #3b82f6;
+    --accent-green: #10b981;
+    --accent-red: #ef4444;
+    --accent-purple: #a855f7;
+    --accent-yellow: #eab308;
+
+    /* Typography */
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
+                 "Inter", system-ui, sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* =========================================
+     AURORA BACKGROUND (animated)
+     ========================================= */
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse at top left, var(--aurora-3) 0%, transparent 45%),
+      radial-gradient(ellipse at top right, var(--aurora-4) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom left, var(--aurora-5) 0%, transparent 45%),
+      radial-gradient(ellipse at bottom right, var(--aurora-1) 0%, transparent 45%),
+      linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
+    background-attachment: fixed;
+    background-size: 100% 100%;
+  }
+
+  /* Subtle noise texture for depth */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* =========================================
+     LAYOUT
+     ========================================= */
+  .doc {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 48px 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* =========================================
+     COVER PAGE
+     ========================================= */
+  .cover {
+    min-height: calc(100vh - 96px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    page-break-after: always;
+  }
+
+  .cover-logo {
+    width: 96px;
+    height: 96px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, var(--accent-orange) 0%, #B85206 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 32px;
+    box-shadow: 0 16px 48px rgba(237, 104, 8, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  .cover-logo-text {
+    font-size: 42px;
+    font-weight: 900;
+    color: white;
+    font-family: var(--font-sans);
+    letter-spacing: -0.04em;
+  }
+
+  .cover-eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--accent-orange);
+    margin-bottom: 16px;
+  }
+
+  .cover h1 {
+    font-size: 64px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.7) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .cover-subtitle {
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    max-width: 560px;
+    margin-bottom: 48px;
+  }
+
+  .cover-meta {
+    display: flex;
+    gap: 32px;
+    padding: 16px 32px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .cover-meta-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .cover-meta-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .cover-meta-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  /* =========================================
+     SECTIONS
+     ========================================= */
+  section {
+    margin-bottom: 64px;
+    page-break-inside: avoid;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .section-number {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent-orange);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    flex-shrink: 0;
+  }
+
+  .section-title {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .section-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  /* =========================================
+     GLASS CARDS
+     ========================================= */
+  .glass-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 24px;
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    box-shadow: var(--glass-shadow);
+    margin-bottom: 24px;
+    position: relative;
+  }
+
+  .glass-card.featured {
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border-strong);
+    box-shadow: var(--glass-shadow-strong);
+  }
+
+  /* =========================================
+     KPI EXPLANATION CARDS
+     ========================================= */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .kpi-card-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .kpi-card-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    letter-spacing: -0.02em;
+  }
+
+  .kpi-card-value-secondary {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-left: 8px;
+    font-weight: 500;
+  }
+
+  .kpi-card-detail {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  .kpi-card-detail .formula {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent-orange);
+  }
+
+  /* =========================================
+     TABS GUIDE
+     ========================================= */
+  .tabs-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .tab-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px 20px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .tab-icon {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .tab-icon.tab-tracking { background: rgba(237, 104, 8, 0.2); color: #fdba74; }
+  .tab-icon.tab-ventas { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+  .tab-icon.tab-grupo { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; }
+  .tab-icon.tab-productos { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+  .tab-icon.tab-clientes { background: rgba(234, 179, 8, 0.2); color: #fde047; }
+  .tab-icon.tab-vendedores { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+  .tab-icon.tab-perdidos { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+
+  .tab-content {
+    flex: 1;
+  }
+
+  .tab-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .tab-summary {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 8px;
+  }
+
+  .tab-detail {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    padding-top: 8px;
+    border-top: 1px solid var(--glass-border);
+  }
+
+  .tab-detail strong {
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  /* =========================================
+     ANATOMY DIAGRAM (dashboard sections)
+     ========================================= */
+  .anatomy-diagram {
+    display: grid;
+    grid-template-columns: 1fr 3fr;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 16px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    margin-bottom: 16px;
+    min-height: 280px;
+  }
+
+  .anatomy-sidebar {
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .anatomy-sidebar-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent-orange);
+    margin-bottom: 4px;
+  }
+
+  .anatomy-sidebar-item {
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 6px 10px;
+    background: var(--glass-bg);
+    border-radius: 6px;
+  }
+
+  .anatomy-sidebar-item.active {
+    background: var(--accent-orange-soft);
+    color: var(--accent-orange);
+    font-weight: 600;
+  }
+
+  .anatomy-main {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .anatomy-main-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .anatomy-main-card {
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .anatomy-main-card-label {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .anatomy-main-card-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .anatomy-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    overflow-x: auto;
+  }
+
+  .anatomy-tab {
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--glass-bg);
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .anatomy-tab.active {
+    background: var(--accent-orange-soft);
+    color: var(--accent-orange);
+    font-weight: 700;
+  }
+
+  /* =========================================
+     ANNOTATION BOX
+     ========================================= */
+  .annotation {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--accent-orange-soft);
+    border: 1px solid rgba(237, 104, 8, 0.4);
+    border-radius: 12px;
+    margin: 16px 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .annotation-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .annotation-text {
+    color: var(--text-primary);
+  }
+
+  .annotation-text strong {
+    color: var(--accent-orange);
+  }
+
+  /* =========================================
+     STEPS LIST
+     ========================================= */
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .step {
+    display: flex;
+    gap: 16px;
+    padding: 16px 20px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    counter-increment: step;
+  }
+
+  .step::before {
+    content: counter(step);
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-orange) 0%, #B85206 100%);
+    color: white;
+    font-weight: 800;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(237, 104, 8, 0.4);
+  }
+
+  .step-content {
+    flex: 1;
+  }
+
+  .step-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .step-description {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* =========================================
+     EXECUTIVE SUMMARY TABLE
+     ========================================= */
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    margin-bottom: 24px;
+  }
+
+  .summary-table th,
+  .summary-table td {
+    padding: 14px 18px;
+    text-align: left;
+    border-bottom: 1px solid var(--glass-border);
+    font-size: 13px;
+  }
+
+  .summary-table th {
+    background: rgba(0, 0, 0, 0.25);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    font-weight: 700;
+  }
+
+  .summary-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .summary-table tr:hover td {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .summary-table .question {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .summary-table .destination {
+    color: var(--accent-orange);
+    font-weight: 600;
+  }
+
+  /* =========================================
+     PARAGRAPHS / TEXT
+     ========================================= */
+  p {
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  p strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  h3 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 14px;
+    margin-top: 24px;
+    letter-spacing: -0.01em;
+  }
+
+  h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    margin-top: 16px;
+  }
+
+  /* =========================================
+     PILL / BADGE
+     ========================================= */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--accent-orange-soft);
+    color: var(--accent-orange);
+    border: 1px solid rgba(237, 104, 8, 0.3);
+  }
+
+  .pill.green {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+    border-color: rgba(16, 185, 129, 0.3);
+  }
+
+  .pill.blue {
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+
+  .pill.gray {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    border-color: var(--glass-border);
+  }
+
+  /* =========================================
+     TOGGLE SHOWCASE (Pesos / Kilos)
+     ========================================= */
+  .toggle-showcase {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    padding: 4px;
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    margin: 8px 0;
+  }
+
+  .toggle-option {
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    border-radius: 7px;
+  }
+
+  .toggle-option.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--accent-orange);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  /* =========================================
+     FOOTER
+     ========================================= */
+  .footer {
+    margin-top: 64px;
+    padding-top: 32px;
+    border-top: 1px solid var(--glass-border);
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* =========================================
+     PRINT STYLES (for PDF export)
+     ========================================= */
+  @media print {
+    @page {
+      size: letter;
+      margin: 12mm 14mm;
+    }
+
+    html, body {
+      background: #1e1b4b !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      color-adjust: exact;
+    }
+
+    body::before { display: none; }
+
+    .doc {
+      max-width: none;
+      padding: 0;
+    }
+
+    .cover {
+      min-height: calc(100vh - 24mm);
+    }
+
+    section {
+      page-break-inside: avoid;
+      margin-bottom: 32px;
+    }
+
+    .glass-card,
+    .kpi-card,
+    .tab-item,
+    .anatomy-diagram,
+    .step,
+    .summary-table {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      background: rgba(255, 255, 255, 0.06) !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="doc">
+
+<!-- ====================================================
+     COVER PAGE
+     ==================================================== -->
+<section class="cover">
+  <div class="cover-logo">
+    <span class="cover-logo-text">S</span>
+  </div>
+  <div class="cover-eyebrow">Grupo Susazón · V3.0</div>
+  <h1>Dashboard Comercial</h1>
+  <p class="cover-subtitle">
+    Guía visual para entender tu nuevo dashboard.
+    Pantalla principal, KPIs, navegación y todos los tabs explicados.
+  </p>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <span class="cover-meta-label">Versión</span>
+      <span class="cover-meta-value">1.2.0</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="cover-meta-label">Fecha</span>
+      <span class="cover-meta-value">Abril 2026</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="cover-meta-label">URL</span>
+      <span class="cover-meta-value">dashboardcomercialsusazon.com</span>
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================
+     1. EN 30 SEGUNDOS
+     ==================================================== -->
+<section>
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <div>
+      <div class="section-title">En 30 segundos</div>
+      <div class="section-subtitle">Lo esencial antes de explorar</div>
+    </div>
+  </div>
+
+  <div class="glass-card featured">
+    <p>
+      <strong>El Dashboard Comercial</strong> te muestra en tiempo real cómo va la venta del mes
+      actual de Grupo Susazón (Susazón + Suve), comparada contra tu presupuesto y contra el
+      mismo mes del año anterior. Está diseñado para tomar decisiones rápidas: ¿estás avanzado
+      o rezagado?, ¿qué territorios necesitan atención?, ¿qué clientes se están perdiendo?
+    </p>
+    <p style="margin-bottom: 0;">
+      Verás solo los territorios que <strong>tu rol te permite ver</strong> — admin y director
+      ven todo, gerentes regionales solo sus zonas, vendedores solo el territorio asignado.
+    </p>
+  </div>
+
+  <h3 style="margin-top: 32px;">¿Qué información busco? → ¿Dónde la encuentro?</h3>
+
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th style="width: 60%;">Si necesitas saber...</th>
+        <th>Ve a</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="question">¿Cómo voy del mes actual contra mi PTTO?</td>
+        <td class="destination">Tab Tracking Diario</td>
+      </tr>
+      <tr>
+        <td class="question">¿Cómo evolucionó mi venta los últimos 12 meses?</td>
+        <td class="destination">Tab Ventas</td>
+      </tr>
+      <tr>
+        <td class="question">¿Qué grupos de producto venden más?</td>
+        <td class="destination">Tab Grupo Producto</td>
+      </tr>
+      <tr>
+        <td class="question">¿Qué SKU específico está creciendo o cayendo?</td>
+        <td class="destination">Tab Productos</td>
+      </tr>
+      <tr>
+        <td class="question">¿Quiénes son mis Top 10 clientes y cómo van?</td>
+        <td class="destination">Tab Clientes</td>
+      </tr>
+      <tr>
+        <td class="question">¿Quién está vendiendo más en mi equipo?</td>
+        <td class="destination">Tab Vendedores</td>
+      </tr>
+      <tr>
+        <td class="question">¿Qué clientes dejaron de comprar?</td>
+        <td class="destination">Tab Perdidos</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ====================================================
+     2. ACCESO Y LOGIN
+     ==================================================== -->
+<section>
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <div>
+      <div class="section-title">Cómo entrar</div>
+      <div class="section-subtitle">Tu primer acceso y login diario</div>
+    </div>
+  </div>
+
+  <ol class="steps">
+    <li class="step">
+      <div class="step-content">
+        <div class="step-title">Recibes un correo de invitación</div>
+        <div class="step-description">
+          El admin (Mauricio) te manda un correo desde
+          <span class="pill gray">noreply@dashboardcomercialsusazon.com</span>
+          con un botón "Configurar mi contraseña".
+        </div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-content">
+        <div class="step-title">Eliges tu contraseña</div>
+        <div class="step-description">
+          Click en el botón del correo → te abre una pantalla donde defines tu contraseña.
+          Mínimo 8 caracteres, al menos una letra y un número. Repítela y listo.
+        </div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-content">
+        <div class="step-title">Entras al dashboard</div>
+        <div class="step-description">
+          Te redirige automáticamente al dashboard con tu sesión activa.
+          De ahora en adelante entras desde
+          <span class="pill">www.dashboardcomercialsusazon.com</span>
+          con tu correo y contraseña.
+        </div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="annotation">
+    <span class="annotation-icon">🔐</span>
+    <div class="annotation-text">
+      <strong>¿Olvidaste tu contraseña?</strong> En la pantalla de login click en
+      "¿Olvidaste tu contraseña?" → recibes un correo con link para definir una nueva.
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================
+     3. ANATOMÍA DEL DASHBOARD
+     ==================================================== -->
+<section>
+  <div class="section-header">
+    <div class="section-number">3</div>
+    <div>
+      <div class="section-title">Anatomía del dashboard</div>
+      <div class="section-subtitle">Cada zona de la pantalla principal y para qué sirve</div>
+    </div>
+  </div>
+
+  <div class="anatomy-diagram">
+    <div class="anatomy-sidebar">
+      <span class="anatomy-sidebar-label">Territorios</span>
+      <div class="anatomy-sidebar-item active">Todos</div>
+      <div class="anatomy-sidebar-item">Cedis Bajío</div>
+      <div class="anatomy-sidebar-item">Cedis Cancún</div>
+      <div class="anatomy-sidebar-item">Cedis México</div>
+      <div class="anatomy-sidebar-item" style="opacity: 0.5;">+ 14 más</div>
+    </div>
+    <div class="anatomy-main">
+      <div class="anatomy-main-row">
+        <div class="anatomy-main-card">
+          <div class="anatomy-main-card-label">Venta Abr 26</div>
+          <div class="anatomy-main-card-value">$137.6M</div>
+        </div>
+        <div class="anatomy-main-card">
+          <div class="anatomy-main-card-label">Margen Abr 26</div>
+          <div class="anatomy-main-card-value">$19.0M · 13.8%</div>
+        </div>
+        <div class="anatomy-main-card">
+          <div class="anatomy-main-card-label">KG Abr 26</div>
+          <div class="anatomy-main-card-value">469K kg</div>
+        </div>
+      </div>
+      <div class="anatomy-tabs">
+        <span class="anatomy-tab active">Tracking Diario</span>
+        <span class="anatomy-tab">Ventas</span>
+        <span class="anatomy-tab">Grupo Producto</span>
+        <span class="anatomy-tab">Productos</span>
+        <span class="anatomy-tab">Clientes</span>
+        <span class="anatomy-tab">Vendedores</span>
+        <span class="anatomy-tab">Perdidos</span>
+      </div>
+      <div style="background: rgba(255,255,255,0.04); border: 1px dashed var(--glass-border); border-radius: 8px; padding: 14px; text-align: center; font-size: 11px; color: var(--text-muted); flex: 1;">
+        Contenido del tab seleccionado<br>
+        (8 stats + chart + tabla)
+      </div>
+    </div>
+  </div>
+
+  <h3>Las 4 zonas principales</h3>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-card-label">A · Header superior</div>
+      <div class="kpi-card-value" style="font-size: 18px;">Logo + Nav + Usuario</div>
+      <div class="kpi-card-detail">
+        Logo Susazón a la izquierda. Botones <span class="pill blue">Dashboard</span>
+        <span class="pill blue">Cargar Datos</span> <span class="pill blue">Admin</span>
+        en el centro (los 2 últimos solo para roles autorizados). A la derecha tu nombre,
+        botón de Tema y "Cerrar sesión".
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">B · Sidebar izquierdo</div>
+      <div class="kpi-card-value" style="font-size: 18px;">Lista de territorios</div>
+      <div class="kpi-card-detail">
+        Click en "Todos" para ver agregado o en un territorio específico para filtrar.
+        Cada territorio muestra su venta del mes y % margen.
+        <strong>Puedes colapsar el sidebar</strong> con el botón de la flecha.
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">C · KPI Cards arriba</div>
+      <div class="kpi-card-value" style="font-size: 18px;">3 cards principales + 3 acumulado</div>
+      <div class="kpi-card-detail">
+        Las 3 grandes (Venta · Margen · KG) muestran el mes actual con comparativo vs año anterior
+        y proyección Run-Rate. Las 3 chicas muestran el acumulado del año en curso vs los 2 años previos.
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">D · Tabs (7 secciones)</div>
+      <div class="kpi-card-value" style="font-size: 18px;">Análisis especializado</div>
+      <div class="kpi-card-detail">
+        7 perspectivas distintas del mismo dato: Tracking Diario, Ventas, Grupo Producto,
+        Productos, Clientes, Vendedores, Perdidos. El tab activo se subraya en naranja.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================
+     4. KPIs ARRIBA EXPLICADOS
+     ==================================================== -->
+<section>
+  <div class="section-header">
+    <div class="section-number">4</div>
+    <div>
+      <div class="section-title">KPIs principales explicados</div>
+      <div class="section-subtitle">Las 3 cards grandes arriba del dashboard</div>
+    </div>
+  </div>
+
+  <div class="glass-card">
+    <h3>Venta del Mes Actual</h3>
+    <p>
+      Total facturado del mes en curso (con la fecha de hoy en CDMX).
+      El comparativo <span class="pill green">+3.8% vs Abr 25</span> te dice
+      cómo vas contra el mismo mes del año anterior.
+    </p>
+    <h4>Run-Rate</h4>
+    <p style="margin-bottom: 8px;">
+      Proyección automática: <span class="formula" style="font-family: var(--font-mono); font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">venta_actual ÷ días_hábiles_transcurridos × días_hábiles_totales</span>.
+      Te dice cuánto vas a cerrar el mes si mantienes este ritmo de venta.
+      <em>"día hábil 25/26"</em> significa que llevas 25 días hábiles del mes
+      (Lunes a Sábado, descontando feriados oficiales LFT como 1 de mayo,
+      16 de septiembre, etc.). El Run-Rate <strong>no cuenta domingos ni feriados</strong>
+      porque en esos días el negocio no opera.
+    </p>
+    <h4>vs PTTO</h4>
+    <p style="margin-bottom: 0;">
+      Porcentaje de tu presupuesto que ya alcanzaste.
+      <span class="pill green">100%+</span> = meta alcanzada,
+      <span class="pill" style="background: rgba(234,179,8,0.15); color: #fde047; border-color: rgba(234,179,8,0.3);">70-99%</span> = alerta,
+      <span class="pill" style="background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">&lt;70%</span> = rezago.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h3>Margen del Mes Actual</h3>
+    <p>
+      Utilidad bruta del mes (venta - costo). Al lado del valor en pesos verás el
+      <span class="pill green">% margen</span> (margen ÷ venta).
+    </p>
+    <p style="margin-bottom: 0;">
+      El comparativo <span class="pill green">↘ -2.5% (-$0.5M) vs Abr 25</span>
+      muestra tanto el cambio porcentual como la diferencia absoluta en pesos contra
+      el mismo mes año anterior.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h3>KG del Mes Actual</h3>
+    <p>
+      Kilos totales facturados en el mes. Misma lógica que Venta y Margen pero en volumen.
+    </p>
+    <p style="margin-bottom: 0;">
+      El comparativo <span class="pill" style="background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">↘ -17.7% (-101K) vs Abr 25</span>
+      muestra el delta en porcentaje y en kilos absolutos. Útil para detectar si la venta crece
+      por precio o por volumen.
+    </p>
+  </div>
+
+  <h3 style="margin-top: 32px;">Cards de Acumulado (las 3 chicas a la derecha)</h3>
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-card-label">Acum 2024</div>
+      <div class="kpi-card-value">$1,393.3M</div>
+      <div class="kpi-card-detail">Cierre completo del año 2024 (referencia histórica).</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">Acum 2025</div>
+      <div class="kpi-card-value">$1,557.2M</div>
+      <div class="kpi-card-detail">Cierre completo del año 2025 (último año cerrado).</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">Acum 2026</div>
+      <div class="kpi-card-value">$492.6M</div>
+      <div class="kpi-card-detail">YTD 2026 — venta acumulada del 1 de enero a hoy.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================
+     5. LOS 7 TABS
+     ==================================================== -->
+<section>
+  <div class="section-header">
+    <div class="section-number">5</div>
+    <div>
+      <div class="section-title">Los 7 tabs del dashboard</div>
+      <div class="section-subtitle">Cada uno una perspectiva distinta del negocio</div>
+    </div>
+  </div>
+
+  <ul class="tabs-list">
+    <li class="tab-item">
+      <div class="tab-icon tab-tracking">📅</div>
+      <div class="tab-content">
+        <div class="tab-name">Tracking Diario · El más visto del día a día</div>
+        <div class="tab-summary">
+          Muestra día por día cómo vas contra tu PTTO del mes. Incluye 8 KPIs
+          (Venta, Alcance, Margen, vs Año Ant., Velocidades, Run Rate), una progress bar visual,
+          un chart de venta diaria + acumulado, y la tabla con todos los días del mes.
+        </div>
+        <div class="tab-detail">
+          <strong>Toggle Pesos / Kilos:</strong> arriba a la derecha. Cambia
+          <span class="toggle-showcase"><span class="toggle-option active">Pesos</span><span class="toggle-option">Kilos</span></span>
+          para ver el mismo análisis pero en kilos comparado vs el cierre de 2025.
+          Tu preferencia se guarda automáticamente.
+        </div>
+      </div>
+    </li>
+
+    <li class="tab-item">
+      <div class="tab-icon tab-ventas">📊</div>
+      <div class="tab-content">
+        <div class="tab-name">Ventas · Evolución mensual</div>
+        <div class="tab-summary">
+          Chart de barras con la venta mes a mes de los últimos 3 años (2024 gris, 2025 azul,
+          2026 verde). Línea de margen % superpuesta. Útil para detectar estacionalidades y
+          comparar trimestres entre años.
+        </div>
+        <div class="tab-detail">
+          <strong>Tip:</strong> pasa el cursor sobre cualquier mes para ver el tooltip con
+          venta total, % margen y delta vs el año anterior.
+        </div>
+      </div>
+    </li>
+
+    <li class="tab-item">
+      <div class="tab-icon tab-grupo">📦</div>
+      <div class="tab-content">
+        <div class="tab-name">Grupo Producto · Top 10 categorías</div>
+        <div class="tab-summary">
+          Gráfica de barras agrupadas con los 10 grupos de producto que más venden, comparando
+          año actual vs año anterior. Tabla scrollable con todos los grupos debajo.
+        </div>
+        <div class="tab-detail">
+          Si la API de Susazón aún no está enviando el campo "GrupoProducto" actualizado,
+          este tab muestra el campo "Familia" como fallback temporal.
+        </div>
+      </div>
+    </li>
+
+    <li class="tab-item">
+      <div class="tab-icon tab-productos">🥩</div>
+      <div class="tab-content">
+        <div class="tab-name">Productos · Análisis SKU por SKU</div>
+        <div class="tab-summary">
+          Chart de doble eje con los Top SKUs por venta del mes: barras en pesos (eje izquierdo)
+          y línea en kilos (eje derecho). Tabla detallada debajo con todos los SKUs activos.
+        </div>
+        <div class="tab-detail">
+          <strong>Útil para:</strong> identificar qué productos crecen, cuáles están cayendo,
+          y cuál es el mix entre alto valor (\$/kg) y alto volumen.
+        </div>
+      </div>
+    </li>
+
+    <li class="tab-item">
+      <div class="tab-icon tab-clientes">👥</div>
+      <div class="tab-content">
+        <div class="tab-name">Clientes · Concentración de cartera</div>
+        <div class="tab-summary">
+          Top 10 clientes por venta del mes (chart de barras agrupadas) + tabla scrollable con
+          todos los clientes. Te muestra dónde está concentrada tu cartera y quién creció o
+          decreció vs el año pasado.
+        </div>
+        <div class="tab-detail">
+          <strong>Tip estratégico:</strong> si tus Top 5 representan +60% de la venta, tienes
+          riesgo de concentración. Diversifica.
+        </div>
+      </div>
+    </li>
+
+    <li class="tab-item">
+      <div class="tab-icon tab-vendedores">🎯</div>
+      <div class="tab-content">
+        <div class="tab-name">Vendedores · Performance del equipo</div>
+        <div class="tab-summary">
+          Ranking de vendedores por venta del mes con comparativo año anterior.
+          Toggle <span class="pill blue">Sus + Suve</span> /
+          <span class="pill blue">Separados</span> para ver agregado o desglosado por empresa.
+        </div>
+        <div class="tab-detail">
+          <strong>Modo "Separados":</strong> Si un vendedor trabaja en ambas empresas, aparece como
+          dos filas (ej. "Juan Pérez (Sus)" y "Juan Pérez (Suve)"). En modo "Unidos" se suma todo.
+        </div>
+      </div>
+    </li>
+
+    <li class="tab-item">
+      <div class="tab-icon tab-perdidos">⚠️</div>
+      <div class="tab-content">
+        <div class="tab-name">Perdidos · Clientes en riesgo</div>
+        <div class="tab-summary">
+          Lista de clientes que <strong>compraron en 2025 pero no en 2026</strong> (perdidos),
+          o que <strong>compran menos del 50%</strong> (declive), o que son <strong>nuevos en
+          2026</strong>. Te ayuda a accionar antes de perder cuentas valiosas.
+        </div>
+        <div class="tab-detail">
+          <strong>Toggle Mes / YTD:</strong> alterna entre comparar el mes actual vs mismo mes año
+          ant., o el acumulado del año vs YTD del año anterior.
+        </div>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<!-- ====================================================
+     6. TRACKING DIARIO EN PROFUNDIDAD
+     ==================================================== -->
+<section>
+  <div class="section-header">
+    <div class="section-number">6</div>
+    <div>
+      <div class="section-title">Tracking Diario en profundidad</div>
+      <div class="section-subtitle">El tab que más usarás — explicado a detalle</div>
+    </div>
+  </div>
+
+  <p>
+    El Tracking Diario es el corazón del dashboard. Te muestra <strong>cómo vas día a día</strong>
+    contra tu PTTO mensual, con velocidad necesaria para alcanzarlo y proyección al cierre.
+  </p>
+
+  <h3>Las 8 stats arriba (vista Pesos)</h3>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-card-label">1 · Venta del Mes</div>
+      <div class="kpi-card-value">$5.8M</div>
+      <div class="kpi-card-detail">Total facturado al día de hoy. Sub: días hábiles transcurridos / total + días con factura.</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">2 · Alcance Ptto</div>
+      <div class="kpi-card-value">85.2%</div>
+      <div class="kpi-card-detail">% de tu PTTO que ya alcanzaste. Sub: cuánto te falta en pesos.</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">3 · Margen $</div>
+      <div class="kpi-card-value">$1.6M <span class="kpi-card-value-secondary">27.9%</span></div>
+      <div class="kpi-card-detail">Utilidad bruta + % margen al lado en gris.</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">4 · vs Mismo Mes Año Ant.</div>
+      <div class="kpi-card-value" style="color: #fca5a5;">-23.7%</div>
+      <div class="kpi-card-detail">Cómo vas contra el mismo mes del año anterior.</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">5 · Vel. Original</div>
+      <div class="kpi-card-value">$260K</div>
+      <div class="kpi-card-detail">Meta diaria desde día 1: <span class="formula" style="font-family: var(--font-mono); font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">PTTO ÷ días_hábiles_total</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">6 · Vel. Actual</div>
+      <div class="kpi-card-value" style="color: #fca5a5;">$221K</div>
+      <div class="kpi-card-detail">Tu ritmo real hoy: <span class="formula" style="font-family: var(--font-mono); font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">venta ÷ días_transcurridos</span>. Verde = ≥ meta, rojo = &lt; meta.</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">7 · Vel. Necesaria</div>
+      <div class="kpi-card-value" style="color: #6ee7b7;">$0</div>
+      <div class="kpi-card-detail">Cuánto debes vender por día restante para alcanzar PTTO.</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">8 · Run Rate</div>
+      <div class="kpi-card-value">$5.8M</div>
+      <div class="kpi-card-detail">Proyección al cierre: <span class="formula" style="font-family: var(--font-mono); font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">Vel. Actual × días_total</span>.</div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="annotation-icon">💡</span>
+    <div class="annotation-text">
+      <strong>Toggle Pesos / Kilos.</strong> Click el botón
+      <span class="toggle-showcase"><span class="toggle-option">Pesos</span><span class="toggle-option active">Kilos</span></span>
+      arriba a la derecha. La vista cambia completa: las 8 stats, el chart, la progress bar y la tabla
+      pasan a comparar contra el cierre 2025 en kilos. Útil para directores que piensan en volumen.
+    </div>
+  </div>
+
+  <h3>Progress Bar visual</h3>
+  <p>
+    Barra horizontal que muestra tu avance vs PTTO (vista pesos) o vs cierre 2025 (vista kilos).
+    Verde si vas avanzado, naranja si vas en línea con el tiempo, rojo si estás rezagado.
+    El marcador punteado indica el % de tiempo transcurrido del mes.
+  </p>
+  <p>
+    Debajo de la barra te dice claramente: <strong>"AVANZADO +X pp"</strong> o
+    <strong>"REZAGADO -X pp"</strong>, los días restantes, y la velocidad necesaria.
+  </p>
+
+  <h3>Chart diario</h3>
+  <p>
+    Gráfica combinada con barras de venta diaria + 3 líneas: <strong>acumulado actual</strong>
+    (azul sólido), <strong>PTTO Linear</strong> (violeta punteado, lo que deberías llevar),
+    <strong>año anterior</strong> (gris punteado). Pasa el cursor para ver el tooltip con todos
+    los valores del día.
+  </p>
+
+  <h3>Tabla diaria con TOTAL</h3>
+  <p style="margin-bottom: 0;">
+    Una fila por cada día del mes con venta, acumulado, % PTTO, velocidad necesaria, margen $ y %, y kilos.
+    Al final una fila <strong>TOTAL</strong> en negrita con el resumen del mes completo.
+  </p>
+</section>
+
+<!-- ====================================================
+     7. PERSONALIZACIÓN
+     ==================================================== -->
+<section>
+  <div class="section-header">
+    <div class="section-number">7</div>
+    <div>
+      <div class="section-title">Personalización</div>
+      <div class="section-subtitle">Ajusta el dashboard a tu gusto</div>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-card-label">🎨 Cambiar tema</div>
+      <div class="kpi-card-value" style="font-size: 18px;">6 temas disponibles</div>
+      <div class="kpi-card-detail">
+        Botón <span class="pill blue">Tema</span> arriba a la derecha. 6 estilos:
+        Clean, Editorial, Warm Neo, Susazón Moderno, Stock Market, Liquid Glass (este).
+        Tu elección se guarda.
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">↔️ Sidebar plegable</div>
+      <div class="kpi-card-value" style="font-size: 18px;">Más espacio para charts</div>
+      <div class="kpi-card-detail">
+        Botón con flecha en el header del sidebar. Click → se colapsa y libera espacio horizontal.
+        Click otra vez para reabrir.
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">⚖️ Pesos / Kilos</div>
+      <div class="kpi-card-value" style="font-size: 18px;">Solo en Tracking Diario</div>
+      <div class="kpi-card-detail">
+        Toggle arriba de las 8 stats. Cambia toda la vista a kilos comparado contra cierre 2025.
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">📅 Selector de mes</div>
+      <div class="kpi-card-value" style="font-size: 18px;">Ver meses pasados</div>
+      <div class="kpi-card-detail">
+        Dropdown <span class="pill">📅 Mayo 2026 ▼</span> al lado del título del territorio.
+        Click → lista de los últimos 24 meses. Selecciona un mes pasado para ver
+        ese período. Al volver al mes actual desaparece la etiqueta de "histórico".
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">💾 Tu preferencia se queda</div>
+      <div class="kpi-card-value" style="font-size: 18px;">Memoria automática</div>
+      <div class="kpi-card-detail">
+        El dashboard recuerda tus elecciones (tema, sidebar abierto/cerrado, vista pesos/kilos)
+        entre sesiones. No necesitas volver a configurar.
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <span class="annotation-icon">📅</span>
+    <div class="annotation-text">
+      <strong>Cuando estás viendo un mes histórico</strong>, aparece un banner amarillo
+      arriba del dashboard avisándote (con un botón "Volver al mes actual"). El selector
+      de mes muestra una etiqueta <span class="pill">Histórico</span> al lado del nombre
+      del mes para que no te confundas con datos en curso.
+    </div>
+  </div>
+
+  <div class="annotation" style="background: rgba(234, 179, 8, 0.12); border-color: rgba(234, 179, 8, 0.4);">
+    <span class="annotation-icon">⚠️</span>
+    <div class="annotation-text">
+      <strong style="color: #fde047;">Limitación importante:</strong> los presupuestos (PTTO)
+      están guardados solo para el año en curso. Si seleccionas un mes histórico antes del
+      año actual, los stats de "Alcance Ptto" y "vs Ptto" pueden aparecer en cero — es
+      esperado, no es bug.
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================
+     8. PREGUNTAS FRECUENTES
+     ==================================================== -->
+<section>
+  <div class="section-header">
+    <div class="section-number">8</div>
+    <div>
+      <div class="section-title">Preguntas frecuentes</div>
+      <div class="section-subtitle">Lo que casi todos preguntan</div>
+    </div>
+  </div>
+
+  <div class="glass-card">
+    <h4>¿Por qué no veo todos los territorios?</h4>
+    <p style="margin-bottom: 0;">
+      Tu rol determina qué territorios puedes ver. Si eres vendedor, solo ves el tuyo.
+      Si eres gerente regional, solo los asignados a tu zona. Si crees que falta uno,
+      contacta al admin (Mauricio).
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>¿Por qué un territorio aparece en gris con un ⚠️?</h4>
+    <p style="margin-bottom: 0;">
+      Significa que el admin lo apagó temporalmente (mantenimiento, datos incompletos, etc.).
+      Verás un banner amarillo arriba con el motivo. Cuando se reactive, vuelve a aparecer normal.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>Los datos no coinciden con mi reporte interno</h4>
+    <p style="margin-bottom: 0;">
+      El dashboard se actualiza solo cuando el admin/director ejecuta "Cargar Datos" desde la
+      sección dedicada. Si los datos están desactualizados, pídele al director que refresque.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>¿Cómo se calculan los días hábiles?</h4>
+    <p style="margin-bottom: 0;">
+      Lunes a Sábado, excluyendo domingos y feriados oficiales LFT (Año Nuevo, Constitución,
+      Natalicio, 1 de mayo, 16 de septiembre, Revolución, 25 de diciembre y los lunes de cierre).
+      Por eso "26 días hábiles" en abril 2026 no son los 30 días calendario.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>Mi sesión expiró o estoy bloqueado</h4>
+    <p style="margin-bottom: 0;">
+      Las sesiones duran varias horas. Si cierras la pestaña, te pedirá login al volver.
+      Después de 5 intentos fallidos hay un bloqueo automático de 15 minutos por seguridad.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>¿Cómo cambio mi contraseña?</h4>
+    <p style="margin-bottom: 0;">
+      En la pantalla de login click "¿Olvidaste tu contraseña?" → recibes correo con link
+      para definir una nueva. También el admin puede mandarte un reset desde su panel.
+    </p>
+  </div>
+</section>
+
+<!-- ====================================================
+     FOOTER
+     ==================================================== -->
+<div class="footer">
+  <p style="margin: 0;">
+    Dashboard Comercial Susazón · Versión 1.2.0 · Abril 2026<br>
+    Plataforma de uso restringido — solo para personal autorizado de Grupo Susazón.<br>
+    Toda actividad queda registrada en el audit log.
+  </p>
+</div>
+
+</div>
+</body>
+</html>

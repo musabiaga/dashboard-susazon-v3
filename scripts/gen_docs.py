@@ -29,11 +29,11 @@ from docx.oxml import OxmlElement
 # ============================================================
 # Constantes del proyecto
 # ============================================================
-PROYECTO = "Dashboard Comercial Susazón V3.0"
+PROYECTO = "Dashboard Comercial Susazón V3.0 — InCom"
 EMPRESA = "Grupo Susazón (Susazón + Suve)"
 OWNER = "Mauricio Usabiaga, Director de Operaciones"
-VERSION = "1.3.0"
-FECHA = date.today().strftime("%Y-%m-%d")
+VERSION = "3.3.0"
+FECHA = "2026-05-10"
 REPO = "github.com/musabiaga/dashboard-susazon-v3"
 URL_PROD = "www.dashboardcomercialsusazon.com"
 URL_FALLBACK = "dashboard-susazon-v3-44sp.vercel.app"

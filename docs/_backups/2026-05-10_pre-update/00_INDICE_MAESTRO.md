@@ -1,11 +1,11 @@
 # Índice Maestro — Dashboard Comercial Susazón V3.0
 
-**Proyecto:** Dashboard Comercial Susazón V3.0 — **InCom** (Inteligencia Comercial Susazón®)
+**Proyecto:** Dashboard Comercial Susazón V3.0
 **Empresa:** Grupo Susazón (Susazón + Suve)
 **Owner:** Mauricio Usabiaga (Director de Operaciones)
-**Estado:** En producción (versión 3.3.0)
+**Estado:** En producción (versión 1.3.0)
 **URL canonical:** `https://www.dashboardcomercialsusazon.com`
-**Última actualización:** 2026-05-10
+**Última actualización:** 2026-05-01
 
 ---
 
@@ -13,38 +13,18 @@
 
 | # | Archivo | Tipo | Propósito | Versión | Última actualización |
 |---|---------|------|-----------|---------|---------------------|
-| 1 | `01_Arquitectura_Tecnica.docx` | Word | Diseño del sistema, stack tecnológico, flujo de información, decisiones arquitectónicas | 2.0 | 2026-05-10 |
-| 2 | `02_Diccionario_Datos.docx` | Word | Schemas de DB, contratos de APIs, estructura de objetos internos, mapeo de columnas + helpers `lib/aggregate.ts` | 2.0 | 2026-05-10 |
-| 3 | `03_ChangeLog_Release_Notes.docx` | Word | Evolución V2.2 → V3.3 (incluye Mejoras 1-7 + Branding InCom + Login rediseño) | 2.0 | 2026-05-10 |
-| 4 | `04_Manual_Usuario.docx` | Word | Manual para usuarios finales — incluye multi-select global, export Excel, expand clientes/día | 2.0 | 2026-05-10 |
-| 5 | `05_Guia_TI_Despliegue.docx` | Word | Guía para ingeniero de TI: despliegue, env vars, troubleshooting, monitoreo | 2.0 | 2026-05-10 |
-| 6 | `06_Guia_Reconstruccion.docx` | Word | Reconstrucción desde cero: paso a paso, algoritmos, dependencias, verificación | 2.0 | 2026-05-10 |
-| 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude que continúen el proyecto | 2.0 | 2026-05-10 |
-| 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones D001-D017, bugs 1-27, backlog, contexto histórico | 2.0 | 2026-05-10 |
-| 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | 2.0 | 2026-05-10 |
-| 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | **Contexto compacto para retomar el proyecto en otra sesión Claude** | 1.0 | 2026-04-30 |
-| 11 | `Instructivo_Usuario_Visual.pdf` | PDF | Instructivo visual para usuarios finales | 1.0 | 2026-04-30 |
-| 12 | `AUTH_FLOWS.md` | Markdown | **Documentación técnica del sistema de auth.** Diagramas de los 3 flows | 1.0 | 2026-05-01 |
-| 13 | `_backups/2026-05-10_pre-update/` | Snapshot | Snapshot inmutable de los 13 docs antes de actualizar con esta sesión | — | 2026-05-10 |
-
-## Documentos NO en el repo (privados)
-
-| Archivo | Ubicación | Contenido |
-|---------|-----------|-----------|
-| `SECRETS_DASHBOARD_V3.txt` | `~/Downloads/` (luego mover a Apple Notes) | TODOS los tokens, API keys, credenciales, UIDs |
-| `Apple Notes: DASHBOARD COMERCIAL SUSAZÓN V3.0` | Apple Notes bloqueado | Credenciales 14 usuarios + Supabase + Vercel + GitHub PAT + recovery codes |
-
-## Respaldo Profesional Plan Z (V2.0)
-
-Existe un respaldo profesional con estructura V2.0 (kebab-case + scaffold completo + 5 sesiones JSONL) en:
-
-```
-~/Downloads/DASHBOARD SEMANAL VENTAS V3.0 [Claude Code] [Respaldo Profesional Plan Z]/
-```
-
-Contiene: `README.md`, `CHANGELOG.md` (source of truth), `.gitignore`, `.env.example`,
-`package.json`, los 11 docs en kebab-case dentro de `/docs/`, y las 5 sesiones de
-trabajo (~65 MB) dentro de `/sessions/`.
+| 1 | `01_Arquitectura_Tecnica.docx` | Word | Diseño del sistema, stack tecnológico, flujo de información, decisiones arquitectónicas | 1.3 | 2026-05-01 |
+| 2 | `02_Diccionario_Datos.docx` | Word | Schemas de DB, contratos de APIs, estructura de objetos internos, mapeo de columnas | 1.3 | 2026-05-01 |
+| 3 | `03_ChangeLog_Release_Notes.docx` | Word | Evolución V2.2 → V3.0, historial de commits, fixes y features por versión | 1.3 | 2026-05-01 |
+| 4 | `04_Manual_Usuario.docx` | Word | Manual no-técnico para los 15 usuarios finales (admin, director, gerente, vendedor) | 1.3 | 2026-05-01 |
+| 5 | `05_Guia_TI_Despliegue.docx` | Word | Guía para ingeniero de TI: despliegue, env vars, troubleshooting, monitoreo | 1.3 | 2026-05-01 |
+| 6 | `06_Guia_Reconstruccion.docx` | Word | Reconstrucción desde cero: paso a paso, algoritmos, dependencias, verificación | 1.3 | 2026-05-01 |
+| 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude que continúen el proyecto | 1.3 | 2026-05-01 |
+| 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones, bugs, backlog, contexto histórico | 1.3 | 2026-05-01 |
+| 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | 1.3 | 2026-05-01 |
+| 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | **Contexto compacto para retomar el proyecto en otra sesión Claude** sin tener que releer todos los docs | 1.0 | 2026-04-30 |
+| 11 | `Instructivo_Usuario_Visual.pdf` | PDF | Instructivo visual estilo Liquid Glass para usuarios finales — explica pantalla principal y cada KPI | 1.0 | 2026-04-30 |
+| 12 | `AUTH_FLOWS.md` | Markdown | **Documentación técnica del sistema de auth.** Diagramas de los 3 flows (login, invite, recovery), config Resend SMTP, backup de los 4 templates HTML, troubleshooting checklist, plan de migración SMTP | 1.0 | 2026-05-01 |
 
 ## Documentos NO en el repo (privados)
 

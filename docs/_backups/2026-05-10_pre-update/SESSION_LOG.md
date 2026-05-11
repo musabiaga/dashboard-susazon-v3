@@ -8,13 +8,11 @@
 - **Cierre fase 1:** 2026-04-28 (deploy a producción)
 - **Cierre fase 2:** 2026-04-30 (custom domain + UI polish + feature toggle Pesos/KG)
 - **Cierre fase 3:** 2026-05-01 (Run-Rate hábiles + selector de mes histórico)
-- **Cierre fase 4:** 2026-05-09 (Mejoras 1-5: lazy clientes, día-vs-día, multi-select Productos/Clientes, KG en tablas)
-- **Cierre fase 5:** 2026-05-10 (Mejora 6: export Excel + Mejora 7: multi-select global + Branding InCom + Login rediseño)
-- **Versión actual:** 3.3.0 (en producción)
+- **Versión actual:** 1.3.0 (en producción)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
 - **URL prod canonical:** `https://www.dashboardcomercialsusazon.com`
-- **URL prod fallback:** `https://dashboard-susazon-v3.vercel.app`
-- **Última actualización:** 2026-05-10
+- **URL prod fallback:** `https://dashboard-susazon-v3-44sp.vercel.app`
+- **Última actualización:** 2026-05-01
 
 ---
 
@@ -177,65 +175,6 @@ Implementación:
 **Razón:** Necesidad real del director: revisar cierre de meses pasados para juntas, revisiones operativas, comparativos retrospectivos. El gap era evidente.
 **Estado:** Vigente. Commit `a3a825f`. Manual y PDF actualizados.
 
-### D013 — 2026-05-10 | Mejora 1: lazy endpoint clientes/día Tracking Diario
-
-**Contexto:** El tab Tracking Diario solo mostraba totales por día. Para investigar qué clientes contribuyeron a una venta diaria específica, Mauricio tenía que abrir Supabase y query manual.
-
-**Decisión:** Hacer cada fila de la tabla diaria expandible (ChevronRight) con un endpoint lazy que carga los clientes del día específico on-demand. Cache en memoria del componente; HTTP cache `private, max-age=60s`. Botón solo en flecha — el resto de la fila sigue cliqueable normal.
-
-**Razón:** Pre-cargar todos los días + todos los clientes sería miles de filas innecesarias en payload. Lazy on-demand es 100x más liviano y la UX es buena (clientes aparecen en <500ms).
-
-**Estado:** Vigente. Commit `744af0c`.
-
-### D014 — 2026-05-10 | Mejora 2: día-vs-día YoY con precisión 100%
-
-**Contexto:** Los charts comparaban mes-cierre 2025 vs mes-en-curso 2026 → sesgo enorme. "Declive del 50%" porque comparaba 30 días vs 5 días.
-
-**Decisión:** Crear 4 vistas SQL diarias en migración 011 (`kpi_grupo_diario`, `kpi_sku_diario`, `kpi_cliente_diario`, `kpi_vendedor_diario`). Pasar acumulado al "mismo día laboral" del 2025 (al-día) además del cierre completo. Helper `findCalendarDayForBizDays(year, month, targetN)` mapea día hábil N entre años considerando feriados LFT distintos.
-
-**Razón:** Precisión 100% en comparativos = decisiones correctas. Antes el dashboard mentía sistemáticamente sobre el desempeño.
-
-**Estado:** Vigente. Commits `efeab07`, `072d872`, varios.
-
-### D015 — 2026-05-10 | Mejora 6: export Excel con exceljs (no xlsx)
-
-**Contexto:** Necesidad recurrente de bajar la data a Excel para tablas dinámicas / compartir con vendedores. Mauricio enfatizó "data accionable".
-
-**Decisión:** Usar `exceljs` (no `xlsx` por CVE-2023-30533 + CVE-2024-22363). Helper `lib/export-excel.ts` genérico con bloque resumen + columnas + filas + total + freeze panes + zebra + numFmt nativo (proporciones reales 0.0% para pivot, NO strings con "%"). Lazy import al click del botón (~700KB no se carga en initial render). Botón en cada tab arriba a la derecha. WYSIWYG: respeta multi-select / status / filtros / dim activos.
-
-**Razón:** Pivot-ready desde Excel + bajo footprint en bundle inicial + seguridad sin compromisos.
-
-**Estado:** Vigente. Commits `49c23a6` (Perdidos) + `c207655` (los otros 6 tabs).
-
-### D016 — 2026-05-10 | Mejora 7: "Todos" configurable con engrane
-
-**Contexto:** Necesidad de comparar subsets arbitrarios de territorios (ej. "costa norte" = Mérida + Cancún + CDMX). Primer intento fue multi-select global en sidebar (cada territorio con checkbox) pero Mauricio lo rechazó: rompía la UX existente de "click = ese territorio".
-
-**Decisión final:** Lista inferior del sidebar sigue siendo **uni-select** (click selecciona ese territorio único, como siempre). El item "Todos" arriba tiene ícono ⚙️ (Settings2) que abre dropdown con checkboxes para configurar QUÉ territorios incluye ese "Todos". Solo afecta cuando estás en modo "Todos"; no toca al estar en un territorio individual.
-
-**Razón:** Preserva UX vieja para clicks rápidos + agrega flexibilidad sin acoplar. 4 modos en `DashboardClient`: `single` / `aggregated-all` / `aggregated-custom` / `aggregated-none`. Helper `lib/aggregate.ts` con `aggregateKpis`, `aggregateDimensionRows`, `aggregatePerdidoRows` agrega dinámicamente en cliente cuando hay subset custom.
-
-**Adicional:** Se eliminó el `TerritoryFilter` local de `PerdidosTab` (~150 líneas borradas) — una sola fuente de verdad ahora vive en el sidebar.
-
-**Estado:** Vigente. Commits `f14c349` (intento 1 rechazado), `2d6e2a0` (rework definitivo), `e4b5887` (frost popover liquid-glass fix).
-
-### D017 — 2026-05-10 | Branding InCom (Inteligencia Comercial)
-
-**Contexto:** El producto necesitaba identidad propia separada del cliente (Susazón). Mauricio compartió un escudo "InCom" (red de nodos + manos sosteniendo + gorrito chef + texto bordado).
-
-**Decisión:**
-- Generar favicon (`app/icon.png` 48×48), apple-icon (`app/apple-icon.png` 180×180 con fondo oscuro #1a1814), Open Graph image (`app/opengraph-image.png` 1200×630 con escudo flotando sobre gradient naranja Susazón).
-- Eliminar el `favicon.ico` default de Next.js.
-- Procesamiento Pillow: combinar 2 PNGs embebidos del SVG (máscara grayscale + escudo RGB) para alpha exacto (vs. floodfill que dejaba artifacts).
-- Login rediseñado completo con split-screen: hero izquierdo con escudo InCom 440-520px + subtítulo "INTELIGENCIA COMERCIAL SUSAZÓN®" sobre aurora animado. Card derecho con form + logo Susazón Gourmet 6× (auto-switch marrón/blanco por theme).
-- Intro animation 1.2s con scale + slide.
-- `SusazonLogo` ahora tiene prop `surface="header"|"page"` con `PAGE_DARK_THEMES = {supabase-orange, stock-market, liquid-glass}` para decidir variante correcta.
-- `metadataBase` + `openGraph` + `twitter` cards en `app/layout.tsx`.
-
-**Razón:** Producto profesional necesita identidad. Branding diferenciado del cliente. Login premium estilo Stripe/Linear/Vercel.
-
-**Estado:** Vigente. Commits `977ddc3` (thumbnails), `b457a53` (login redesign), `0f5572e` (logo limpio), `789bcc8` (logo Susazón), `48c0c4a` (logo 6× + fix themes oscuros).
-
 ---
 
 ## Bugs Resueltos
@@ -262,13 +201,6 @@ Implementación:
 | 18 | 2026-04-29 | Email "rate limit exceeded" pese a Supabase Pro | El servicio email default tiene rate limit (3-4/hora) en TODOS los planes Supabase. Pro no lo quita. | Configurar SMTP custom de Resend en Supabase Dashboard → Auth → SMTP Settings. Free tier de Resend: 3,000 emails/mes. | (config Supabase) |
 | 19 | 2026-04-30 | "✓ Ya superaste" salía cuando NO se había superado 2025 (mes cerrado) | Lógica `faltaIgualarKg = days > 0 ? gap/days : 0` caía en `0` cuando no quedaban días, y se interpretaba como "ya superaste". | Reformular a 3 estados claros: ySuperaste, mesCerradoSinSuperar, en marcha. Aplicado en stat #7 y progress bar. | `96a0f79` |
 | 20 | 2026-05-01 | Run-Rate del header inconsistente con Run-Rate del Tracking Diario (calendario vs hábiles) | El KPI card grande del header usaba `factor = daysTotal/daysCurrent` (días calendario), mientras Tracking Diario ya usaba hábiles. | Unificar a días hábiles en `DashboardClient.tsx`: `factor = totalBizDays/elapsedBizDays`. Texto de la card cambia de "día X/Y" a "día hábil X/Y". | `41355ee` |
-| 21 | 2026-05-10 | Perdidos: TODOS los clientes salían como "declive" | Comparaba mes-cierre 2025 vs mes-en-curso 2026 (parcial) → diferencia ~50% siempre. | Migración 011 vistas diarias + helper `findCalendarDayForBizDays()` + lógica al-día consistente. Status calculado con `baseRef`/`baseCur` en métrica activa. | `efeab07` |
-| 22 | 2026-05-10 | `CREATE OR REPLACE VIEW` no permite reordenar columnas | Intenté agregar `mes_margen` + `ytd_margen` en medio de columnas existentes en `kpi_cliente_perdidos`. | Agregar nuevos campos al FINAL de la vista (única forma permitida por Postgres). Migración 012. | (migration 012) |
-| 23 | 2026-05-10 | Vendedores multi-select preservaba selección inválida al cambiar Sus/Suve | Toggle cambia nombres de vendedores (con/sin sufijo), pero `selectedItems` quedaba con nombres viejos. | `key={...}` dinámico en `<DimensionTab>` fuerza remount + limpieza explícita de `localStorage` (`VENDEDORES_SELECTION_KEY`). | (Mejora 5+) |
-| 24 | 2026-05-10 | Dropdown del ⚙️ "Configurar Todos" se transparentaba en Liquid Glass | `--bg-surface` en liquid-glass es solo 6% blanco; el background del dropdown no tapaba la lista de territorios detrás. | Clase `.frost-popover` con `background: rgba(20,18,38,0.88)` + `backdrop-filter: blur(40px) saturate(1.8)`. Override scopeado a `[data-theme="liquid-glass"]`. | `e4b5887` |
-| 25 | 2026-05-10 | Logo Susazón se veía marrón ilegible en theme "Susazón Moderno" (supabase-orange) | `PAGE_DARK_THEMES` solo incluía `liquid-glass`. Los themes `supabase-orange` y `stock-market` también tienen `--bg-page` oscuro (#0a0a0a, #0a1124). | Agregar ambos themes a `PAGE_DARK_THEMES` en `components/brand/SusazonLogo.tsx`. | `48c0c4a` |
-| 26 | 2026-05-10 | `<>...</>` fragment sin key causaba warning en TrackingDiarioTab | React requiere key en cada item de map; el fragment no la tomaba. | Cambiar a `<Fragment key={row.d}>...</Fragment>` explícito. | `744af0c` |
-| 27 | 2026-05-10 | Tab Tracking Diario perdía 1 columna por row TOTAL al agregar expand button | Nueva columna del botón ChevronRight no fue agregada al row TOTAL. | Agregar `<Td>{" "}</Td>` empty como primera celda del TOTAL para alinear. | `744af0c` |
 | 21 | 2026-05-01 | No había forma de ver datos de meses pasados desde el dashboard | El dashboard estaba hardcodeado al mes actual CDMX en `app/dashboard/page.tsx`. Sin selector de mes/año en UI. | Componente `MonthSelector` con dropdown 24 meses + searchParams `year`/`month` en `/dashboard` + banner amarillo cuando `isHistorical`. | `a3a825f` |
 
 ---
@@ -298,28 +230,6 @@ Implementación:
 - [x] **Run-Rate unificado a días hábiles** — eliminar inconsistencia calendario vs hábil entre header y Tracking Diario (D017).
 - [x] **Selector de mes/año en dashboard** — dropdown 24 meses con banner histórico (D018).
 - [x] **Manual de usuario actualizado** con corrección de Run-Rate y nueva sección sobre selector de mes (PDF regenerado).
-
-### Completados en fase 4 (2026-05-09)
-
-- [x] **Mejora 1**: Lazy endpoint clientes/día Tracking Diario (D013).
-- [x] **Mejora 2**: Día-vs-día YoY con precisión 100% (D014) — 4 vistas SQL + helper `findCalendarDayForBizDays`.
-- [x] **Mejora 3**: Multi-select Productos con persistencia + lock 15.
-- [x] **Mejora 4**: Multi-select Clientes con `<MultiSelectChips>` reusable.
-- [x] **Mejora 5**: Columnas KG en tablas inferiores (Grupo, Clientes, Vendedores).
-- [x] **Buscador amplio en Perdidos** + chips de status + dona + LossCards laterales.
-- [x] **Año 2024 informativo** como columna en Perdidos.
-
-### Completados en fase 5 (2026-05-10)
-
-- [x] **Mejora 6 (Chunk A)**: Export Excel en tab Perdidos (D015) — helper `lib/export-excel.ts` + `<ExportExcelButton>`.
-- [x] **Mejora 6 (Chunk B)**: Export Excel en los 6 tabs restantes (Tracking, Ventas, Grupo, Productos, Clientes, Vendedores).
-- [x] **Mejora 7**: Multi-select global con "Todos" configurable + engrane ⚙️ (D016) — `lib/aggregate.ts` con 4 modos de selección.
-- [x] **Branding InCom** (D017): favicon + apple-icon + OG image + Twitter card + `metadataBase` + `openGraph` metadata.
-- [x] **Login rediseño** split-screen: hero izquierdo con escudo InCom 520px + subtítulo "INTELIGENCIA COMERCIAL SUSAZÓN®" sobre aurora animado. Card derecho con logo Susazón Gourmet 6× (auto-switch marrón/blanco por theme).
-- [x] **Intro animation** 1.2s con `prefers-reduced-motion` respetado.
-- [x] **Fix Liquid Glass**: `.frost-popover` con background opaco + blur 40px para dropdowns en theme oscuro.
-- [x] **`SusazonLogo` extendido** con prop `surface="header"|"page"` para auto-detectar variante correcta según contexto.
-- [x] **Apple Notes** template completo de credenciales generado (Supabase + Susazón API + Vercel + GitHub + 14 usuarios + recovery codes).
 
 ### Mejoras opcionales (sin prisa)
 
