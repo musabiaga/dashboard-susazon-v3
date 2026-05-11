@@ -76,6 +76,9 @@ interface DashboardClientProps {
   todayMonth: number;
   /** Permiso para descargar Excel desde los tabs (de users_permissions.can_export_excel). */
   canExportExcel: boolean;
+  /** Fecha ISO "hoy - 90 días" (CDMX). Cliente "Nuevo" en Perdidos si su
+   *  first_purchase_date >= este cutoff. */
+  newCustomerCutoffDate: string;
 }
 
 /**
@@ -112,6 +115,7 @@ export function DashboardClient({
   todayYear,
   todayMonth,
   canExportExcel,
+  newCustomerCutoffDate,
 }: DashboardClientProps) {
   // Selección uni-select del sidebar: "" = modo "Todos", o nombre = single.
   // No persiste — cada sesión arranca en "Todos" para mantener UX previa.
@@ -580,6 +584,7 @@ export function DashboardClient({
                     prevMonthShortYY={prevMonthShortYY}
                     currentTerritory={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
+                    newCustomerCutoffDate={newCustomerCutoffDate}
                   />
                 );
               }

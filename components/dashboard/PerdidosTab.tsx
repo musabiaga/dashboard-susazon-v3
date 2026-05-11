@@ -7,6 +7,8 @@ import {
   AlertTriangle,
   Search,
   X,
+  RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { formatMoney, formatKilos } from "@/lib/format";
@@ -16,7 +18,12 @@ import type {
   ExcelSummaryRow,
 } from "@/lib/export-excel";
 
-export type PerdidoStatus = "perdido" | "declive" | "nuevo" | "estable";
+export type PerdidoStatus =
+  | "perdido"
+  | "declive"
+  | "nuevo"
+  | "recuperado"
+  | "estable";
 export type PerdidoDim = "mes" | "ytd";
 export type PerdidoMetric = "pesos" | "kilos";
 
@@ -55,9 +62,22 @@ const STATUS_CONFIG: Record<
     bgInactive: "var(--bg-surface-muted)",
     emoji: "🔵",
   },
+  recuperado: {
+    label: "Recuperado",
+    bg: "rgba(139, 92, 246, 0.15)",
+    color: "#8b5cf6", // violeta
+    bgInactive: "var(--bg-surface-muted)",
+    emoji: "🟣",
+  },
 };
 
-const DEFAULT_STATUS_FILTER: PerdidoStatus[] = ["perdido", "declive"];
+// Default chips activos: focus en accionables (Perdido + Declive + Recuperado).
+// Nuevo y Estable se pueden activar manualmente si interesa.
+const DEFAULT_STATUS_FILTER: PerdidoStatus[] = [
+  "perdido",
+  "declive",
+  "recuperado",
+];
 
 export interface PerdidoRow {
   no_cliente: string;
@@ -97,6 +117,10 @@ export interface PerdidoRow {
   mes_venta_alDia_2026?: number;
   mes_kg_alDia_2026?: number;
   mes_margen_alDia_2026?: number;
+  /** Fecha ISO YYYY-MM-DD de la primera compra histórica del cliente
+   *  (across todas las empresas y territorios). Si null, el cliente
+   *  no aparece en kpi_cliente_lifecycle (raro). */
+  first_purchase_date?: string | null;
 }
 
 interface Props {
@@ -110,6 +134,9 @@ interface Props {
   currentTerritory?: string;
   /** Permiso para descargar Excel (default false). */
   canExportExcel?: boolean;
+  /** Fecha ISO "hoy - 90 días" (CDMX). Cliente es "Nuevo" si su
+   *  first_purchase_date >= esta fecha. */
+  newCustomerCutoffDate?: string;
 }
 
 interface Computed {
@@ -128,24 +155,53 @@ interface Computed {
   declinePct: number;
 }
 
-function computeStatus(v25: number, v26: number): {
+function computeStatus(
+  v25: number,
+  v26: number,
+  opts: {
+    /** Primera fecha de compra del cliente (cualquier territorio/empresa) */
+    firstPurchaseDate?: string | null;
+    /** Cutoff ISO YYYY-MM-DD: clientes con first_purchase_date >= cutoff
+     *  son considerados "Nuevo" (90 días desde hoy CDMX). */
+    cutoffDate?: string;
+  }
+): {
   status: PerdidoStatus | null;
   declinePct: number;
 } {
-  // Perdido: tenía venta en 2025 pero CERO en 2026
+  // === REGLA 1 (precedencia): cliente con primera compra ≤ 90 días → NUEVO ===
+  // Cubre el caso "compró por primera vez con nosotros recientemente",
+  // independiente de su comportamiento v25/v26.
+  const isReallyNew = !!(
+    opts.firstPurchaseDate &&
+    opts.cutoffDate &&
+    opts.firstPurchaseDate >= opts.cutoffDate
+  );
+  if (isReallyNew) {
+    return { status: "nuevo", declinePct: 0 };
+  }
+
+  // === REGLA 2: Perdido — tenía venta en 2025 pero CERO en 2026 ===
   if (v25 > 0 && v26 === 0) return { status: "perdido", declinePct: 100 };
-  // Declive: tenía venta en 2025 y BAJO en 2026 (sin llegar a cero)
+
+  // === REGLA 3: Declive — tenía venta en 2025 y BAJÓ en 2026 ===
   if (v25 > 0 && v26 < v25) {
     return { status: "declive", declinePct: ((v25 - v26) / v25) * 100 };
   }
-  // Nuevo: NO tenía venta en 2025 pero AHORA sí en 2026
-  if (v25 === 0 && v26 > 0) {
-    return { status: "nuevo", declinePct: 0 };
+
+  // === REGLA 4: Recuperado — cliente con historial (NO nuevo) que
+  //     no tenía venta en 2025 al-día pero AHORA sí en 2026.
+  //     Antes esto se etiquetaba "Nuevo"; ahora reconocemos que es
+  //     un recovery (cliente que regresa, más valioso). ===
+  if (v25 === 0 && v26 > 0 && !isReallyNew) {
+    return { status: "recuperado", declinePct: 0 };
   }
-  // Estable o creciendo: v26 >= v25 (cubre v25 == v26 o creció)
+
+  // === REGLA 5: Estable o creciendo — v26 >= v25 ===
   if (v26 >= v25 && (v25 > 0 || v26 > 0)) {
     return { status: "estable", declinePct: 0 };
   }
+
   // Sin venta en ambos años → no incluir
   return { status: null, declinePct: 0 };
 }
@@ -167,6 +223,7 @@ export function PerdidosTab({
   topNTable = 100,
   currentTerritory = "",
   canExportExcel = false,
+  newCustomerCutoffDate,
 }: Props) {
   // Mejora 7: multi-select de territorios ahora vive en el sidebar global.
   // Aquí solo recibimos los rows ya agregados (DashboardClient hace la
@@ -212,7 +269,9 @@ export function PerdidosTab({
         const parsed = JSON.parse(saved) as unknown;
         if (Array.isArray(parsed)) {
           const valid = parsed.filter((s): s is PerdidoStatus =>
-            ["perdido", "declive", "estable", "nuevo"].includes(s as string)
+            ["perdido", "declive", "estable", "nuevo", "recuperado"].includes(
+              s as string
+            )
           );
           setActiveStatuses(new Set(valid));
         }
@@ -297,7 +356,10 @@ export function PerdidosTab({
       // Status calculado en la métrica activa (pesos o kilos)
       const baseRef = metric === "pesos" ? v25 : k25;
       const baseCur = metric === "pesos" ? v26 : k26;
-      const { status, declinePct } = computeStatus(baseRef, baseCur);
+      const { status, declinePct } = computeStatus(baseRef, baseCur, {
+        firstPurchaseDate: r.first_purchase_date,
+        cutoffDate: newCustomerCutoffDate,
+      });
       if (!status) continue;
       out.push({
         no_cliente: r.no_cliente,
@@ -351,18 +413,29 @@ export function PerdidosTab({
   // Se calcula sobre `computed` SIN filtro de búsqueda — orientativo.
   const countByStatus = useMemo(() => {
     const c: Record<PerdidoStatus, number> = {
-      perdido: 0, declive: 0, estable: 0, nuevo: 0,
+      perdido: 0, declive: 0, estable: 0, nuevo: 0, recuperado: 0,
     };
     for (const r of computed) c[r.status]++;
     return c;
   }, [computed]);
 
-  // Stats SIEMPRE basadas en perdidos+declive (no se afectan por el buscador).
+  // Stats SIEMPRE basadas en perdidos+declive+recuperados (accionables).
+  // No se afectan por el buscador.
   const stats = useMemo(() => {
     const perdidos = computed.filter((r) => r.status === "perdido").length;
     const declives = computed.filter((r) => r.status === "declive");
     const declive30 = declives.filter((r) => r.declinePct > 30).length;
-    return { perdidos, declive30, totalDeclive: declives.length };
+    const recuperados = computed.filter(
+      (r) => r.status === "recuperado"
+    ).length;
+    const nuevos = computed.filter((r) => r.status === "nuevo").length;
+    return {
+      perdidos,
+      declive30,
+      totalDeclive: declives.length,
+      recuperados,
+      nuevos,
+    };
   }, [computed]);
 
   // ============ Datos para la Dona + Loss Cards ============
@@ -373,8 +446,9 @@ export function PerdidosTab({
   //   que dejaron de vender)
   // - pctVenta = pérdida / total venta 2025 al-día (todos los clientes)
   const donutData = useMemo(() => {
-    let estVal = 0, decVal = 0, nuevoVal = 0;
+    let estVal = 0, decVal = 0, nuevoVal = 0, recuperadoVal = 0;
     let estCount = 0, decCount = 0, nuevoCount = 0, perdidoCount = 0;
+    let recuperadoCount = 0;
     // Acumuladores de pérdidas (Perdido + Declive) en la métrica activa
     let perdidoLossVenta = 0, perdidoLossMargen = 0, perdidoLossKg = 0;
     let decliveLossVenta = 0, decliveLossMargen = 0, decliveLossKg = 0;
@@ -389,17 +463,17 @@ export function PerdidosTab({
       } else if (r.status === "declive") {
         decVal += metric === "pesos" ? r.v26 : r.k26;
         decCount++;
-        // Pérdida = lo que dejaron de vender = v25 - v26 (siempre positivo
-        // porque están en declive)
         decliveLossVenta += Math.max(0, r.v25 - r.v26);
         decliveLossMargen += Math.max(0, r.m25 - r.m26);
         decliveLossKg += Math.max(0, r.k25 - r.k26);
       } else if (r.status === "nuevo") {
         nuevoVal += metric === "pesos" ? r.v26 : r.k26;
         nuevoCount++;
+      } else if (r.status === "recuperado") {
+        recuperadoVal += metric === "pesos" ? r.v26 : r.k26;
+        recuperadoCount++;
       } else if (r.status === "perdido") {
         perdidoCount++;
-        // Pérdida = TODA la venta 2025 al-día (porque en 2026 = 0)
         perdidoLossVenta += r.v25;
         perdidoLossMargen += r.m25;
         perdidoLossKg += r.k25;
@@ -409,6 +483,7 @@ export function PerdidosTab({
     const segmentsAll: DonutSegment[] = [
       { status: "estable" as PerdidoStatus, value: estVal, count: estCount },
       { status: "declive" as PerdidoStatus, value: decVal, count: decCount },
+      { status: "recuperado" as PerdidoStatus, value: recuperadoVal, count: recuperadoCount },
       { status: "nuevo" as PerdidoStatus, value: nuevoVal, count: nuevoCount },
     ];
     const segments: DonutSegment[] = segmentsAll.filter((s) => s.value > 0);
@@ -796,8 +871,8 @@ export function PerdidosTab({
         />
       )}
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* Stats cards — 5 indicadores accionables */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard
           icon={<AlertOctagon size={18} />}
           label={`Perdidos · ${dimLabel}`}
@@ -815,6 +890,18 @@ export function PerdidosTab({
           label="Total Declive"
           value={stats.totalDeclive.toLocaleString("es-MX")}
           tone="muted"
+        />
+        <StatCard
+          icon={<RotateCcw size={18} />}
+          label="Recuperados · 90d"
+          value={stats.recuperados.toLocaleString("es-MX")}
+          tone="recuperado"
+        />
+        <StatCard
+          icon={<Sparkles size={18} />}
+          label="Nuevos · 90d"
+          value={stats.nuevos.toLocaleString("es-MX")}
+          tone="info"
         />
       </div>
 
@@ -879,8 +966,15 @@ export function PerdidosTab({
           >
             Status:
           </span>
-          {(["perdido", "declive", "estable", "nuevo"] as PerdidoStatus[]).map(
-            (s) => {
+          {(
+            [
+              "perdido",
+              "declive",
+              "recuperado",
+              "nuevo",
+              "estable",
+            ] as PerdidoStatus[]
+          ).map((s) => {
               const cfg = STATUS_CONFIG[s];
               const active = activeStatuses.has(s);
               const count = countByStatus[s];
@@ -1165,14 +1259,18 @@ function StatCard({
   icon: React.ReactNode;
   label: string;
   value: string;
-  tone: "danger" | "warning" | "muted";
+  tone: "danger" | "warning" | "muted" | "recuperado" | "info";
 }) {
   const accentVar =
     tone === "danger"
       ? "var(--danger)"
       : tone === "warning"
         ? "var(--warning)"
-        : "var(--text-secondary)";
+        : tone === "recuperado"
+          ? "#8b5cf6" // violeta — matchea STATUS_CONFIG.recuperado.color
+          : tone === "info"
+            ? "#3b82f6" // azul — matchea STATUS_CONFIG.nuevo.color
+            : "var(--text-secondary)";
   return (
     <div
       className="flex flex-col rounded-[var(--radius-lg)] border p-5"
@@ -1202,28 +1300,8 @@ function StatCard({
 }
 
 function StatusBadge({ status }: { status: PerdidoStatus }) {
-  const config = {
-    perdido: {
-      label: "Perdido",
-      bg: "var(--danger-soft)",
-      color: "var(--danger)",
-    },
-    declive: {
-      label: "Declive",
-      bg: "var(--warning-soft)",
-      color: "var(--warning)",
-    },
-    nuevo: {
-      label: "Nuevo",
-      bg: "rgba(59, 130, 246, 0.15)",
-      color: "#3b82f6",
-    },
-    estable: {
-      label: "Estable",
-      bg: "var(--success-soft)",
-      color: "var(--success)",
-    },
-  }[status];
+  // Reusamos STATUS_CONFIG declarado arriba (single source of truth)
+  const config = STATUS_CONFIG[status];
   return (
     <span
       className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"

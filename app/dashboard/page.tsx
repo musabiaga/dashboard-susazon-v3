@@ -492,12 +492,31 @@ export default async function DashboardPage({
   // (pre-agregada con mes actual y YTD: venta + kg + margen).
   // Traemos 3 años: 2024 (informativo, columna extra en tabla), 2025
   // (referencia base de status), 2026 (mes actual).
-  const { data: clientePerdidosRows } = await supabase
-    .from("kpi_cliente_perdidos")
-    .select(
-      "anio, no_cliente, cliente, vendedor, territorio, mes_venta, mes_kg, mes_margen, ytd_venta, ytd_kg, ytd_margen"
-    )
-    .in("anio", [currentYear - 2, currentYear - 1, currentYear]);
+  // En paralelo: kpi_cliente_lifecycle para distinguir clientes
+  // "Nuevo" (primera compra ≤90 días) vs "Recuperado" (volvió después
+  // de >90 días sin comprar).
+  const [
+    { data: clientePerdidosRows },
+    { data: clienteLifecycleRows },
+  ] = await Promise.all([
+    supabase
+      .from("kpi_cliente_perdidos")
+      .select(
+        "anio, no_cliente, cliente, vendedor, territorio, mes_venta, mes_kg, mes_margen, ytd_venta, ytd_kg, ytd_margen"
+      )
+      .in("anio", [currentYear - 2, currentYear - 1, currentYear]),
+    supabase
+      .from("kpi_cliente_lifecycle")
+      .select("no_cliente, first_purchase_date, last_purchase_date"),
+  ]);
+
+  // Map no_cliente → first_purchase_date para merge rápido en PerdidoRow.
+  const firstPurchaseByClient = new Map<string, string>();
+  for (const r of clienteLifecycleRows ?? []) {
+    if (r.no_cliente && r.first_purchase_date) {
+      firstPurchaseByClient.set(r.no_cliente, r.first_purchase_date);
+    }
+  }
 
   // Build datasets para grupos, clientes y vendedores via helper genérico.
   // Después mergeamos los acumulados "al día N" para los charts con
@@ -679,6 +698,9 @@ export default async function DashboardPage({
     ytd_venta_2026: c.ytd_venta_2026,
     ytd_kg_2026: c.ytd_kg_2026,
     ytd_margen_2026: c.ytd_margen_2026,
+    // Lifecycle: primera fecha de compra histórica (cualquier territorio,
+    // cualquier empresa). Usado para distinguir "Nuevo" vs "Recuperado".
+    first_purchase_date: firstPurchaseByClient.get(id) ?? null,
   });
 
   const perdidosByTerritory: Record<string, PerdidoRow[]> = {};
@@ -1129,6 +1151,13 @@ export default async function DashboardPage({
         todayYear={today.year}
         todayMonth={today.month}
         canExportExcel={permissions?.can_export_excel ?? false}
+        newCustomerCutoffDate={(() => {
+          // Hoy CDMX menos 90 días → fecha ISO YYYY-MM-DD.
+          // Cliente "Nuevo" si first_purchase_date >= cutoff.
+          const d = new Date(today.year, today.month - 1, today.day);
+          d.setDate(d.getDate() - 90);
+          return d.toISOString().slice(0, 10);
+        })()}
       />
     </div>
   );
