@@ -201,18 +201,25 @@ function buildDimDataset<
     const v = Number(row.total_venta) || 0;
     const k = Number(row.total_kg ?? 0) || 0;
     const mg = Number(row.total_margen ?? 0) || 0;
+    // SUMAR (no asignar). Cuando hay MÚLTIPLES rows que mapean al MISMO name
+    // (ej. 2 no_cliente distintos con el mismo cliente="TIERRA DE HORNEROS",
+    // o múltiples SKU/grupo con el mismo nombre, o múltiples territorios
+    // que aportan al mismo row en el total), el = sobreescribe y solo
+    // queda el último procesado. Bug detectado por Mauricio cuando la
+    // tabla mostraba $34.72K (suma correcta del al-día) pero el tooltip
+    // mostraba $9.03K (cierre del 2do no_cliente que sobreescribió al 1ro).
     if (row.anio === cy - 2) {
-      cur.v24 = v;
-      cur.k24 = k;
-      cur.m24 = mg;
+      cur.v24 = (cur.v24 ?? 0) + v;
+      cur.k24 = (cur.k24 ?? 0) + k;
+      cur.m24 = (cur.m24 ?? 0) + mg;
     } else if (row.anio === cy - 1) {
-      cur.v25 = v;
-      cur.k25 = k;
-      cur.m25 = mg;
+      cur.v25 = (cur.v25 ?? 0) + v;
+      cur.k25 = (cur.k25 ?? 0) + k;
+      cur.m25 = (cur.m25 ?? 0) + mg;
     } else if (row.anio === cy) {
-      cur.v26 = v;
-      cur.k26 = k;
-      cur.m26 = mg;
+      cur.v26 = (cur.v26 ?? 0) + v;
+      cur.k26 = (cur.k26 ?? 0) + k;
+      cur.m26 = (cur.m26 ?? 0) + mg;
     }
     m.set(name, cur);
   }
@@ -835,9 +842,17 @@ export default async function DashboardPage({
     const v = Number(row.total_venta) || 0;
     const k = Number(row.total_kg) || 0;
     const mg = Number(row.total_margen) || 0;
-    if (row.anio === currentYear - 2) { cur.v24 = v; cur.k24 = k; cur.m24 = mg; }
-    else if (row.anio === currentYear - 1) { cur.v25 = v; cur.k25 = k; cur.m25 = mg; }
-    else if (row.anio === currentYear) { cur.v26 = v; cur.k26 = k; cur.m26 = mg; }
+    // SUMAR (no asignar) — mismo razonamiento que buildDimDataset: si hay
+    // múltiples rows que mapean al mismo SKU (ej. mismo SKU en varios meses
+    // dentro del mismo año, ya que la vista trae rows por mes), debemos
+    // sumarlos en lugar de sobreescribir con el último.
+    if (row.anio === currentYear - 2) {
+      cur.v24 += v; cur.k24 += k; cur.m24 += mg;
+    } else if (row.anio === currentYear - 1) {
+      cur.v25 += v; cur.k25 += k; cur.m25 += mg;
+    } else if (row.anio === currentYear) {
+      cur.v26 += v; cur.k26 += k; cur.m26 += mg;
+    }
     terrMap.set(row.sku, cur);
   }
 
