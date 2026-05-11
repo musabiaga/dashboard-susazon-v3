@@ -112,18 +112,22 @@ function mergeAlDiaIntoDataset<
       k24_alDia: 0, k25_alDia: 0, k26_alDia: 0,
       m24_alDia: 0, m25_alDia: 0, m26_alDia: 0,
     };
+    // SUMAR (no asignar). La vista diaria devuelve 1 row por (territorio,
+    // dimensión, día). Si usamos `=` solo nos quedamos con el último día
+    // procesado de cada territorio → kgs ~17% del real. Bug detectado por
+    // Mauricio: SALMON LOMO mostraba 296 kg al-día cuando real era 1,703 kg.
     if (row.anio === cy - 2) {
-      cur.v24_alDia = v;
-      cur.k24_alDia = k;
-      cur.m24_alDia = mg;
+      cur.v24_alDia = (cur.v24_alDia ?? 0) + v;
+      cur.k24_alDia = (cur.k24_alDia ?? 0) + k;
+      cur.m24_alDia = (cur.m24_alDia ?? 0) + mg;
     } else if (row.anio === cy - 1) {
-      cur.v25_alDia = v;
-      cur.k25_alDia = k;
-      cur.m25_alDia = mg;
+      cur.v25_alDia = (cur.v25_alDia ?? 0) + v;
+      cur.k25_alDia = (cur.k25_alDia ?? 0) + k;
+      cur.m25_alDia = (cur.m25_alDia ?? 0) + mg;
     } else if (row.anio === cy) {
-      cur.v26_alDia = v;
-      cur.k26_alDia = k;
-      cur.m26_alDia = mg;
+      cur.v26_alDia = (cur.v26_alDia ?? 0) + v;
+      cur.k26_alDia = (cur.k26_alDia ?? 0) + k;
+      cur.m26_alDia = (cur.m26_alDia ?? 0) + mg;
     }
     terrMap.set(name, cur);
 
