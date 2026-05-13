@@ -627,24 +627,28 @@ function SummaryTable({
   );
 }
 
-// === Tabla Kilos por Territorio (vs cierre 2025) ===
+// === Tabla Kilos por Territorio (vs al-día 2025; cierre como referencia gris) ===
 function KilosTable({ rows }: { rows: ReportKilosRow[] }) {
   if (rows.length === 0) return null;
-  const W_NAME = 28;
-  const W_NUM = 16;
-  const W_VAR = 12;
+  const W_NAME = 22;
+  const W_NUM = 14;
+  const W_VAR = 10;
   const kg26T = rows.reduce((s, r) => s + r.kg26, 0);
-  const kg25T = rows.reduce((s, r) => s + r.kg25, 0);
-  const deltaT = kg26T - kg25T;
-  const varT = kg25T > 0 ? deltaT / kg25T : null;
+  const kg25AlDiaT = rows.reduce((s, r) => s + r.kg25AlDia, 0);
+  const kg25CierreT = rows.reduce((s, r) => s + r.kg25Cierre, 0);
+  const deltaT = kg26T - kg25AlDiaT;
+  const varT = kg25AlDiaT > 0 ? deltaT / kg25AlDiaT : null;
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Kilos por Territorio · vs cierre 2025</Text>
+      <Text style={styles.sectionTitle}>
+        Kilos por Territorio · vs 2025 al-día (cierre como referencia)
+      </Text>
       <View style={styles.table}>
         <View style={styles.tableHeader}>
           <Text style={[styles.cellHeader, { width: `${W_NAME}%` }]}>Territorio</Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>KG Mes</Text>
-          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>KG 25 cierre</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>25 al-día</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>25 cierre</Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Δ KG</Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_VAR}%` }]}>Var %</Text>
         </View>
@@ -657,8 +661,11 @@ function KilosTable({ rows }: { rows: ReportKilosRow[] }) {
             <Text style={[styles.cell, styles.cellRight, styles.cellBold, { width: `${W_NUM}%` }]}>
               {formatKilos(r.kg26)}
             </Text>
-            <Text style={[styles.cell, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textSecondary }]}>
-              {formatKilos(r.kg25)}
+            <Text style={[styles.cell, styles.cellRight, { width: `${W_NUM}%` }]}>
+              {formatKilos(r.kg25AlDia)}
+            </Text>
+            <Text style={[styles.cell, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textMuted }]}>
+              {formatKilos(r.kg25Cierre)}
             </Text>
             <Text
               style={[
@@ -700,8 +707,11 @@ function KilosTable({ rows }: { rows: ReportKilosRow[] }) {
           <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
             {formatKilos(kg26T)}
           </Text>
-          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textSecondary }]}>
-            {formatKilos(kg25T)}
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
+            {formatKilos(kg25AlDiaT)}
+          </Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textMuted }]}>
+            {formatKilos(kg25CierreT)}
           </Text>
           <Text
             style={[
@@ -741,39 +751,45 @@ function KilosTable({ rows }: { rows: ReportKilosRow[] }) {
   );
 }
 
-// === Tabla Margen por Territorio (vs cierre 2025) ===
+// === Tabla Margen por Territorio (vs al-día 2025; cierre como referencia gris) ===
 function MargenTable({ rows }: { rows: ReportMargenRow[] }) {
   if (rows.length === 0) return null;
-  const W_NAME = 20;
-  const W_NUM = 13;
-  const W_PCT = 9;
-  const W_PP = 9;
+  const W_NAME = 18;
+  const W_NUM = 11;
+  const W_PCT = 7;
+  const W_PP = 8;
   const margen26T = rows.reduce((s, r) => s + r.margen26, 0);
-  const margen25T = rows.reduce((s, r) => s + r.margen25, 0);
-  const deltaT = margen26T - margen25T;
-  // Para margen % total, ponderado por venta
+  const margen25AlDiaT = rows.reduce((s, r) => s + r.margen25AlDia, 0);
+  const margen25CierreT = rows.reduce((s, r) => s + r.margen25Cierre, 0);
+  const deltaT = margen26T - margen25AlDiaT;
+  // Margen % total ponderado por venta
   const venta26T = rows.reduce(
     (s, r) => s + (r.marginPct26 > 0 ? r.margen26 / r.marginPct26 : 0),
     0
   );
-  const venta25T = rows.reduce(
-    (s, r) => s + (r.marginPct25 > 0 ? r.margen25 / r.marginPct25 : 0),
+  const venta25AlDiaT = rows.reduce((s, r) => s + r.venta25AlDia, 0);
+  const venta25CierreT = rows.reduce(
+    (s, r) => s + (r.marginPct25Cierre > 0 ? r.margen25Cierre / r.marginPct25Cierre : 0),
     0
   );
   const marginPct26T = venta26T > 0 ? margen26T / venta26T : 0;
-  const marginPct25T = venta25T > 0 ? margen25T / venta25T : 0;
-  const deltaPpT = (marginPct26T - marginPct25T) * 100;
+  const marginPct25AlDiaT = venta25AlDiaT > 0 ? margen25AlDiaT / venta25AlDiaT : 0;
+  const marginPct25CierreT = venta25CierreT > 0 ? margen25CierreT / venta25CierreT : 0;
+  const deltaPpT = (marginPct26T - marginPct25AlDiaT) * 100;
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Margen por Territorio · vs cierre 2025</Text>
+      <Text style={styles.sectionTitle}>
+        Margen por Territorio · vs 2025 al-día (cierre como referencia)
+      </Text>
       <View style={styles.table}>
         <View style={styles.tableHeader}>
           <Text style={[styles.cellHeader, { width: `${W_NAME}%` }]}>Territorio</Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Mg $ Mes</Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_PCT}%` }]}>Mg %</Text>
-          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Mg $ 25 cierre</Text>
-          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_PCT}%` }]}>Mg % 25</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>$ 25 al-día</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_PCT}%` }]}>% 25 al-día</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>$ 25 cierre</Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Δ $</Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_PP}%` }]}>Δ pp</Text>
         </View>
@@ -789,11 +805,14 @@ function MargenTable({ rows }: { rows: ReportMargenRow[] }) {
             <Text style={[styles.cell, styles.cellRight, { width: `${W_PCT}%` }]}>
               {formatPct(r.marginPct26)}
             </Text>
-            <Text style={[styles.cell, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textSecondary }]}>
-              {formatMoney(r.margen25)}
+            <Text style={[styles.cell, styles.cellRight, { width: `${W_NUM}%` }]}>
+              {formatMoney(r.margen25AlDia)}
             </Text>
-            <Text style={[styles.cell, styles.cellRight, { width: `${W_PCT}%`, color: COLORS.textSecondary }]}>
-              {formatPct(r.marginPct25)}
+            <Text style={[styles.cell, styles.cellRight, { width: `${W_PCT}%` }]}>
+              {formatPct(r.marginPct25AlDia)}
+            </Text>
+            <Text style={[styles.cell, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textMuted }]}>
+              {formatMoney(r.margen25Cierre)}
             </Text>
             <Text
               style={[
@@ -832,11 +851,14 @@ function MargenTable({ rows }: { rows: ReportMargenRow[] }) {
           <Text style={[styles.cellBold, styles.cellRight, { width: `${W_PCT}%` }]}>
             {formatPct(marginPct26T)}
           </Text>
-          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textSecondary }]}>
-            {formatMoney(margen25T)}
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
+            {formatMoney(margen25AlDiaT)}
           </Text>
-          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_PCT}%`, color: COLORS.textSecondary }]}>
-            {formatPct(marginPct25T)}
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_PCT}%` }]}>
+            {formatPct(marginPct25AlDiaT)}
+          </Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textMuted }]}>
+            {formatMoney(margen25CierreT)}
           </Text>
           <Text
             style={[
@@ -1150,7 +1172,7 @@ function StatsGridPesos({ data }: { data: ReportData }) {
           valueTone={t.hasPrev ? (t.yoyCh >= 0 ? "success" : "danger") : "neutral"}
           sub={
             t.hasPrev
-              ? `vs ${formatMoneyExact(t.prevYearVenta)}`
+              ? `vs ${formatMoneyExact(t.prevYearVentaAlDia)} al-día\ncierre ${formatMoneyExact(t.prevYearVenta)}`
               : "Sin data año ant."
           }
         />
@@ -1198,9 +1220,11 @@ function StatsGridPesos({ data }: { data: ReportData }) {
 /** 8 stats vista KILOS (réplica exacta del tab). */
 function StatsGridKilos({ data }: { data: ReportData }) {
   const t = data.tracking;
-  const kgSign = t.yoyKgPct >= 0 ? "+" : "";
-  const kgSignDelta = t.yoyKgDelta >= 0 ? "+" : "";
-  const kgArrow = t.yoyKgPct >= 0 ? "▲" : "▼";
+  // Card "VS 2025" (2do) — vs cierre histórico
+  const kgArrowCierre = t.yoyKgPctCierre >= 0 ? "▲" : "▼";
+  const kgSignDeltaCierre = t.yoyKgDeltaCierre >= 0 ? "+" : "";
+  // Card "VS MISMO MES AÑO ANT." (4to) — al-día
+  const kgSignAlDia = t.yoyKgPctAlDia >= 0 ? "+" : "";
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Resumen del mes · Kilos</Text>
@@ -1211,16 +1235,16 @@ function StatsGridKilos({ data }: { data: ReportData }) {
           sub={`Día ${t.elapsedBizDays} de ${t.totalBizDays} · ${t.daysWithInvoice} con factura`}
         />
         <StatCard
-          label="vs 2025"
+          label="vs 2025 (cierre)"
           value={
             t.hasPrev
-              ? `${kgArrow} ${Math.abs(t.yoyKgPct).toFixed(1)}%`
+              ? `${kgArrowCierre} ${Math.abs(t.yoyKgPctCierre).toFixed(1)}%`
               : "—"
           }
-          valueTone={t.hasPrev ? (t.yoyKgPct >= 0 ? "success" : "danger") : "neutral"}
-          subInline={
+          valueTone={t.hasPrev ? (t.yoyKgPctCierre >= 0 ? "success" : "danger") : "neutral"}
+          sub={
             t.hasPrev
-              ? `${kgSignDelta}${formatKilos(t.yoyKgDelta)}`
+              ? `${kgSignDeltaCierre}${formatKilos(t.yoyKgDeltaCierre)}`
               : "Sin data año ant."
           }
         />
@@ -1233,13 +1257,13 @@ function StatsGridKilos({ data }: { data: ReportData }) {
           label="vs Mismo Mes Año Ant."
           value={
             t.hasPrev
-              ? `${kgSign}${t.yoyKgPct.toFixed(1)}%`
+              ? `${kgSignAlDia}${t.yoyKgPctAlDia.toFixed(1)}%`
               : "—"
           }
-          valueTone={t.hasPrev ? (t.yoyKgPct >= 0 ? "success" : "danger") : "neutral"}
+          valueTone={t.hasPrev ? (t.yoyKgPctAlDia >= 0 ? "success" : "danger") : "neutral"}
           sub={
             t.hasPrev
-              ? `vs ${formatKilos(t.prevYearKg)}`
+              ? `vs ${formatKilos(t.prevYearKgAlDia)} al-día\ncierre ${formatKilos(t.prevYearKg)}`
               : "Sin data año ant."
           }
         />
@@ -1347,18 +1371,19 @@ function ProgressBarPesos({ data }: { data: ReportData }) {
 
 /** Chart compuesto Pesos: barras (venta diaria) + 3 líneas (acumulado,
  *  ptto lineal, acumulado año anterior). Dibujado con SVG nativo de
- *  @react-pdf (no recharts). */
+ *  @react-pdf (no recharts). Tiene eje Y numerado (izquierda) y eje X
+ *  (días del mes) etiquetado debajo del chart. */
 function DailyChart({ data }: { data: ReportData }) {
   const pts = data.tracking.chartData;
   if (pts.length === 0) return null;
 
-  // Dimensiones del SVG. Letter width usable ≈ 540pt con paddingHorizontal 28.
+  // Dimensiones del SVG.
   const W = 540;
-  const H = 200;
-  const padTop = 14;
-  const padBottom = 26;
-  const padLeft = 38;
-  const padRight = 38;
+  const H = 210;
+  const padTop = 12;
+  const padBottom = 14; // espacio para línea base; labels X van afuera
+  const padLeft = 48; // espacio para labels Y
+  const padRight = 14;
 
   const innerW = W - padLeft - padRight;
   const innerH = H - padTop - padBottom;
@@ -1370,9 +1395,6 @@ function DailyChart({ data }: { data: ReportData }) {
   const dayRange = Math.max(1, maxDay - minDay);
 
   const maxBar = Math.max(0, ...pts.map((p) => p.ventaDiaria));
-  // Para el eje izquierdo (escala compartida pero podemos manejar barras vs
-  // líneas con el mismo eje porque acumulado >> diaria, así que la barra
-  // diaria queda chiquita. Mejor uso 2 escalas como en el tab.)
   const maxLine = Math.max(
     0,
     ...pts.map((p) => Math.max(p.acumulado, p.pttoLinear, p.anoAnterior))
@@ -1381,129 +1403,168 @@ function DailyChart({ data }: { data: ReportData }) {
   // Helpers de coordenadas
   const xOf = (day: number) =>
     padLeft + ((day - minDay) / dayRange) * innerW;
+  // Las barras ocupan los primeros 40% verticales del área (parte de abajo).
   const yBarTop = (value: number) =>
-    maxBar > 0 ? padTop + innerH - (value / maxBar) * (innerH * 0.4) : padTop + innerH;
-  // Las barras ocupan los primeros 40% verticales (parte de abajo)
+    maxBar > 0
+      ? padTop + innerH - (value / maxBar) * (innerH * 0.4)
+      : padTop + innerH;
+  // Las líneas usan toda la altura.
   const yLine = (value: number) =>
     maxLine > 0
       ? padTop + innerH - (value / maxLine) * innerH
       : padTop + innerH;
 
-  // Build polyline points (acumulado, ptto, año ant.)
   const acumStr = pts.map((p) => `${xOf(p.day)},${yLine(p.acumulado)}`).join(" ");
   const pttoStr = pts.map((p) => `${xOf(p.day)},${yLine(p.pttoLinear)}`).join(" ");
   const anioStr = pts.map((p) => `${xOf(p.day)},${yLine(p.anoAnterior)}`).join(" ");
 
-  // Ancho de cada barra
   const barW = Math.max(2, Math.min(18, (innerW / pts.length) * 0.55));
+
+  // Niveles del eje Y (5 marcas: 0, 25%, 50%, 75%, 100% del max line)
+  const yLevels = [0, 0.25, 0.5, 0.75, 1].map((f) => ({
+    f,
+    value: maxLine * f,
+    y: padTop + innerH * (1 - f),
+  }));
 
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>
         Tendencia diaria · {data.monthLabel} (barras: venta del día · líneas: acumulado)
       </Text>
-      <Svg width={W} height={H}>
-        {/* Ejes/grid suave */}
-        <SvgLine
-          x1={padLeft}
-          y1={padTop + innerH}
-          x2={padLeft + innerW}
-          y2={padTop + innerH}
-          stroke={COLORS.borderStrong}
-          strokeWidth={0.5}
-        />
-        <SvgLine
-          x1={padLeft}
-          y1={padTop}
-          x2={padLeft}
-          y2={padTop + innerH}
-          stroke={COLORS.border}
-          strokeWidth={0.3}
-        />
-        {/* Líneas horizontales tenues cada 25% */}
-        {[0.25, 0.5, 0.75].map((f) => (
+
+      {/* Wrapper relative para overlay de labels Y y X sobre el SVG */}
+      <View style={{ position: "relative", width: W, height: H }}>
+        <Svg width={W} height={H}>
+          {/* Línea base (eje X) */}
           <SvgLine
-            key={f}
             x1={padLeft}
-            y1={padTop + innerH * (1 - f)}
+            y1={padTop + innerH}
             x2={padLeft + innerW}
-            y2={padTop + innerH * (1 - f)}
+            y2={padTop + innerH}
+            stroke={COLORS.borderStrong}
+            strokeWidth={0.5}
+          />
+          {/* Línea vertical eje Y */}
+          <SvgLine
+            x1={padLeft}
+            y1={padTop}
+            x2={padLeft}
+            y2={padTop + innerH}
             stroke={COLORS.border}
             strokeWidth={0.3}
-            strokeDasharray="2 2"
           />
-        ))}
-
-        {/* Barras venta diaria */}
-        {pts.map((p) => {
-          const x = xOf(p.day) - barW / 2;
-          const y = yBarTop(p.ventaDiaria);
-          const h = padTop + innerH - y;
-          if (p.ventaDiaria <= 0) return null;
-          return (
-            <Rect
-              key={`bar-${p.day}`}
-              x={x}
-              y={y}
-              width={barW}
-              height={Math.max(0.5, h)}
-              fill={COLORS.orange}
-              fillOpacity={0.5}
+          {/* Grid horizontal por niveles Y */}
+          {yLevels.slice(1, 4).map((l) => (
+            <SvgLine
+              key={l.f}
+              x1={padLeft}
+              y1={l.y}
+              x2={padLeft + innerW}
+              y2={l.y}
+              stroke={COLORS.border}
+              strokeWidth={0.3}
+              strokeDasharray="2 2"
             />
-          );
-        })}
+          ))}
 
-        {/* Línea año anterior (gris claro) */}
-        <Polyline
-          points={anioStr}
-          stroke={COLORS.textMuted}
-          strokeWidth={0.8}
-          fill="none"
-          strokeDasharray="3 2"
-        />
-        {/* Línea PTTO lineal (marrón) */}
-        <Polyline
-          points={pttoStr}
-          stroke={COLORS.brown}
-          strokeWidth={0.8}
-          fill="none"
-          strokeDasharray="4 2"
-        />
-        {/* Línea acumulado (naranja) */}
-        <Polyline
-          points={acumStr}
-          stroke={COLORS.orangeDark}
-          strokeWidth={1.4}
-          fill="none"
-        />
-      </Svg>
+          {/* Barras venta diaria */}
+          {pts.map((p) => {
+            const x = xOf(p.day) - barW / 2;
+            const y = yBarTop(p.ventaDiaria);
+            const h = padTop + innerH - y;
+            if (p.ventaDiaria <= 0) return null;
+            return (
+              <Rect
+                key={`bar-${p.day}`}
+                x={x}
+                y={y}
+                width={barW}
+                height={Math.max(0.5, h)}
+                fill={COLORS.orange}
+                fillOpacity={0.5}
+              />
+            );
+          })}
 
-      {/* Labels eje X simulados — solo cada 3 días para no saturar */}
-      <View
-        style={{
-          flexDirection: "row",
-          paddingLeft: padLeft,
-          paddingRight: padRight,
-          marginTop: -22,
-          marginBottom: 4,
-        }}
-      >
-        {labelDaysEvery(pts, 3).map((p) => (
-          <View
-            key={p.day}
+          {/* Línea año anterior (gris claro punteada) */}
+          <Polyline
+            points={anioStr}
+            stroke={COLORS.textMuted}
+            strokeWidth={0.8}
+            fill="none"
+            strokeDasharray="3 2"
+          />
+          {/* Línea PTTO lineal (marrón punteada) */}
+          <Polyline
+            points={pttoStr}
+            stroke={COLORS.brown}
+            strokeWidth={0.8}
+            fill="none"
+            strokeDasharray="4 2"
+          />
+          {/* Línea acumulado (naranja sólida) */}
+          <Polyline
+            points={acumStr}
+            stroke={COLORS.orangeDark}
+            strokeWidth={1.4}
+            fill="none"
+          />
+        </Svg>
+
+        {/* Labels eje Y — 5 niveles a la izquierda del chart */}
+        {yLevels.map((l) => (
+          <Text
+            key={`y-${l.f}`}
             style={{
               position: "absolute",
-              left: xOf(p.day) - 6,
-              top: 4,
+              left: 0,
+              top: l.y - 4,
+              width: padLeft - 4,
+              textAlign: "right",
+              fontSize: 6,
+              color: COLORS.textSecondary,
             }}
           >
-            <Text style={{ fontSize: 6, color: COLORS.textMuted }}>{p.day}</Text>
-          </View>
+            {formatMoney(l.value)}
+          </Text>
         ))}
       </View>
 
-      {/* Leyenda */}
-      <View style={{ flexDirection: "row", gap: 10, justifyContent: "center", marginTop: 4 }}>
+      {/* Labels eje X — DEBAJO del chart, separados del SVG. Cada 3 días + último */}
+      <View
+        style={{
+          position: "relative",
+          width: W,
+          height: 10,
+          marginTop: 2,
+        }}
+      >
+        {labelDaysEvery(pts, 3).map((p) => (
+          <Text
+            key={`x-${p.day}`}
+            style={{
+              position: "absolute",
+              left: xOf(p.day) - 5,
+              top: 0,
+              fontSize: 6,
+              color: COLORS.textMuted,
+            }}
+          >
+            {p.day}
+          </Text>
+        ))}
+      </View>
+
+      {/* Leyenda — separada con margen mayor para no chocar con labels X */}
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 10,
+          justifyContent: "center",
+          marginTop: 8,
+        }}
+      >
         <Legend color={COLORS.orange} label="Venta del día" />
         <Legend color={COLORS.orangeDark} label="Venta acumulada" />
         <Legend color={COLORS.brown} label="PTTO lineal" />

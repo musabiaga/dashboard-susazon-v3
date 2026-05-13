@@ -11,6 +11,7 @@
 import type { Territory, TerritoryKpi } from "@/components/dashboard/Sidebar";
 import type { DimensionRow } from "@/components/dashboard/DimensionTab";
 import { countBizDays, isBusinessDay } from "@/lib/business-days";
+import { computePrevYearAlDia } from "@/lib/prev-year-al-dia";
 import {
   REPORT_TERRITORIES,
   TERRITORY_DIVISION,
@@ -239,32 +240,53 @@ export function buildReportData(input: BuildReportInput): ReportData {
     ...summarize([t], elapsedBizDays, totalBizDays),
   }));
 
-  // === Tabla B "Kilos por Territorio" (vs cierre 2025) ===
+  // === Tabla B "Kilos por Territorio" (vs al-día 2025, cierre como referencia) ===
   const porTerritorioKilos: ReportKilosRow[] = reportTerrs.map((t) => {
     const kg26 = sumKgCurrent(t);
-    const kg25 = sumKgPrev(t);
-    const deltaKg = kg26 - kg25;
+    const kg25Cierre = sumKgPrev(t);
+    const alDia = computePrevYearAlDia(
+      t.kpi.daily.prevYear,
+      currentYear - 1,
+      currentMonth,
+      elapsedBizDays
+    );
+    const kg25AlDia = alDia.k;
+    const deltaKg = kg26 - kg25AlDia;
     const varVsAnio: number | null =
-      kg25 > 0 ? (kg26 - kg25) / kg25 : null;
-    return { name: t.name, kg26, kg25, deltaKg, varVsAnio };
+      kg25AlDia > 0 ? deltaKg / kg25AlDia : null;
+    return { name: t.name, kg26, kg25AlDia, kg25Cierre, deltaKg, varVsAnio };
   });
 
-  // === Tabla C "Margen por Territorio" (vs cierre 2025) ===
+  // === Tabla C "Margen por Territorio" (vs al-día 2025, cierre como referencia) ===
   const porTerritorioMargen: ReportMargenRow[] = reportTerrs.map((t) => {
     const margen26 = t.kpi.margen;
     const venta26 = t.kpi.venta;
-    const margen25 = sumMargenPrev(t);
-    const venta25 = sumVentaPrev(t);
+    const margen25Cierre = sumMargenPrev(t);
+    const venta25Cierre = sumVentaPrev(t);
+    const alDia = computePrevYearAlDia(
+      t.kpi.daily.prevYear,
+      currentYear - 1,
+      currentMonth,
+      elapsedBizDays
+    );
+    const margen25AlDia = alDia.m;
+    const venta25AlDia = alDia.v;
     const marginPct26 = venta26 > 0 ? margen26 / venta26 : 0;
-    const marginPct25 = venta25 > 0 ? margen25 / venta25 : 0;
-    const deltaMargen = margen26 - margen25;
-    const deltaPp = (marginPct26 - marginPct25) * 100;
+    const marginPct25AlDia =
+      venta25AlDia > 0 ? margen25AlDia / venta25AlDia : 0;
+    const marginPct25Cierre =
+      venta25Cierre > 0 ? margen25Cierre / venta25Cierre : 0;
+    const deltaMargen = margen26 - margen25AlDia;
+    const deltaPp = (marginPct26 - marginPct25AlDia) * 100;
     return {
       name: t.name,
       margen26,
       marginPct26,
-      margen25,
-      marginPct25,
+      margen25AlDia,
+      venta25AlDia,
+      marginPct25AlDia,
+      margen25Cierre,
+      marginPct25Cierre,
       deltaMargen,
       deltaPp,
     };
@@ -392,10 +414,20 @@ export function buildReportData(input: BuildReportInput): ReportData {
   const acum = selectedKpi.venta;
   const marginMoney = selectedKpi.margen;
   const marginPctVal = selectedKpi.marginPct; // 0-100
-  const prevYearVenta = selectedKpi.prevYear.venta;
+  const prevYearVenta = selectedKpi.prevYear.venta; // CIERRE completo
   const remainingBizDays = Math.max(0, totalBizDays - elapsedBizDays);
   const hasPtto = ptto > 0;
   const hasPrev = prevYearVenta > 0;
+
+  // Comparativo al día hábil equivalente 2025 (apples-to-apples).
+  const prevAlDia = computePrevYearAlDia(
+    selectedKpi.daily.prevYear,
+    currentYear - 1,
+    currentMonth,
+    elapsedBizDays
+  );
+  const prevYearVentaAlDia = prevAlDia.v;
+  const prevYearKgAlDia = prevAlDia.k;
 
   // ---- 8 stats Pesos ----
   const velOrig = totalBizDays > 0 ? ptto / totalBizDays : 0;
@@ -408,9 +440,10 @@ export function buildReportData(input: BuildReportInput): ReportData {
   const runRatePct = ptto > 0 ? (runRate / ptto) * 100 : 0;
   const alcancePct = ptto > 0 ? (acum / ptto) * 100 : 0;
   const faltante = Math.max(0, ptto - acum);
+  // yoy contra AL-DÍA (no cierre completo).
   const yoyCh =
-    prevYearVenta > 0
-      ? ((acum - prevYearVenta) / prevYearVenta) * 100
+    prevYearVentaAlDia > 0
+      ? ((acum - prevYearVentaAlDia) / prevYearVentaAlDia) * 100
       : 0;
   const tiempoPct =
     totalBizDays > 0 ? (elapsedBizDays / totalBizDays) * 100 : 0;
@@ -421,9 +454,16 @@ export function buildReportData(input: BuildReportInput): ReportData {
   // ---- 8 stats Kilos ----
   const acumKg = selectedKpi.daily.current.reduce((s, p) => s + p.k, 0);
   const prevYearKg = selectedKpi.daily.prevYear.reduce((s, p) => s + p.k, 0);
-  const yoyKgDelta = acumKg - prevYearKg;
-  const yoyKgPct =
+  // Card "VS 2025" (2do, mantiene comparación vs CIERRE)
+  const yoyKgDeltaCierre = acumKg - prevYearKg;
+  const yoyKgPctCierre =
     prevYearKg > 0 ? ((acumKg - prevYearKg) / prevYearKg) * 100 : 0;
+  // Card "VS MISMO MES AÑO ANT." (4to, al-día)
+  const yoyKgDeltaAlDia = acumKg - prevYearKgAlDia;
+  const yoyKgPctAlDia =
+    prevYearKgAlDia > 0
+      ? ((acumKg - prevYearKgAlDia) / prevYearKgAlDia) * 100
+      : 0;
   const pace2025 = totalBizDays > 0 ? prevYearKg / totalBizDays : 0;
   const velActualKg = elapsedBizDays > 0 ? acumKg / elapsedBizDays : 0;
   const ySuperaste = prevYearKg > 0 && acumKg >= prevYearKg;
@@ -500,6 +540,7 @@ export function buildReportData(input: BuildReportInput): ReportData {
     marginMoney,
     marginPct: marginPctVal,
     prevYearVenta,
+    prevYearVentaAlDia,
     yoyCh,
     velOrig,
     velActual,
@@ -509,8 +550,11 @@ export function buildReportData(input: BuildReportInput): ReportData {
     // Kilos
     acumKg,
     prevYearKg,
-    yoyKgDelta,
-    yoyKgPct,
+    prevYearKgAlDia,
+    yoyKgDeltaCierre,
+    yoyKgPctCierre,
+    yoyKgDeltaAlDia,
+    yoyKgPctAlDia,
     pace2025,
     velActualKg,
     ySuperaste,

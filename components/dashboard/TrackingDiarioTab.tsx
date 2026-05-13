@@ -15,6 +15,7 @@ import {
 import { ChevronRight, Loader2 } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 import { countBizDays, isBusinessDay } from "@/lib/business-days";
+import { computePrevYearAlDia } from "@/lib/prev-year-al-dia";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
@@ -191,9 +192,20 @@ export function TrackingDiarioTab({
   const acum = kpi.venta;
   const marginMoney = kpi.margen;
   const marginPct = kpi.marginPct;
+  // Cierre completo del mismo mes año anterior.
   const prevYearVenta = kpi.prevYear.venta;
   const ptto = ventaBudget;
   const remainingBizDays = Math.max(0, totalBizDays - elapsedBizDays);
+
+  // Comparativo "al día hábil equivalente" del año anterior (apples-to-apples).
+  // Pesos, Kilos, Margen calculados client-side desde kpi.daily.prevYear[].
+  const prevAlDia = computePrevYearAlDia(
+    kpi.daily.prevYear,
+    currentYear - 1,
+    currentMonth,
+    elapsedBizDays
+  );
+  const prevYearVentaAlDia = prevAlDia.v;
 
   const velOrig = totalBizDays > 0 ? ptto / totalBizDays : 0;
   const velActual = elapsedBizDays > 0 ? acum / elapsedBizDays : 0;
@@ -203,8 +215,14 @@ export function TrackingDiarioTab({
   const runRatePct = ptto > 0 ? (runRate / ptto) * 100 : 0;
   const alcancePct = ptto > 0 ? (acum / ptto) * 100 : 0;
   const faltante = Math.max(0, ptto - acum);
+  // YoY comparado contra el mismo día hábil 2025 (no contra cierre completo).
+  // Esto da una visión "real" del avance: si llevamos $22M al día 10 y el año
+  // pasado al día 10 llevábamos $21M → +5% (vs cierre completo $60M sería un
+  // engañoso -63%).
   const yoyCh =
-    prevYearVenta > 0 ? ((acum - prevYearVenta) / prevYearVenta) * 100 : 0;
+    prevYearVentaAlDia > 0
+      ? ((acum - prevYearVentaAlDia) / prevYearVentaAlDia) * 100
+      : 0;
   const tiempoPct =
     totalBizDays > 0 ? (elapsedBizDays / totalBizDays) * 100 : 0;
   const brechaPp = alcancePct - tiempoPct;
@@ -214,15 +232,24 @@ export function TrackingDiarioTab({
   // a partir de los datos diarios (kpi.daily.current[].k para 2026 y
   // kpi.daily.prevYear[].k para 2025).
   const acumKg = kpi.daily.current.reduce((s, p) => s + p.k, 0);
-  const prevYearKg = kpi.daily.prevYear.reduce((s, p) => s + p.k, 0);
-  const yoyKgDelta = acumKg - prevYearKg; // diferencia absoluta KG
-  const yoyKgPct =
+  const prevYearKg = kpi.daily.prevYear.reduce((s, p) => s + p.k, 0); // CIERRE completo
+  const prevYearKgAlDia = prevAlDia.k; // al-día equivalente
+
+  // Card "VS 2025" (2do, mantiene comparación vs CIERRE — referencia histórica)
+  const yoyKgDeltaCierre = acumKg - prevYearKg;
+  const yoyKgPctCierre =
     prevYearKg > 0 ? ((acumKg - prevYearKg) / prevYearKg) * 100 : 0;
+  // Card "VS MISMO MES AÑO ANT." (4to, AL-DÍA — apples-to-apples)
+  const yoyKgDeltaAlDia = acumKg - prevYearKgAlDia;
+  const yoyKgPctAlDia =
+    prevYearKgAlDia > 0
+      ? ((acumKg - prevYearKgAlDia) / prevYearKgAlDia) * 100
+      : 0;
   // Pace 2025 = KG/día promedio que tuvo 2025 al cierre del mes (todos los
   // días hábiles del mes). Si no hay data 2025, queda en 0.
   const pace2025 = totalBizDays > 0 ? prevYearKg / totalBizDays : 0;
   const velActualKg = elapsedBizDays > 0 ? acumKg / elapsedBizDays : 0;
-  // Estados claros para "comparar vs cierre 2025":
+  // Estados claros para "comparar vs cierre 2025" (Card 7 "Falta para igualar"):
   //   - ySuperaste: ya rebasamos el cierre 2025 (incluso si quedan días)
   //   - mesCerradoSinSuperar: ya no quedan días Y no rebasamos 2025 (= NO se logró)
   //   - quedanDiasParaIgualar: aún se puede pelear, requiere X kg/día
@@ -238,6 +265,9 @@ export function TrackingDiarioTab({
   const runRateKg = velActualKg * totalBizDays;
   // % de cierre 2025: para la progress bar en vista KG.
   const pctVs2025 = prevYearKg > 0 ? (acumKg / prevYearKg) * 100 : 0;
+  // % al-día 2025: posición de la marca de referencia sobre la progress bar.
+  const pctVs2025AlDia =
+    prevYearKg > 0 ? (prevYearKgAlDia / prevYearKg) * 100 : 0;
 
   // Días hábiles con factura (venta > 0)
   const daysWithInvoice = kpi.daily.current.filter((p) =>
@@ -363,8 +393,10 @@ export function TrackingDiarioTab({
     const marginPctTot = marginPct;
     const kgTot = acumKg;
     const kgPrevTot = prevYearKg;
-    const diffKgTot = yoyKgDelta;
-    const pctVs2025Tot = yoyKgPct;
+    // Totales para Excel — siguen mostrando comparativo vs cierre (compatibilidad
+    // con la exportación previa). Los KPIs del header del tab usan al-día.
+    const diffKgTot = yoyKgDeltaCierre;
+    const pctVs2025Tot = yoyKgPctCierre;
     return {
       ventaTot,
       margenTot,
@@ -381,8 +413,8 @@ export function TrackingDiarioTab({
     marginPct,
     acumKg,
     prevYearKg,
-    yoyKgDelta,
-    yoyKgPct,
+    yoyKgDeltaCierre,
+    yoyKgPctCierre,
   ]);
 
   // ============ Render ============
@@ -407,9 +439,11 @@ export function TrackingDiarioTab({
   const brechaLabel = brechaPp >= 0 ? "AVANZADO" : "REZAGADO";
 
   // ============ Variables auxiliares de presentación KG ============
-  const kgSign = yoyKgPct >= 0 ? "+" : "";
-  const kgSignDelta = yoyKgDelta >= 0 ? "+" : "";
-  const kgArrow = yoyKgPct >= 0 ? "▲" : "▼";
+  // Card "VS 2025" (2do) — vs cierre histórico
+  const kgSignDeltaCierre = yoyKgDeltaCierre >= 0 ? "+" : "";
+  const kgArrowCierre = yoyKgPctCierre >= 0 ? "▲" : "▼";
+  // Card "VS MISMO MES AÑO ANT." (4to) — al-día apples-to-apples
+  const kgSignAlDia = yoyKgPctAlDia >= 0 ? "+" : "";
 
   // ============ Export Excel ============
   const handleExportExcel = async () => {
@@ -445,7 +479,8 @@ export function TrackingDiarioTab({
       ...(hasPrev
         ? [
             { label: `Venta ${prevMonthShortYY} (cierre)`, value: prevYearVenta, numFmt: "$#,##0" as const },
-            { label: "Var % YoY (vs mismo mes 2025 cierre)", value: yoyCh / 100, numFmt: "0.0%" as const },
+            { label: `Venta ${prevMonthShortYY} al-día`, value: prevYearVentaAlDia, numFmt: "$#,##0" as const },
+            { label: "Var % YoY (vs 2025 al-día)", value: yoyCh / 100, numFmt: "0.0%" as const },
           ]
         : []),
       // KG
@@ -453,8 +488,11 @@ export function TrackingDiarioTab({
       ...(hasPrev
         ? [
             { label: "KG mismo mes año anterior", value: prevYearKg, numFmt: "#,##0" as const },
-            { label: "Diferencia KG vs 2025", value: yoyKgDelta, numFmt: "#,##0" as const },
-            { label: "Var % KG vs 2025", value: yoyKgPct / 100, numFmt: "0.0%" as const },
+            { label: "Diferencia KG vs 2025 (cierre)", value: yoyKgDeltaCierre, numFmt: "#,##0" as const },
+            { label: "Var % KG vs 2025 (cierre)", value: yoyKgPctCierre / 100, numFmt: "0.0%" as const },
+            { label: "KG 2025 al-día", value: prevYearKgAlDia, numFmt: "#,##0" as const },
+            { label: "Diferencia KG vs 2025 (al-día)", value: yoyKgDeltaAlDia, numFmt: "#,##0" as const },
+            { label: "Var % KG vs 2025 (al-día)", value: yoyKgPctAlDia / 100, numFmt: "0.0%" as const },
           ]
         : []),
     ];
@@ -581,7 +619,9 @@ export function TrackingDiarioTab({
                 hasPrev ? (yoyCh >= 0 ? "success" : "danger") : "neutral"
               }
               sub={
-                hasPrev ? `vs ${formatMoney(prevYearVenta)}` : "Sin data año ant."
+                hasPrev
+                  ? `vs ${formatMoney(prevYearVentaAlDia)} al-día · cierre ${formatMoney(prevYearVenta)}`
+                  : "Sin data año ant."
               }
             />
             <Stat
@@ -632,13 +672,13 @@ export function TrackingDiarioTab({
               label="vs 2025"
               value={
                 hasPrev
-                  ? `${kgArrow} ${Math.abs(yoyKgPct).toFixed(1)}%`
+                  ? `${kgArrowCierre} ${Math.abs(yoyKgPctCierre).toFixed(1)}%`
                   : "—"
               }
-              valueTone={hasPrev ? (yoyKgPct >= 0 ? "success" : "danger") : "neutral"}
+              valueTone={hasPrev ? (yoyKgPctCierre >= 0 ? "success" : "danger") : "neutral"}
               subInline={
                 hasPrev
-                  ? `${kgSignDelta}${formatKilos(yoyKgDelta)}`
+                  ? `${kgSignDeltaCierre}${formatKilos(yoyKgDeltaCierre)}`
                   : "Sin data año ant."
               }
             />
@@ -651,13 +691,13 @@ export function TrackingDiarioTab({
               label="vs Mismo Mes Año Ant."
               value={
                 hasPrev
-                  ? `${kgSign}${yoyKgPct.toFixed(1)}%`
+                  ? `${kgSignAlDia}${yoyKgPctAlDia.toFixed(1)}%`
                   : "—"
               }
-              valueTone={hasPrev ? (yoyKgPct >= 0 ? "success" : "danger") : "neutral"}
+              valueTone={hasPrev ? (yoyKgPctAlDia >= 0 ? "success" : "danger") : "neutral"}
               sub={
                 hasPrev
-                  ? `vs ${formatKilos(prevYearKg)}`
+                  ? `vs ${formatKilos(prevYearKgAlDia)} al-día · cierre ${formatKilos(prevYearKg)}`
                   : "Sin data año ant."
               }
             />
@@ -853,6 +893,25 @@ export function TrackingDiarioTab({
                     style={{ background: "var(--text-primary)" }}
                   >
                     Día {elapsedBizDays}/{totalBizDays}
+                  </span>
+                </div>
+              )}
+              {/* Marca de referencia: dónde estaba 2025 al mismo día hábil.
+                  Ayuda a leer si vamos arriba o abajo del pace 2025 al-día. */}
+              {pctVs2025AlDia > 0 && pctVs2025AlDia < 100 && (
+                <div
+                  className="absolute top-0 h-full border-l-2"
+                  style={{
+                    left: `${pctVs2025AlDia}%`,
+                    borderColor: "var(--text-secondary)",
+                    borderStyle: "dotted",
+                  }}
+                >
+                  <span
+                    className="absolute -bottom-5 -translate-x-1/2 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                    style={{ background: "var(--text-secondary)" }}
+                  >
+                    2025 al-día: {formatKilos(prevYearKgAlDia)}
                   </span>
                 </div>
               )}

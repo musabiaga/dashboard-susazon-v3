@@ -62,25 +62,36 @@ export interface ReportSummaryRow {
   varVsAnio: number | null;
 }
 
-/** Fila Kilos por territorio. Kilos no tiene objetivo, por eso solo comparamos
- *  contra el cierre del mismo mes 2025. */
+/** Fila Kilos por territorio. Comparamos contra el AL-DÍA equivalente 2025
+ *  (calculado client-side desde daily.prevYear) y exponemos el cierre completo
+ *  como referencia secundaria. */
 export interface ReportKilosRow {
   name: string;
   kg26: number;
-  kg25: number; // cierre del mes 2025 (no al-día porque no está agregado en backend)
-  deltaKg: number;
-  varVsAnio: number | null;
+  /** Kilos al mismo día hábil 2025 (comparativo principal). */
+  kg25AlDia: number;
+  /** Cierre completo del mes 2025 (referencia secundaria, mostrado en gris). */
+  kg25Cierre: number;
+  deltaKg: number; // kg26 - kg25AlDia
+  varVsAnio: number | null; // vs al-día
 }
 
-/** Fila Margen $ y % por territorio. Compara contra el cierre del mes 2025. */
+/** Fila Margen $ y % por territorio. Compara contra el AL-DÍA 2025 con cierre
+ *  como referencia secundaria. */
 export interface ReportMargenRow {
   name: string;
   margen26: number;
   marginPct26: number; // 0-1
-  margen25: number; // cierre del mes 2025
-  marginPct25: number; // 0-1
-  deltaMargen: number;
-  /** Diferencia en puntos porcentuales (marginPct26 - marginPct25) × 100. */
+  /** Margen $ al mismo día hábil 2025 (principal). */
+  margen25AlDia: number;
+  /** Venta del al-día 2025, para calcular margen %. */
+  venta25AlDia: number;
+  marginPct25AlDia: number; // 0-1
+  /** Cierre completo 2025 (referencia secundaria). */
+  margen25Cierre: number;
+  marginPct25Cierre: number;
+  deltaMargen: number; // margen26 - margen25AlDia
+  /** Diferencia en puntos porcentuales (marginPct26 - marginPct25AlDia) × 100. */
   deltaPp: number;
 }
 
@@ -163,8 +174,12 @@ export interface TrackingPdfStats {
   faltante: number;
   marginMoney: number;
   marginPct: number; // 0-100
+  /** Cierre completo del mismo mes 2025 (referencia histórica). */
   prevYearVenta: number;
-  yoyCh: number; // % vs año ant.
+  /** Venta al mismo día hábil 2025 (comparativo principal apples-to-apples). */
+  prevYearVentaAlDia: number;
+  /** % cambio vs al-día (no cierre). */
+  yoyCh: number;
   velOrig: number;
   velActual: number;
   velNeces: number;
@@ -173,9 +188,16 @@ export interface TrackingPdfStats {
 
   // === Kilos (8 stats) ===
   acumKg: number;
+  /** Cierre completo 2025 (usado en card "VS 2025" y progress bar). */
   prevYearKg: number;
-  yoyKgDelta: number;
-  yoyKgPct: number;
+  /** Kilos al mismo día hábil 2025 (card "VS MISMO MES AÑO ANT."). */
+  prevYearKgAlDia: number;
+  // Card "VS 2025" (2do card) — vs cierre completo
+  yoyKgDeltaCierre: number;
+  yoyKgPctCierre: number;
+  // Card "VS MISMO MES AÑO ANT." (4to card) — al-día
+  yoyKgDeltaAlDia: number;
+  yoyKgPctAlDia: number;
   pace2025: number;
   velActualKg: number;
   ySuperaste: boolean;
@@ -183,7 +205,7 @@ export interface TrackingPdfStats {
   mesCerradoSinSuperar: boolean;
   faltaIgualarKg: number;
   runRateKg: number;
-  pctVs2025: number; // % de cierre 2025 (proy.)
+  pctVs2025: number; // % de cierre 2025 (proy.) — para Run Rate KG sub
 
   // === Progress bar Pesos (vs PTTO) ===
   tiempoPct: number;
