@@ -90,9 +90,80 @@ export interface ReportDailyRow {
   acumulado: number;
   pctPtto: number;
   velNecesaria: number;
+  /** Categoría del semáforo de vel. necesaria comparada con vel. original. */
+  velNecesTone: "success" | "warning" | "danger";
   margen: number;
   marginPct: number;
   kg: number;
+  // ===== Comparativo KG vs mismo día año anterior (para tabla en PDF) =====
+  acumKg: number;
+  acumKgPrev: number;
+  diffKg: number;
+  pctVs2025: number;
+  kgPrevDaily: number;
+}
+
+/** Punto del chart compuesto del Tracking Diario (Pesos o KG). */
+export interface TrackingChartPoint {
+  day: number;
+  // Pesos
+  ventaDiaria: number;
+  acumulado: number;
+  pttoLinear: number;
+  anoAnterior: number;
+  // Kilos
+  kgDiaria: number;
+  acumKg: number;
+  acumKgPrev: number;
+  paceKg: number;
+}
+
+/** Stats del Tracking Diario — réplica exacta de las 8 stats por modo (Pesos / Kilos)
+ *  del tab. Se usa para armar los dos grids de 8 KPIs en la página 1 del PDF. */
+export interface TrackingPdfStats {
+  // === Datos base ===
+  elapsedBizDays: number;
+  totalBizDays: number;
+  daysWithInvoice: number;
+  hasPtto: boolean;
+  hasPrev: boolean;
+  ptto: number;
+
+  // === Pesos (8 stats) ===
+  acum: number;
+  alcancePct: number; // 0-100
+  faltante: number;
+  marginMoney: number;
+  marginPct: number; // 0-100
+  prevYearVenta: number;
+  yoyCh: number; // % vs año ant.
+  velOrig: number;
+  velActual: number;
+  velNeces: number;
+  runRate: number;
+  runRatePct: number; // % del ptto
+
+  // === Kilos (8 stats) ===
+  acumKg: number;
+  prevYearKg: number;
+  yoyKgDelta: number;
+  yoyKgPct: number;
+  pace2025: number;
+  velActualKg: number;
+  ySuperaste: boolean;
+  kgGapAbs: number;
+  mesCerradoSinSuperar: boolean;
+  faltaIgualarKg: number;
+  runRateKg: number;
+  pctVs2025: number; // % de cierre 2025 (proy.)
+
+  // === Progress bar Pesos (vs PTTO) ===
+  tiempoPct: number;
+  brechaPp: number;
+  progressTone: "success" | "warning" | "danger";
+
+  // === Chart compuesto (mismas series Pesos+Kilos en el mismo array) ===
+  chartData: TrackingChartPoint[];
 }
 
 /** Datos completos del reporte. */
@@ -141,4 +212,8 @@ export interface ReportData {
 
   /** Tracking diario detallado */
   trackingDiario: ReportDailyRow[];
+
+  /** Bloques del tab Tracking Diario para la página 1 del PDF.
+   *  Réplica exacta del tab: 8 stats Pesos + 8 stats Kilos + progress bar + chart. */
+  tracking: TrackingPdfStats;
 }

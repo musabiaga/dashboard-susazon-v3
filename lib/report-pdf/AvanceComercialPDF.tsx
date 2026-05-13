@@ -21,8 +21,12 @@ import {
   View,
   Text,
   StyleSheet,
+  Svg,
+  Rect,
+  Line as SvgLine,
+  Polyline,
 } from "@react-pdf/renderer";
-import type { ReportData } from "./types";
+import type { ReportData, TrackingChartPoint } from "./types";
 
 // ============================================================
 // Fonts — usamos Helvetica (built-in) para evitar carga de fonts externas.
@@ -196,7 +200,95 @@ const styles = StyleSheet.create({
     paddingTop: 5,
   },
 
-  // === Trend chart simulado (rectángulos) ===
+  // === Stats grid (8 cards) ===
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginBottom: 8,
+  },
+  statCard: {
+    // 4 columnas → cada card ocupa ~25% (con gap). Calculamos manualmente:
+    width: "24.4%",
+    border: `0.5pt solid ${COLORS.border}`,
+    borderRadius: 3,
+    padding: 5,
+    backgroundColor: COLORS.bgMuted,
+  },
+  statLabel: {
+    fontSize: 6,
+    color: COLORS.textMuted,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  statValue: {
+    fontSize: 11,
+    fontFamily: "Helvetica-Bold",
+    color: COLORS.textPrimary,
+    marginTop: 2,
+  },
+  statValueWithInline: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 4,
+    marginTop: 2,
+    flexWrap: "wrap",
+  },
+  statValueInline: {
+    fontSize: 8,
+    color: COLORS.textSecondary,
+  },
+  statSub: {
+    fontSize: 6,
+    color: COLORS.textSecondary,
+    marginTop: 1,
+  },
+
+  // === Progress bar ===
+  progressWrap: {
+    marginVertical: 4,
+  },
+  progressTrack: {
+    height: 14,
+    width: "100%",
+    backgroundColor: COLORS.bgMuted,
+    borderRadius: 2,
+    border: `0.5pt solid ${COLORS.border}`,
+    overflow: "hidden",
+    position: "relative",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: COLORS.success,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  progressLabel: {
+    fontSize: 7,
+    color: "white",
+    fontFamily: "Helvetica-Bold",
+  },
+  progressMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 3,
+  },
+  progressMetaText: {
+    fontSize: 7,
+    color: COLORS.textSecondary,
+  },
+  progressBadge: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 7,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 2,
+    color: "white",
+  },
+
+  // === Trend chart simulado (rectángulos) — LEGACY ===
   trendChart: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -253,6 +345,28 @@ function formatMoneyExact(n: number): string {
     currency: "MXN",
     maximumFractionDigits: 0,
   }).format(n);
+}
+
+function formatKilos(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(2)}M kg`;
+  if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(1)}K kg`;
+  return `${sign}${abs.toFixed(0)} kg`;
+}
+
+function formatPctRaw(n: number, digits = 1): string {
+  if (!Number.isFinite(n)) return "—";
+  return `${n.toFixed(digits)}%`;
+}
+
+/** Variante coloreable según tone. */
+function toneColor(tone: "success" | "warning" | "danger" | "neutral"): string {
+  if (tone === "success") return COLORS.success;
+  if (tone === "warning") return COLORS.warning;
+  if (tone === "danger") return COLORS.danger;
+  return COLORS.textPrimary;
 }
 
 // ============================================================
@@ -531,12 +645,13 @@ function TopClientesTable({ data }: { data: ReportData }) {
   );
 }
 
-// === Tracking diario ===
+// === Tracking diario (con semáforo de vel. necesaria) ===
 function TrackingDiarioTable({ data }: { data: ReportData }) {
   if (data.trackingDiario.length === 0) return null;
-  const totalVenta = data.totalAvance;
-  const totalMargen = data.trackingDiario.reduce((s, r) => s + r.margen, 0);
-  const totalKg = data.trackingDiario.reduce((s, r) => s + r.kg, 0);
+  const t = data.tracking;
+  const totalVenta = t.acum;
+  const totalMargen = t.marginMoney;
+  const totalKg = t.acumKg;
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Tracking Diario · {data.monthLabel}</Text>
@@ -570,7 +685,14 @@ function TrackingDiarioTable({ data }: { data: ReportData }) {
             <Text style={[styles.cell, styles.cellRight, { width: "11%", color: COLORS.textSecondary }]}>
               {formatPct(r.pctPtto)}
             </Text>
-            <Text style={[styles.cell, styles.cellRight, { width: "16%" }]}>
+            <Text
+              style={[
+                styles.cell,
+                styles.cellRight,
+                styles.cellBold,
+                { width: "16%", color: toneColor(r.velNecesTone) },
+              ]}
+            >
               {formatMoney(r.velNecesaria)}
             </Text>
             <Text style={[styles.cell, styles.cellRight, { width: "13%" }]}>
@@ -593,7 +715,7 @@ function TrackingDiarioTable({ data }: { data: ReportData }) {
             {formatMoney(totalVenta)}
           </Text>
           <Text style={[styles.cell, styles.cellRight, { width: "11%" }]}>
-            {formatPct(data.totalObjetivo > 0 ? totalVenta / data.totalObjetivo : 0)}
+            {formatPct(t.ptto > 0 ? totalVenta / t.ptto : 0)}
           </Text>
           <Text style={[styles.cell, styles.cellRight, { width: "16%" }]}>—</Text>
           <Text style={[styles.cellBold, styles.cellRight, { width: "13%" }]}>
@@ -624,67 +746,474 @@ function FooterFixed({ data }: { data: ReportData }) {
 }
 
 // ============================================================
+// Nuevos componentes — réplica del tab TrackingDiario
+// ============================================================
+
+/** Card de 1 stat con label/value/sub o subInline. Width controlada por el grid. */
+function StatCard({
+  label,
+  value,
+  valueTone,
+  sub,
+  subInline,
+}: {
+  label: string;
+  value: string;
+  valueTone?: "success" | "warning" | "danger" | "neutral";
+  sub?: string;
+  subInline?: string;
+}) {
+  const color = toneColor(valueTone ?? "neutral");
+  return (
+    <View style={styles.statCard}>
+      <Text style={styles.statLabel}>{label}</Text>
+      {subInline ? (
+        <View style={styles.statValueWithInline}>
+          <Text style={[styles.statValue, { color }]}>{value}</Text>
+          <Text style={styles.statValueInline}>{subInline}</Text>
+        </View>
+      ) : (
+        <Text style={[styles.statValue, { color }]}>{value}</Text>
+      )}
+      {sub && <Text style={styles.statSub}>{sub}</Text>}
+    </View>
+  );
+}
+
+/** 8 stats vista PESOS (réplica exacta del tab). */
+function StatsGridPesos({ data }: { data: ReportData }) {
+  const t = data.tracking;
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Resumen del mes · Pesos</Text>
+      <View style={styles.statsGrid}>
+        <StatCard
+          label="Venta del Mes"
+          value={formatMoneyExact(t.acum)}
+          sub={`Día ${t.elapsedBizDays} de ${t.totalBizDays} · ${t.daysWithInvoice} con factura`}
+        />
+        <StatCard
+          label="Alcance Ptto"
+          value={t.hasPtto ? formatPctRaw(t.alcancePct) : "—"}
+          sub={t.hasPtto ? `${formatMoneyExact(t.faltante)} faltante` : "Sin PTTO"}
+        />
+        <StatCard
+          label="Margen $"
+          value={formatMoneyExact(t.marginMoney)}
+          subInline={formatPctRaw(t.marginPct)}
+        />
+        <StatCard
+          label="vs Mismo Mes Año Ant."
+          value={
+            t.hasPrev
+              ? `${t.yoyCh >= 0 ? "+" : ""}${t.yoyCh.toFixed(1)}%`
+              : "—"
+          }
+          valueTone={t.hasPrev ? (t.yoyCh >= 0 ? "success" : "danger") : "neutral"}
+          sub={
+            t.hasPrev
+              ? `vs ${formatMoneyExact(t.prevYearVenta)}`
+              : "Sin data año ant."
+          }
+        />
+        <StatCard
+          label="Vel. Original"
+          value={t.hasPtto ? formatMoneyExact(t.velOrig) : "—"}
+          sub="meta/día"
+        />
+        <StatCard
+          label="Vel. Actual"
+          value={formatMoneyExact(t.velActual)}
+          valueTone={
+            t.hasPtto
+              ? t.velActual >= t.velOrig
+                ? "success"
+                : "danger"
+              : "neutral"
+          }
+          sub="meta/día"
+        />
+        <StatCard
+          label="Vel. Necesaria"
+          value={t.hasPtto ? formatMoneyExact(t.velNeces) : "—"}
+          valueTone={
+            t.hasPtto
+              ? t.velNeces <= t.velOrig
+                ? "success"
+                : t.velNeces <= t.velOrig * 1.2
+                  ? "warning"
+                  : "danger"
+              : "neutral"
+          }
+          sub="meta/día"
+        />
+        <StatCard
+          label="Run Rate"
+          value={formatMoneyExact(t.runRate)}
+          sub={t.hasPtto ? `${t.runRatePct.toFixed(0)}% del ptto` : "Sin PTTO"}
+        />
+      </View>
+    </View>
+  );
+}
+
+/** 8 stats vista KILOS (réplica exacta del tab). */
+function StatsGridKilos({ data }: { data: ReportData }) {
+  const t = data.tracking;
+  const kgSign = t.yoyKgPct >= 0 ? "+" : "";
+  const kgSignDelta = t.yoyKgDelta >= 0 ? "+" : "";
+  const kgArrow = t.yoyKgPct >= 0 ? "▲" : "▼";
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Resumen del mes · Kilos</Text>
+      <View style={styles.statsGrid}>
+        <StatCard
+          label="KG del Mes"
+          value={formatKilos(t.acumKg)}
+          sub={`Día ${t.elapsedBizDays} de ${t.totalBizDays} · ${t.daysWithInvoice} con factura`}
+        />
+        <StatCard
+          label="vs 2025"
+          value={
+            t.hasPrev
+              ? `${kgArrow} ${Math.abs(t.yoyKgPct).toFixed(1)}%`
+              : "—"
+          }
+          valueTone={t.hasPrev ? (t.yoyKgPct >= 0 ? "success" : "danger") : "neutral"}
+          subInline={
+            t.hasPrev
+              ? `${kgSignDelta}${formatKilos(t.yoyKgDelta)}`
+              : "Sin data año ant."
+          }
+        />
+        <StatCard
+          label="Margen $"
+          value={formatMoneyExact(t.marginMoney)}
+          subInline={formatPctRaw(t.marginPct)}
+        />
+        <StatCard
+          label="vs Mismo Mes Año Ant."
+          value={
+            t.hasPrev
+              ? `${kgSign}${t.yoyKgPct.toFixed(1)}%`
+              : "—"
+          }
+          valueTone={t.hasPrev ? (t.yoyKgPct >= 0 ? "success" : "danger") : "neutral"}
+          sub={
+            t.hasPrev
+              ? `vs ${formatKilos(t.prevYearKg)}`
+              : "Sin data año ant."
+          }
+        />
+        <StatCard
+          label="Pace 2025"
+          value={t.hasPrev ? formatKilos(t.pace2025) : "—"}
+          sub="kg/día"
+        />
+        <StatCard
+          label="Vel. Actual"
+          value={formatKilos(t.velActualKg)}
+          valueTone={
+            t.hasPrev
+              ? t.velActualKg >= t.pace2025
+                ? "success"
+                : "danger"
+              : "neutral"
+          }
+          sub="kg/día"
+        />
+        <StatCard
+          label="Falta para igualar 2025"
+          value={
+            !t.hasPrev
+              ? "—"
+              : t.ySuperaste
+                ? "✓ Ya superaste"
+                : t.mesCerradoSinSuperar
+                  ? "✗ No alcanzado"
+                  : formatKilos(t.faltaIgualarKg)
+          }
+          valueTone={
+            !t.hasPrev
+              ? "neutral"
+              : t.ySuperaste
+                ? "success"
+                : t.mesCerradoSinSuperar
+                  ? "danger"
+                  : t.faltaIgualarKg <= t.pace2025
+                    ? "warning"
+                    : "danger"
+          }
+          sub={
+            !t.hasPrev
+              ? "Sin data año ant."
+              : t.mesCerradoSinSuperar
+                ? `-${formatKilos(t.kgGapAbs)} vs 2025`
+                : "kg/día"
+          }
+        />
+        <StatCard
+          label="Run Rate KG"
+          value={formatKilos(t.runRateKg)}
+          sub={
+            t.hasPrev
+              ? `${t.pctVs2025.toFixed(0)}% de 2025 (proy.)`
+              : "Sin data año ant."
+          }
+        />
+      </View>
+    </View>
+  );
+}
+
+/** Progress bar Pesos: avance acumulado vs PTTO con semáforo de brecha
+ *  acumulada vs avance temporal. */
+function ProgressBarPesos({ data }: { data: ReportData }) {
+  const t = data.tracking;
+  if (!t.hasPtto) return null;
+  const fillPct = Math.min(100, t.alcancePct);
+  const fillColor = toneColor(t.progressTone);
+  const brechaLabel = t.brechaPp >= 0 ? "AVANZADO" : "REZAGADO";
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Avance vs Presupuesto</Text>
+      <View style={styles.progressWrap}>
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${fillPct}%`, backgroundColor: fillColor },
+            ]}
+          >
+            {fillPct >= 12 && (
+              <Text style={styles.progressLabel}>
+                {formatMoneyExact(t.acum)} ({t.alcancePct.toFixed(0)}%)
+              </Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.progressMetaRow}>
+          <Text style={styles.progressMetaText}>
+            PTTO: {formatMoneyExact(t.ptto)} · Tiempo transcurrido:{" "}
+            {t.tiempoPct.toFixed(0)}%
+          </Text>
+          <Text style={[styles.progressBadge, { backgroundColor: fillColor }]}>
+            {brechaLabel} {t.brechaPp >= 0 ? "+" : ""}
+            {t.brechaPp.toFixed(1)} pp
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** Chart compuesto Pesos: barras (venta diaria) + 3 líneas (acumulado,
+ *  ptto lineal, acumulado año anterior). Dibujado con SVG nativo de
+ *  @react-pdf (no recharts). */
+function DailyChart({ data }: { data: ReportData }) {
+  const pts = data.tracking.chartData;
+  if (pts.length === 0) return null;
+
+  // Dimensiones del SVG. Letter width usable ≈ 540pt con paddingHorizontal 28.
+  const W = 540;
+  const H = 200;
+  const padTop = 14;
+  const padBottom = 26;
+  const padLeft = 38;
+  const padRight = 38;
+
+  const innerW = W - padLeft - padRight;
+  const innerH = H - padTop - padBottom;
+
+  // Escalas
+  const days = pts.map((p) => p.day);
+  const maxDay = Math.max(...days);
+  const minDay = Math.min(...days);
+  const dayRange = Math.max(1, maxDay - minDay);
+
+  const maxBar = Math.max(0, ...pts.map((p) => p.ventaDiaria));
+  // Para el eje izquierdo (escala compartida pero podemos manejar barras vs
+  // líneas con el mismo eje porque acumulado >> diaria, así que la barra
+  // diaria queda chiquita. Mejor uso 2 escalas como en el tab.)
+  const maxLine = Math.max(
+    0,
+    ...pts.map((p) => Math.max(p.acumulado, p.pttoLinear, p.anoAnterior))
+  );
+
+  // Helpers de coordenadas
+  const xOf = (day: number) =>
+    padLeft + ((day - minDay) / dayRange) * innerW;
+  const yBarTop = (value: number) =>
+    maxBar > 0 ? padTop + innerH - (value / maxBar) * (innerH * 0.4) : padTop + innerH;
+  // Las barras ocupan los primeros 40% verticales (parte de abajo)
+  const yLine = (value: number) =>
+    maxLine > 0
+      ? padTop + innerH - (value / maxLine) * innerH
+      : padTop + innerH;
+
+  // Build polyline points (acumulado, ptto, año ant.)
+  const acumStr = pts.map((p) => `${xOf(p.day)},${yLine(p.acumulado)}`).join(" ");
+  const pttoStr = pts.map((p) => `${xOf(p.day)},${yLine(p.pttoLinear)}`).join(" ");
+  const anioStr = pts.map((p) => `${xOf(p.day)},${yLine(p.anoAnterior)}`).join(" ");
+
+  // Ancho de cada barra
+  const barW = Math.max(2, Math.min(18, (innerW / pts.length) * 0.55));
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>
+        Tendencia diaria · {data.monthLabel} (barras: venta del día · líneas: acumulado)
+      </Text>
+      <Svg width={W} height={H}>
+        {/* Ejes/grid suave */}
+        <SvgLine
+          x1={padLeft}
+          y1={padTop + innerH}
+          x2={padLeft + innerW}
+          y2={padTop + innerH}
+          stroke={COLORS.borderStrong}
+          strokeWidth={0.5}
+        />
+        <SvgLine
+          x1={padLeft}
+          y1={padTop}
+          x2={padLeft}
+          y2={padTop + innerH}
+          stroke={COLORS.border}
+          strokeWidth={0.3}
+        />
+        {/* Líneas horizontales tenues cada 25% */}
+        {[0.25, 0.5, 0.75].map((f) => (
+          <SvgLine
+            key={f}
+            x1={padLeft}
+            y1={padTop + innerH * (1 - f)}
+            x2={padLeft + innerW}
+            y2={padTop + innerH * (1 - f)}
+            stroke={COLORS.border}
+            strokeWidth={0.3}
+            strokeDasharray="2 2"
+          />
+        ))}
+
+        {/* Barras venta diaria */}
+        {pts.map((p) => {
+          const x = xOf(p.day) - barW / 2;
+          const y = yBarTop(p.ventaDiaria);
+          const h = padTop + innerH - y;
+          if (p.ventaDiaria <= 0) return null;
+          return (
+            <Rect
+              key={`bar-${p.day}`}
+              x={x}
+              y={y}
+              width={barW}
+              height={Math.max(0.5, h)}
+              fill={COLORS.orange}
+              fillOpacity={0.5}
+            />
+          );
+        })}
+
+        {/* Línea año anterior (gris claro) */}
+        <Polyline
+          points={anioStr}
+          stroke={COLORS.textMuted}
+          strokeWidth={0.8}
+          fill="none"
+          strokeDasharray="3 2"
+        />
+        {/* Línea PTTO lineal (marrón) */}
+        <Polyline
+          points={pttoStr}
+          stroke={COLORS.brown}
+          strokeWidth={0.8}
+          fill="none"
+          strokeDasharray="4 2"
+        />
+        {/* Línea acumulado (naranja) */}
+        <Polyline
+          points={acumStr}
+          stroke={COLORS.orangeDark}
+          strokeWidth={1.4}
+          fill="none"
+        />
+      </Svg>
+
+      {/* Labels eje X simulados — solo cada 3 días para no saturar */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingLeft: padLeft,
+          paddingRight: padRight,
+          marginTop: -22,
+          marginBottom: 4,
+        }}
+      >
+        {labelDaysEvery(pts, 3).map((p) => (
+          <View
+            key={p.day}
+            style={{
+              position: "absolute",
+              left: xOf(p.day) - 6,
+              top: 4,
+            }}
+          >
+            <Text style={{ fontSize: 6, color: COLORS.textMuted }}>{p.day}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Leyenda */}
+      <View style={{ flexDirection: "row", gap: 10, justifyContent: "center", marginTop: 4 }}>
+        <Legend color={COLORS.orange} label="Venta del día" />
+        <Legend color={COLORS.orangeDark} label="Venta acumulada" />
+        <Legend color={COLORS.brown} label="PTTO lineal" />
+        <Legend color={COLORS.textMuted} label="Acum. año anterior" />
+      </View>
+    </View>
+  );
+}
+
+/** Filtra puntos para mostrar cada N días en eje X. */
+function labelDaysEvery(pts: TrackingChartPoint[], step: number): TrackingChartPoint[] {
+  const out: TrackingChartPoint[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    if (i % step === 0 || i === pts.length - 1) out.push(pts[i]);
+  }
+  return out;
+}
+
+// ============================================================
 // Documento PDF principal
 // ============================================================
 
 export function AvanceComercialPDF({ data }: { data: ReportData }) {
-  const totalRow = {
-    objetivo: data.totalObjetivo,
-    avance: data.totalAvance,
-    proyeccion: data.totalProyeccion,
-    pctVsObjetivo: data.totalPctVsObjetivo,
-    marginPct: data.totalMarginPct,
-  };
-
   return (
     <Document
       title={`Avance Comercial ${data.monthLabel}`}
       author="InCom · Susazón"
       subject="Reporte de avance comercial"
     >
+      {/* === Página 1: réplica del tab Tracking Diario === */}
       <Page size="LETTER" style={styles.page}>
         <Header data={data} />
         <FooterFixed data={data} />
 
-        {/* Modo SINGLE: KPIs del territorio focalizado */}
-        {data.mode.kind === "single" && <SingleTerritoryKpis data={data} />}
+        {/* 8 stats Pesos arriba */}
+        <StatsGridPesos data={data} />
 
-        {/* Modo MULTI/ALL: KPIs de venta del día por división */}
-        <KpiBoxes data={data} />
+        {/* 8 stats Kilos abajo */}
+        <StatsGridKilos data={data} />
 
-        {/* Tendencia mensual */}
-        <TrendChart data={data} />
+        {/* Progress bar avance vs PTTO */}
+        <ProgressBarPesos data={data} />
 
-        {/* Tablas Por División / Por Empresa (solo multi/all) */}
-        {data.mode.kind !== "single" && data.porDivision && (
-          <SummaryTable
-            title="Por División (canal)"
-            rows={data.porDivision}
-            showMargin={false}
-            totalRow={totalRow}
-          />
-        )}
-        {data.mode.kind !== "single" && data.porEmpresa && data.porEmpresa.length > 1 && (
-          <SummaryTable
-            title="Por Empresa"
-            rows={data.porEmpresa}
-            showMargin={false}
-            totalRow={totalRow}
-          />
-        )}
-
-        {/* Tabla Por Territorio (siempre, con margen) */}
-        {data.porTerritorio && data.porTerritorio.length > 0 && (
-          <SummaryTable
-            title="Por Territorio"
-            rows={data.porTerritorio}
-            showMargin
-            totalRow={totalRow}
-          />
-        )}
+        {/* Chart compuesto (barras venta diaria + líneas acumulado/ptto/año ant) */}
+        <DailyChart data={data} />
       </Page>
 
-      {/* Página 2: agregados (Top Clientes + Tracking Diario) */}
+      {/* === Página 2: Top 10 Clientes + Tracking Diario detallado === */}
       <Page size="LETTER" style={styles.page}>
         <Header data={data} />
         <FooterFixed data={data} />
