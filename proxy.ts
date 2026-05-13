@@ -69,6 +69,27 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Con sesión Y must_change_password=true → bloquear a /mi-cuenta hasta
+  // que cambie la contraseña (caso típico: usuario creado con password
+  // directa por admin). Excepción: la propia /mi-cuenta, /api/auth/* y
+  // /api/admin (porque puede ser un admin gestionando algo desde admin).
+  if (user && !isPublicRoute) {
+    const mustChange =
+      (user.user_metadata as { must_change_password?: boolean } | null)
+        ?.must_change_password === true;
+    if (mustChange) {
+      const allowedDuringForcedChange =
+        pathname === "/mi-cuenta" ||
+        pathname.startsWith("/api/auth/") ||
+        pathname.startsWith("/_next");
+      if (!allowedDuringForcedChange) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/mi-cuenta";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
   return response;
 }
 

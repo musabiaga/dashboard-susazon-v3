@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, BarChart3, Database, Shield } from "lucide-react";
+import { LogOut, BarChart3, Database, Shield, KeyRound } from "lucide-react";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
 import { SusazonLogo } from "@/components/brand/SusazonLogo";
 import { InstructivoButton } from "@/components/dashboard/InstructivoButton";
@@ -85,11 +85,16 @@ export function Header({
 
       <div className="flex items-center gap-3">
         {userName && (
-          <div className="hidden flex-col items-end leading-tight sm:flex">
+          <Link
+            href="/mi-cuenta"
+            title="Mi cuenta · Cambiar contraseña"
+            className="hidden flex-col items-end leading-tight transition-opacity hover:opacity-80 sm:flex"
+          >
             <span
-              className="text-sm font-medium"
+              className="flex items-center gap-1 text-sm font-medium"
               style={{ color: "var(--text-on-header)" }}
             >
+              <KeyRound size={11} style={{ opacity: 0.55 }} />
               {userName}
             </span>
             {userRole && (
@@ -100,7 +105,7 @@ export function Header({
                 {userRole}
               </span>
             )}
-          </div>
+          </Link>
         )}
 
         <InstructivoButton visible={instructivoVisible} />

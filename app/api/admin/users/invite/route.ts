@@ -5,6 +5,9 @@ import {
   isValidEmail,
   isValidRole,
 } from "@/lib/admin-guards";
+import { validatePassword } from "@/lib/password-utils";
+
+type AuthMethod = "email" | "password";
 
 interface InviteBody {
   email: string;
@@ -13,13 +16,25 @@ interface InviteBody {
   allowed_territories: string[] | null;
   can_edit_ptto: boolean;
   can_export_excel?: boolean;
+  /** Método de auth (default "email" para back-compat). */
+  auth_method?: AuthMethod;
+  /** Contraseña inicial — requerida si auth_method === "password". */
+  initial_password?: string;
+  /** Forzar cambio en primer login — solo aplica con password. Default true. */
+  force_change_password?: boolean;
 }
 
 /**
  * POST /api/admin/users/invite
- * Crea un nuevo usuario en auth.users + users_permissions y manda magic link
- * via inviteUserByEmail (Supabase). El usuario fija su propia contraseña al
- * abrir el link.
+ *
+ * Crea un nuevo usuario en auth.users + users_permissions.
+ *
+ * Dos métodos de alta soportados:
+ *   - auth_method: "email" (default, back-compat) → manda magic link via
+ *     inviteUserByEmail. El usuario fija su contraseña al abrir el link en /set-password.
+ *   - auth_method: "password" → admin asigna una contraseña directa. No se manda
+ *     email. El user_metadata.must_change_password queda en true por default
+ *     para forzar al usuario a cambiar la contraseña en su primer login.
  */
 export async function POST(request: NextRequest) {
   const guard = await requireAdmin();
@@ -48,6 +63,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const authMethod: AuthMethod = body.auth_method === "password" ? "password" : "email";
+  const forceChangePassword = body.force_change_password !== false; // default true
+
+  // Validar password si auth_method === "password"
+  if (authMethod === "password") {
+    const pwValidation = validatePassword(body.initial_password);
+    if (!pwValidation.ok) {
+      return NextResponse.json({ error: pwValidation.error }, { status: 400 });
+    }
+  }
+
   const email = body.email.trim().toLowerCase();
   const fullName = body.full_name.trim();
   const role = body.role;
@@ -56,8 +82,6 @@ export async function POST(request: NextRequest) {
       ? null
       : Array.from(new Set(body.allowed_territories.map((t) => t.trim())));
   const canEditPtto = body.can_edit_ptto;
-  // Default: admin/director sí pueden exportar Excel; gerente/vendedor no.
-  // El admin puede override en el form de invite.
   const canExportExcel =
     typeof body.can_export_excel === "boolean"
       ? body.can_export_excel
@@ -65,32 +89,46 @@ export async function POST(request: NextRequest) {
 
   const admin = createSupabaseAdminClient();
 
-  // 1. Invitar via auth admin API — manda email con magic link.
-  // El redirectTo apunta a /set-password donde el invitado fija su contraseña
-  // antes de poder usar la app. Construimos la URL desde el origin del request
-  // para que funcione tanto en local (http://localhost:3000) como en prod
-  // (https://*.vercel.app), sin depender del Site URL de Supabase.
-  const origin = new URL(request.url).origin;
-  // redirectTo va al callback (Route Handler que SÍ puede setear cookies de
-  // sesión Supabase) con next apuntando a /set-password?from=invite. Server
-  // Components no pueden mutar cookies, por eso el exchange tiene que hacerse
-  // en el callback antes de llegar a /set-password.
-  const next = encodeURIComponent("/set-password?from=invite");
-  const redirectTo = `${origin}/api/auth/callback?next=${next}`;
+  // 1. Crear el usuario auth — distinto path según authMethod
+  let userId: string;
 
-  const { data: invited, error: inviteErr } =
-    await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
+  if (authMethod === "password") {
+    // Crear directamente con contraseña. email_confirm=true para que pueda
+    // hacer login sin pasos extra. user_metadata.must_change_password fuerza
+    // al usuario a /mi-cuenta en su primer login si forceChangePassword.
+    const { data: created, error: createErr } = await admin.auth.admin.createUser({
+      email,
+      password: body.initial_password!,
+      email_confirm: true,
+      user_metadata: {
+        must_change_password: forceChangePassword,
+      },
+    });
+    if (createErr || !created?.user) {
+      const msg = createErr?.message ?? "Error desconocido al crear usuario";
+      return NextResponse.json(
+        { error: `No se pudo crear el usuario: ${msg}` },
+        { status: 400 }
+      );
+    }
+    userId = created.user.id;
+  } else {
+    // Flow tradicional: magic link via inviteUserByEmail
+    const origin = new URL(request.url).origin;
+    const next = encodeURIComponent("/set-password?from=invite");
+    const redirectTo = `${origin}/api/auth/callback?next=${next}`;
 
-  if (inviteErr || !invited?.user) {
-    // Si el user ya existe en auth, devolver error claro
-    const msg = inviteErr?.message ?? "Error desconocido al invitar";
-    return NextResponse.json(
-      { error: `No se pudo invitar: ${msg}` },
-      { status: 400 }
-    );
+    const { data: invited, error: inviteErr } =
+      await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
+    if (inviteErr || !invited?.user) {
+      const msg = inviteErr?.message ?? "Error desconocido al invitar";
+      return NextResponse.json(
+        { error: `No se pudo invitar: ${msg}` },
+        { status: 400 }
+      );
+    }
+    userId = invited.user.id;
   }
-
-  const userId = invited.user.id;
 
   // 2. Crear o actualizar fila en users_permissions
   const { data: perms, error: permsErr } = await admin
@@ -114,7 +152,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (permsErr || !perms) {
-    // Si falla la creación del perms, limpiar el auth user para no dejar zombies
+    // Cleanup auth user si falló perms (evitar zombies)
     await admin.auth.admin.deleteUser(userId).catch(() => {});
     return NextResponse.json(
       {
@@ -135,6 +173,9 @@ export async function POST(request: NextRequest) {
       role,
       allowed_territories: allowedTerritories,
       can_edit_ptto: canEditPtto,
+      can_export_excel: canExportExcel,
+      auth_method: authMethod,
+      force_change_password: authMethod === "password" ? forceChangePassword : null,
     },
   });
 
@@ -143,5 +184,7 @@ export async function POST(request: NextRequest) {
       ...perms,
       last_login: null,
     },
+    auth_method: authMethod,
+    must_change_password: authMethod === "password" ? forceChangePassword : null,
   });
 }

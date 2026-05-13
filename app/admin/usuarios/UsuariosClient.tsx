@@ -61,8 +61,17 @@ export function UsuariosClient({ initial, territories }: Props) {
   const [modal, setModal] = useState<
     | { kind: "invite" }
     | { kind: "edit"; user: UserRow }
+    | { kind: "reset"; user: UserRow }
     | null
   >(null);
+
+  // Tras un invite/reset con método "password", mostramos la pw al admin
+  // para que la copie y la transmita al usuario.
+  const [passwordReveal, setPasswordReveal] = useState<{
+    email: string;
+    password: string;
+    action: "invite" | "reset";
+  } | null>(null);
 
   const stats = {
     total: users.length,
@@ -88,9 +97,19 @@ export function UsuariosClient({ initial, territories }: Props) {
       if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
       setUsers((prev) => [...prev, j.user as UserRow]);
       setModal(null);
-      flashSuccess(
-        `Invitación enviada a ${form.email}. Revisará su correo para fijar contraseña.`
-      );
+      // Si fue alta con password directa, mostrar la pw al admin para que
+      // la copie y la transmita al usuario por canal seguro.
+      if (form.auth_method === "password" && form.initial_password) {
+        setPasswordReveal({
+          email: form.email,
+          password: form.initial_password,
+          action: "invite",
+        });
+      } else {
+        flashSuccess(
+          `Invitación enviada a ${form.email}. Revisará su correo para fijar contraseña.`
+        );
+      }
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido");
@@ -160,19 +179,43 @@ export function UsuariosClient({ initial, territories }: Props) {
     }
   }
 
-  async function handleResetPassword(u: UserRow) {
-    if (!confirm(`Enviar email de reset de contraseña a ${u.email}?`)) return;
+  // Abre modal con 2 opciones de reset (email vs password directa).
+  function handleResetPassword(u: UserRow) {
+    setModal({ kind: "reset", user: u });
+  }
+
+  // Ejecuta el reset elegido en el modal.
+  async function performResetPassword(
+    u: UserRow,
+    method: "email" | "password",
+    newPassword?: string
+  ) {
     setError(null);
     setPendingId(u.user_id);
     try {
       const res = await fetch("/api/admin/users/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: u.user_id }),
+        body: JSON.stringify({
+          user_id: u.user_id,
+          method,
+          new_password: method === "password" ? newPassword : undefined,
+          force_change_password: true,
+        }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
-      flashSuccess(`Email de reset enviado a ${u.email}.`);
+      setModal(null);
+      if (method === "password" && newPassword) {
+        // Mostrar la pw al admin
+        setPasswordReveal({
+          email: u.email,
+          password: newPassword,
+          action: "reset",
+        });
+      } else {
+        flashSuccess(`Email de reset enviado a ${u.email}.`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido");
     } finally {
@@ -376,8 +419,8 @@ export function UsuariosClient({ initial, territories }: Props) {
         )}
       </div>
 
-      {/* Modal */}
-      {modal && (
+      {/* Modal invitar / editar */}
+      {modal && (modal.kind === "invite" || modal.kind === "edit") && (
         <UserFormModal
           kind={modal.kind}
           user={modal.kind === "edit" ? modal.user : null}
@@ -393,6 +436,28 @@ export function UsuariosClient({ initial, territories }: Props) {
           }}
         />
       )}
+
+      {/* Modal reset password (con tabs) */}
+      {modal && modal.kind === "reset" && (
+        <ResetPasswordModal
+          user={modal.user}
+          submitting={pendingId !== null}
+          onClose={() => setModal(null)}
+          onSubmit={(method, newPassword) =>
+            performResetPassword(modal.user, method, newPassword)
+          }
+        />
+      )}
+
+      {/* Modal reveal de contraseña (tras invite/reset con method password) */}
+      {passwordReveal && (
+        <PasswordRevealModal
+          email={passwordReveal.email}
+          password={passwordReveal.password}
+          action={passwordReveal.action}
+          onClose={() => setPasswordReveal(null)}
+        />
+      )}
     </div>
   );
 }
@@ -405,6 +470,14 @@ interface FormPayload {
   allowed_territories: string[] | null; // null = todos
   can_edit_ptto: boolean;
   can_export_excel: boolean;
+  /** Solo aplica en modo "invite" — define cómo se da de alta el usuario.
+   *  "email" = magic link (flow tradicional).
+   *  "password" = admin asigna contraseña directa. */
+  auth_method?: "email" | "password";
+  /** Solo si auth_method === "password" */
+  initial_password?: string;
+  /** Solo si auth_method === "password". Default true. */
+  force_change_password?: boolean;
 }
 
 function UserFormModal({
@@ -439,6 +512,14 @@ function UserFormModal({
     user?.can_export_excel ??
       (user?.role === "admin" || user?.role === "director")
   );
+  // Auth method (solo modo invite). Default "password" — más rápido, no
+  // depende de email. El admin puede cambiar a "email" si prefiere.
+  const [authMethod, setAuthMethod] = useState<"email" | "password">(
+    "password"
+  );
+  const [initialPassword, setInitialPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [forceChangePassword, setForceChangePassword] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
 
   function toggleTerritory(t: string) {
@@ -463,6 +544,15 @@ function UserFormModal({
       );
       return;
     }
+    // Validar password solo en modo invite + password
+    if (kind === "invite" && authMethod === "password") {
+      if (initialPassword.length < 8) {
+        setLocalError(
+          "La contraseña inicial debe tener al menos 8 caracteres."
+        );
+        return;
+      }
+    }
     onSubmit({
       email: email.trim().toLowerCase(),
       full_name: fullName.trim(),
@@ -470,7 +560,32 @@ function UserFormModal({
       allowed_territories: allTerritories ? null : selected,
       can_edit_ptto: canEditPtto,
       can_export_excel: canExportExcel,
+      ...(kind === "invite"
+        ? {
+            auth_method: authMethod,
+            initial_password:
+              authMethod === "password" ? initialPassword : undefined,
+            force_change_password:
+              authMethod === "password" ? forceChangePassword : undefined,
+          }
+        : {}),
     });
+  }
+
+  function generateRandomPassword() {
+    // Genera 12 chars random sin ambiguos (sin O/0, I/l/1, S/5).
+    // crypto.getRandomValues() está disponible en browser.
+    const alphabet =
+      "ABCDEFGHJKLMNPQRSTUVWXYZ" +
+      "abcdefghijkmnpqrstuvwxyz" +
+      "23456789" +
+      "!@#$%&*?+-";
+    const arr = new Uint32Array(12);
+    crypto.getRandomValues(arr);
+    let pw = "";
+    for (let i = 0; i < 12; i++) pw += alphabet[arr[i] % alphabet.length];
+    setInitialPassword(pw);
+    setShowPassword(true); // mostrar al usuario tras generar
   }
 
   return (
@@ -664,6 +779,132 @@ function UserFormModal({
             />
             <span>Puede descargar Excel desde los tabs</span>
           </label>
+
+          {/* SOLO EN MODO INVITE: método de alta (email vs password directa) */}
+          {kind === "invite" && (
+            <div
+              className="rounded-[var(--radius)] border p-3 space-y-3"
+              style={{
+                background: "var(--bg-surface-muted)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <Field label="Método de alta">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAuthMethod("password")}
+                    className="flex-1 rounded-[var(--radius)] border px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors"
+                    style={{
+                      background:
+                        authMethod === "password"
+                          ? "var(--accent-soft)"
+                          : "var(--bg-surface)",
+                      borderColor:
+                        authMethod === "password"
+                          ? "var(--accent)"
+                          : "var(--border)",
+                      color:
+                        authMethod === "password"
+                          ? "var(--accent)"
+                          : "var(--text-secondary)",
+                    }}
+                  >
+                    🔐 Contraseña directa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMethod("email")}
+                    className="flex-1 rounded-[var(--radius)] border px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors"
+                    style={{
+                      background:
+                        authMethod === "email"
+                          ? "var(--accent-soft)"
+                          : "var(--bg-surface)",
+                      borderColor:
+                        authMethod === "email"
+                          ? "var(--accent)"
+                          : "var(--border)",
+                      color:
+                        authMethod === "email"
+                          ? "var(--accent)"
+                          : "var(--text-secondary)",
+                    }}
+                  >
+                    📧 Magic link
+                  </button>
+                </div>
+                <p
+                  className="mt-2 text-[11px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {authMethod === "password"
+                    ? "Asignás una contraseña inicial y la transmitís al usuario por canal seguro (WhatsApp, en persona). El usuario deberá cambiarla en su primer login."
+                    : "Supabase manda un link al email del usuario para que él fije su contraseña. Requiere que el email funcione."}
+                </p>
+              </Field>
+
+              {authMethod === "password" && (
+                <>
+                  <Field label="Contraseña inicial">
+                    <div
+                      className="flex items-center gap-2 rounded-[var(--radius)] border px-3"
+                      style={{
+                        background: "var(--bg-surface)",
+                        borderColor: "var(--border)",
+                      }}
+                    >
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={initialPassword}
+                        onChange={(e) => setInitialPassword(e.target.value)}
+                        placeholder="Mínimo 8 caracteres"
+                        className="flex-1 bg-transparent py-2 text-sm outline-none tabular-nums"
+                        style={{ color: "var(--text-primary)" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        title={showPassword ? "Ocultar" : "Mostrar"}
+                        className="text-xs"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {showPassword ? "Ocultar" : "Mostrar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={generateRandomPassword}
+                        title="Generar contraseña aleatoria de 12 caracteres"
+                        className="rounded-[var(--radius-sm)] border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors hover:bg-[var(--bg-surface-muted)]"
+                        style={{
+                          borderColor: "var(--border)",
+                          color: "var(--accent)",
+                        }}
+                      >
+                        🎲 Generar
+                      </button>
+                    </div>
+                  </Field>
+
+                  <label
+                    className="flex items-center gap-2 text-sm"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={forceChangePassword}
+                      onChange={(e) =>
+                        setForceChangePassword(e.target.checked)
+                      }
+                    />
+                    <span>
+                      Forzar cambio de contraseña en primer login (recomendado)
+                    </span>
+                  </label>
+                </>
+              )}
+            </div>
+          )}
 
           {localError && (
             <div
@@ -946,5 +1187,362 @@ function Td({
     >
       {children}
     </td>
+  );
+}
+
+// ============================================================
+// PasswordRevealModal — muestra la contraseña al admin tras invitar
+// o resetear con método "password directa". El admin la copia y la
+// transmite al usuario por canal seguro (WhatsApp, en persona).
+// ============================================================
+function PasswordRevealModal({
+  email,
+  password,
+  action,
+  onClose,
+}: {
+  email: string;
+  password: string;
+  action: "invite" | "reset";
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyPassword() {
+    try {
+      await navigator.clipboard.writeText(password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback: select manualmente
+      window.prompt("Copia la contraseña manualmente:", password);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.55)" }}
+    >
+      <div
+        className="w-full max-w-md rounded-[var(--radius-lg)] border shadow-2xl"
+        style={{
+          background: "var(--bg-surface)",
+          borderColor: "var(--border-strong)",
+        }}
+      >
+        <header
+          className="flex items-center gap-2 border-b px-4 py-3"
+          style={{
+            borderColor: "var(--border)",
+            background: "var(--success-soft)",
+          }}
+        >
+          <span className="text-2xl">✓</span>
+          <div>
+            <h2
+              className="text-base font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {action === "invite" ? "Usuario creado" : "Contraseña reseteada"}
+            </h2>
+            <p
+              className="text-[11px]"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {email}
+            </p>
+          </div>
+        </header>
+
+        <div className="space-y-3 p-4">
+          <div
+            className="rounded-[var(--radius)] border px-4 py-3 font-mono text-base tabular-nums"
+            style={{
+              background: "var(--bg-surface-muted)",
+              borderColor: "var(--border)",
+              color: "var(--text-primary)",
+              letterSpacing: "0.05em",
+            }}
+          >
+            {password}
+          </div>
+
+          <button
+            type="button"
+            onClick={copyPassword}
+            className="flex w-full items-center justify-center gap-2 rounded-[var(--radius)] px-4 py-2.5 text-sm font-semibold uppercase tracking-wider transition-all hover:opacity-90"
+            style={{
+              background: copied ? "var(--success)" : "var(--accent)",
+              color: "white",
+            }}
+          >
+            {copied ? "✓ Copiada al portapapeles" : "📋 Copiar contraseña"}
+          </button>
+
+          <div
+            className="rounded-[var(--radius)] border px-3 py-2 text-[11px]"
+            style={{
+              background: "var(--warning-soft)",
+              borderColor: "var(--warning)",
+              color: "var(--text-primary)",
+            }}
+          >
+            <strong>Importante:</strong> Esta contraseña no se guarda en la
+            aplicación. Transmítela al usuario por canal seguro (WhatsApp con
+            E2EE, en persona). El usuario deberá cambiarla en su primer login.
+            Si cierras este diálogo, no podrás verla otra vez.
+          </div>
+        </div>
+
+        <footer
+          className="flex justify-end border-t px-4 py-3"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[var(--radius)] border px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--bg-surface-muted)]"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-primary)",
+            }}
+          >
+            Listo, ya la transmití
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ResetPasswordModal — 2 opciones: enviar email recovery o asignar
+// nueva password directa.
+// ============================================================
+function ResetPasswordModal({
+  user,
+  submitting,
+  onClose,
+  onSubmit,
+}: {
+  user: UserRow;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (method: "email" | "password", newPassword?: string) => void;
+}) {
+  const [method, setMethod] = useState<"email" | "password">("password");
+  const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  function generate() {
+    const alphabet =
+      "ABCDEFGHJKLMNPQRSTUVWXYZ" +
+      "abcdefghijkmnpqrstuvwxyz" +
+      "23456789" +
+      "!@#$%&*?+-";
+    const arr = new Uint32Array(12);
+    crypto.getRandomValues(arr);
+    let pw = "";
+    for (let i = 0; i < 12; i++) pw += alphabet[arr[i] % alphabet.length];
+    setNewPassword(pw);
+    setShowPassword(true);
+  }
+
+  function submit() {
+    setLocalError(null);
+    if (method === "password") {
+      if (newPassword.length < 8) {
+        setLocalError("La contraseña debe tener al menos 8 caracteres.");
+        return;
+      }
+      onSubmit("password", newPassword);
+    } else {
+      onSubmit("email");
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-[var(--radius-lg)] border shadow-2xl"
+        style={{
+          background: "var(--bg-surface)",
+          borderColor: "var(--border-strong)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header
+          className="border-b px-4 py-3"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <h2
+            className="text-base font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Resetear contraseña
+          </h2>
+          <p
+            className="text-[11px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {user.full_name} · {user.email}
+          </p>
+        </header>
+
+        <div className="space-y-4 p-4">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setMethod("password")}
+              className="flex-1 rounded-[var(--radius)] border px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors"
+              style={{
+                background:
+                  method === "password"
+                    ? "var(--accent-soft)"
+                    : "var(--bg-surface)",
+                borderColor:
+                  method === "password" ? "var(--accent)" : "var(--border)",
+                color:
+                  method === "password"
+                    ? "var(--accent)"
+                    : "var(--text-secondary)",
+              }}
+            >
+              🔐 Contraseña directa
+            </button>
+            <button
+              type="button"
+              onClick={() => setMethod("email")}
+              className="flex-1 rounded-[var(--radius)] border px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors"
+              style={{
+                background:
+                  method === "email"
+                    ? "var(--accent-soft)"
+                    : "var(--bg-surface)",
+                borderColor:
+                  method === "email" ? "var(--accent)" : "var(--border)",
+                color:
+                  method === "email"
+                    ? "var(--accent)"
+                    : "var(--text-secondary)",
+              }}
+            >
+              📧 Email recovery
+            </button>
+          </div>
+
+          {method === "password" ? (
+            <>
+              <div>
+                <label
+                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Nueva contraseña
+                </label>
+                <div
+                  className="flex items-center gap-2 rounded-[var(--radius)] border px-3"
+                  style={{
+                    background: "var(--bg-surface-muted)",
+                    borderColor: "var(--border)",
+                  }}
+                >
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 8 caracteres"
+                    className="flex-1 bg-transparent py-2 text-sm outline-none tabular-nums"
+                    style={{ color: "var(--text-primary)" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {showPassword ? "Ocultar" : "Mostrar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={generate}
+                    className="rounded-[var(--radius-sm)] border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors hover:bg-[var(--bg-surface-muted)]"
+                    style={{
+                      borderColor: "var(--border)",
+                      color: "var(--accent)",
+                    }}
+                  >
+                    🎲 Generar
+                  </button>
+                </div>
+                <p
+                  className="mt-1 text-[11px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Tras guardar, el usuario será forzado a cambiarla en su
+                  siguiente login.
+                </p>
+              </div>
+            </>
+          ) : (
+            <p
+              className="text-sm"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Se enviará un email a <strong>{user.email}</strong> con un
+              link para que el usuario defina su nueva contraseña. Útil si el
+              usuario tiene acceso a su email y prefiere ese flow.
+            </p>
+          )}
+
+          {localError && (
+            <div
+              className="flex items-start gap-2 rounded-[var(--radius)] border px-3 py-2 text-xs"
+              style={{
+                background: "var(--danger-soft)",
+                borderColor: "var(--danger)",
+                color: "var(--danger)",
+              }}
+            >
+              <AlertCircle size={14} className="mt-0.5 shrink-0" />
+              <span>{localError}</span>
+            </div>
+          )}
+        </div>
+
+        <footer
+          className="flex justify-end gap-2 border-t px-4 py-3"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="rounded-[var(--radius)] border px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--bg-surface-muted)] disabled:opacity-50"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={submitting}
+            className="rounded-[var(--radius)] px-4 py-2 text-sm font-semibold uppercase tracking-wider transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            {submitting ? "Procesando…" : "Confirmar reset"}
+          </button>
+        </footer>
+      </div>
+    </div>
   );
 }
