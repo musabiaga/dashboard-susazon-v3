@@ -13,6 +13,8 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { formatMoney, formatKilos } from "@/lib/format";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import { ReportButton } from "@/components/dashboard/ReportButton";
+import type { BuildReportInput } from "@/lib/report-pdf/data";
 import type {
   ExcelColumn,
   ExcelSummaryRow,
@@ -137,6 +139,8 @@ interface Props {
   /** Fecha ISO "hoy - 90 días" (CDMX). Cliente es "Nuevo" si su
    *  first_purchase_date >= esta fecha. */
   newCustomerCutoffDate?: string;
+  /** Input para el reporte PDF "Avance Comercial". */
+  reportInput?: BuildReportInput | null;
 }
 
 interface Computed {
@@ -224,6 +228,7 @@ export function PerdidosTab({
   currentTerritory = "",
   canExportExcel = false,
   newCustomerCutoffDate,
+  reportInput = null,
 }: Props) {
   // Mejora 7: multi-select de territorios ahora vive en el sidebar global.
   // Aquí solo recibimos los rows ya agregados (DashboardClient hace la
@@ -843,7 +848,7 @@ export function PerdidosTab({
   return (
     <div className="space-y-4">
       {/* Toggles + export (multi-select de territorios vive en el sidebar global) */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <MetricToggle value={metric} onChange={switchMetric} />
         <DimToggle value={dim} onChange={setDim} monthShortYY={monthShortYY} />
         <ExportExcelButton
@@ -856,6 +861,7 @@ export function PerdidosTab({
               : `Exportar ${tableRows.length} fila${tableRows.length === 1 ? "" : "s"} a Excel`
           }
         />
+        <ReportButton reportInput={reportInput} canExport={canExportExcel} />
       </div>
 
       {/* Dona de status + alertas laterales */}

@@ -17,6 +17,8 @@ import type { DimensionRow } from "@/components/dashboard/DimensionTab";
 import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import { ReportButton } from "@/components/dashboard/ReportButton";
+import type { BuildReportInput } from "@/lib/report-pdf/data";
 import type {
   ExcelColumn,
   ExcelSummaryRow,
@@ -40,6 +42,8 @@ interface Props {
   exportPeriodLabel?: string;
   /** Permiso para descargar Excel (default false). */
   canExportExcel?: boolean;
+  /** Input para el reporte PDF "Avance Comercial". */
+  reportInput?: BuildReportInput | null;
 }
 
 /**
@@ -60,6 +64,7 @@ export function ProductosTab({
   exportTerritory = "",
   exportPeriodLabel,
   canExportExcel = false,
+  reportInput = null,
 }: Props) {
   const [topNChart, setTopNChart] = useState<10 | 15>(topNChartDefault);
 
@@ -304,8 +309,8 @@ export function ProductosTab({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar superior: solo botón export */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      {/* Toolbar superior: botones de exportación */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <ExportExcelButton
           onExport={handleExportExcel}
           disabled={tableRows.length === 0}
@@ -316,6 +321,7 @@ export function ProductosTab({
               : `Exportar ${tableRows.length} SKU${tableRows.length === 1 ? "" : "s"} a Excel`
           }
         />
+        <ReportButton reportInput={reportInput} canExport={canExportExcel} />
       </div>
 
       {/* ============ Chart top N — venta + kilos ============ */}

@@ -18,6 +18,8 @@ import { countBizDays, isBusinessDay } from "@/lib/business-days";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import { ReportButton } from "@/components/dashboard/ReportButton";
+import type { BuildReportInput } from "@/lib/report-pdf/data";
 import type {
   ExcelColumn,
   ExcelSummaryRow,
@@ -61,6 +63,8 @@ interface Props {
   territorio?: string;
   /** Permiso para descargar Excel (default false). */
   canExportExcel?: boolean;
+  /** Input para el reporte PDF "Avance Comercial". */
+  reportInput?: BuildReportInput | null;
 }
 
 export function TrackingDiarioTab({
@@ -74,6 +78,7 @@ export function TrackingDiarioTab({
   totalBizDays,
   territorio = "",
   canExportExcel = false,
+  reportInput = null,
 }: Props) {
   // ============ Estado de expansión de filas (Mejora 1) ============
   // Al hacer click en la flecha de un día, se hace fetch lazy a
@@ -531,7 +536,7 @@ export function TrackingDiarioTab({
   return (
     <div className="space-y-4">
       {/* ============ Toggle Pesos / Kilos + Export ============ */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <ModeToggle mode={mode} onChange={switchMode} />
         <ExportExcelButton
           onExport={handleExportExcel}
@@ -543,6 +548,7 @@ export function TrackingDiarioTab({
               : `Exportar ${tableRows.length} día${tableRows.length === 1 ? "" : "s"} de ${monthShortYY} a Excel`
           }
         />
+        <ReportButton reportInput={reportInput} canExport={canExportExcel} />
       </div>
 
       {/* ============ 8 stats grid ============ */}

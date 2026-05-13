@@ -8,6 +8,8 @@ import {
 } from "@/components/dashboard/GroupedBarChart";
 import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import { ReportButton } from "@/components/dashboard/ReportButton";
+import type { BuildReportInput } from "@/lib/report-pdf/data";
 import type {
   ExcelColumn,
   ExcelSummaryRow,
@@ -80,6 +82,9 @@ interface Props {
   exportTerritory?: string;
   /** Permiso para descargar Excel (default false). */
   canExportExcel?: boolean;
+  /** Input para el reporte PDF "Avance Comercial". Si null, el botón se
+   *  renderiza disabled (sin data, ej. modo agregado vacío). */
+  reportInput?: BuildReportInput | null;
 }
 
 /**
@@ -113,6 +118,7 @@ export function DimensionTab({
   exportPeriodLabel,
   exportTerritory = "",
   canExportExcel = false,
+  reportInput = null,
 }: Props) {
   // Selección custom (multi-select). Vacía = comportamiento default Top N.
   // Persistencia en localStorage si selectionStorageKey está definido.
@@ -396,19 +402,23 @@ export function DimensionTab({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar superior: solo botón export (alineado a la derecha) */}
-      {handleExportExcel && canExportExcel && (
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <ExportExcelButton
-            onExport={handleExportExcel}
-            disabled={tableRows.length === 0}
-            canExport={canExportExcel}
-            title={
-              tableRows.length === 0
-                ? "Sin filas para exportar"
-                : `Exportar ${tableRows.length} fila${tableRows.length === 1 ? "" : "s"} a Excel`
-            }
-          />
+      {/* Toolbar superior: botones de exportación (alineados a la derecha).
+          Se renderiza si tiene permiso, aunque algún botón esté disabled. */}
+      {canExportExcel && (handleExportExcel || reportInput !== undefined) && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {handleExportExcel && (
+            <ExportExcelButton
+              onExport={handleExportExcel}
+              disabled={tableRows.length === 0}
+              canExport={canExportExcel}
+              title={
+                tableRows.length === 0
+                  ? "Sin filas para exportar"
+                  : `Exportar ${tableRows.length} fila${tableRows.length === 1 ? "" : "s"} a Excel`
+              }
+            />
+          )}
+          <ReportButton reportInput={reportInput} canExport={canExportExcel} />
         </div>
       )}
 

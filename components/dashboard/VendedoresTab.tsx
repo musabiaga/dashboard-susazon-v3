@@ -5,6 +5,7 @@ import {
   DimensionTab,
   type DimensionRow,
 } from "@/components/dashboard/DimensionTab";
+import type { BuildReportInput } from "@/lib/report-pdf/data";
 
 interface Props {
   rowsSeparados: DimensionRow[];
@@ -18,6 +19,8 @@ interface Props {
   exportPeriodLabel?: string;
   /** Permiso para descargar Excel (default false). */
   canExportExcel?: boolean;
+  /** Input para el reporte PDF "Avance Comercial". */
+  reportInput?: BuildReportInput | null;
 }
 
 const VENDEDORES_SELECTION_KEY = "vendedores-selected";
@@ -44,6 +47,7 @@ export function VendedoresTab({
   exportTerritory = "",
   exportPeriodLabel,
   canExportExcel = false,
+  reportInput = null,
 }: Props) {
   const [merged, setMerged] = useState(false);
   const [topN, setTopN] = useState<10 | 20 | null>(20);
@@ -94,6 +98,7 @@ export function VendedoresTab({
         exportPeriodLabel={exportPeriodLabel}
         exportTerritory={exportTerritory}
         canExportExcel={canExportExcel}
+        reportInput={reportInput}
       />
     </div>
   );

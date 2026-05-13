@@ -16,6 +16,8 @@ import { formatMoney } from "@/lib/format";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import { ReportButton } from "@/components/dashboard/ReportButton";
+import type { BuildReportInput } from "@/lib/report-pdf/data";
 import type {
   ExcelColumn,
   ExcelSummaryRow,
@@ -43,6 +45,8 @@ interface Props {
   exportPeriodLabel?: string;
   /** Permiso para descargar Excel (default false). */
   canExportExcel?: boolean;
+  /** Input para el reporte PDF "Avance Comercial". */
+  reportInput?: BuildReportInput | null;
 }
 
 /**
@@ -59,6 +63,7 @@ export function VentasTab({
   exportTerritory = "",
   exportPeriodLabel,
   canExportExcel = false,
+  reportInput = null,
 }: Props) {
   const chartData = useMemo(() => {
     // Index por (anio, mes) → MonthlyPoint
@@ -322,12 +327,13 @@ export function VentasTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <ExportExcelButton
           onExport={handleExportExcel}
           canExport={canExportExcel}
           title="Exportar 12 meses de Ventas a Excel"
         />
+        <ReportButton reportInput={reportInput} canExport={canExportExcel} />
       </div>
       <div
         className="rounded-[var(--radius-lg)] border p-4"

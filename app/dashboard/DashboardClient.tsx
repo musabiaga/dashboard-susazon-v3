@@ -28,6 +28,9 @@ import {
   selectedKpis,
   rowsBySelected,
 } from "@/lib/aggregate";
+import type { BuildReportInput } from "@/lib/report-pdf/data";
+import type { ReportMode } from "@/lib/report-pdf/types";
+import { REPORT_TERRITORIES } from "@/lib/report-pdf/types";
 
 interface DimensionDataset {
   byTerritory: Record<string, DimensionRow[]>;
@@ -311,6 +314,61 @@ export function DashboardClient({
     return Array.from(aggregatedTerritories).sort().join(", ");
   })();
 
+  // ===== Report PDF: input compartido por todos los tabs =====
+  // Convertir el selectionMode interno a ReportMode (discriminated union
+  // que consume buildReportData). Filtra al universo de 11 territorios.
+  // Null cuando no hay nada que reportar (aggregated-none).
+  const reportInput: BuildReportInput | null = useMemo(() => {
+    if (selectionMode === "aggregated-none") return null;
+    const reportSet = new Set<string>(REPORT_TERRITORIES);
+    let mode: ReportMode;
+    if (selectionMode === "single") {
+      if (!reportSet.has(effectiveSelected)) return null; // territorio fuera del scope
+      mode = { kind: "single", territory: effectiveSelected };
+    } else if (selectionMode === "aggregated-all") {
+      const all = activeTerritoryNames.filter((n) => reportSet.has(n));
+      if (all.length === 0) return null;
+      mode = { kind: "all", territories: all };
+    } else {
+      // aggregated-custom
+      const sel = Array.from(aggregatedTerritories)
+        .filter((n) => reportSet.has(n))
+        .sort();
+      if (sel.length === 0) return null;
+      const label =
+        sel.length <= 2
+          ? sel.join(", ")
+          : `${sel.length} territorios seleccionados`;
+      mode = { kind: "multi", territories: sel, label };
+    }
+    return {
+      territories,
+      selectedKpi: activeKpi,
+      selectedBudget: activeBudget,
+      mode,
+      currentYear,
+      currentMonth,
+      daysCurrent,
+      elapsedBizDays,
+      totalBizDays,
+      clientes,
+    };
+  }, [
+    selectionMode,
+    effectiveSelected,
+    activeTerritoryNames,
+    aggregatedTerritories,
+    territories,
+    activeKpi,
+    activeBudget,
+    currentYear,
+    currentMonth,
+    daysCurrent,
+    elapsedBizDays,
+    totalBizDays,
+    clientes,
+  ]);
+
   // KPI cards data (mismo cálculo de antes pero usando activeKpi/activeBudget)
   const activeKpiData: KpiData = useMemo(() => {
     const kpi = activeKpi;
@@ -505,6 +563,7 @@ export function DashboardClient({
                     totalBizDays={totalBizDays}
                     territorio={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
+                    reportInput={reportInput}
                   />
                 );
               }
@@ -517,6 +576,7 @@ export function DashboardClient({
                     exportTerritory={exportTerritoryLabel}
                     exportPeriodLabel={monthShortYY}
                     canExportExcel={canExportExcel}
+                    reportInput={reportInput}
                   />
                 );
               }
@@ -535,6 +595,7 @@ export function DashboardClient({
                     exportPeriodLabel={monthShortYY}
                     exportTerritory={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
+                    reportInput={reportInput}
                   />
                 );
               }
@@ -548,6 +609,7 @@ export function DashboardClient({
                     exportTerritory={exportTerritoryLabel}
                     exportPeriodLabel={monthShortYY}
                     canExportExcel={canExportExcel}
+                    reportInput={reportInput}
                   />
                 );
               }
@@ -571,6 +633,7 @@ export function DashboardClient({
                     exportPeriodLabel={monthShortYY}
                     exportTerritory={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
+                    reportInput={reportInput}
                   />
                 );
               }
@@ -585,6 +648,7 @@ export function DashboardClient({
                     currentTerritory={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
                     newCustomerCutoffDate={newCustomerCutoffDate}
+                    reportInput={reportInput}
                   />
                 );
               }
@@ -599,6 +663,7 @@ export function DashboardClient({
                     exportPeriodLabel={monthShortYY}
                     exportTerritory={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
+                    reportInput={reportInput}
                   />
                 );
               }
