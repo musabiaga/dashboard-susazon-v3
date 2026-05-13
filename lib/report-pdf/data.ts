@@ -20,6 +20,8 @@ import {
   type ReportMonthlyPoint,
   type ReportTopCliente,
   type ReportDailyRow,
+  type ReportKilosRow,
+  type ReportMargenRow,
   type TrackingPdfStats,
   type TrackingChartPoint,
 } from "./types";
@@ -82,8 +84,8 @@ function projectMonth(avance: number, elapsed: number, total: number): number {
   return (avance / elapsed) * total;
 }
 
-/** Devuelve { objetivo, avance, proyeccion, pctVsObjetivo, marginPct } por
- *  conjunto de territorios. */
+/** Devuelve { objetivo, avance, proyeccion, pctVsObjetivo, marginPct, ... }
+ *  por conjunto de territorios. Incluye comparativo al-día 2025 (Pesos). */
 function summarize(
   territories: Territory[],
   elapsed: number,
@@ -93,13 +95,44 @@ function summarize(
   const avance = territories.reduce((s, t) => s + t.kpi.venta, 0);
   const margen = territories.reduce((s, t) => s + t.kpi.margen, 0);
   const proyeccion = projectMonth(avance, elapsed, total);
+  // Pesos al-día 2025 = suma de t.kpi.currentMonthAlDia.v25 (cuando exista)
+  const avance2025AlDia = territories.reduce(
+    (s, t) => s + (t.kpi.currentMonthAlDia?.v25 ?? 0),
+    0
+  );
+  const varVsAnio: number | null =
+    avance2025AlDia > 0
+      ? (avance - avance2025AlDia) / avance2025AlDia
+      : null;
   return {
     objetivo,
     avance,
     proyeccion,
     pctVsObjetivo: objetivo > 0 ? proyeccion / objetivo : 0,
     marginPct: avance > 0 ? margen / avance : 0,
+    avance2025AlDia,
+    varVsAnio,
   };
+}
+
+/** Suma kilos del mes actual del territorio (suma de daily.current[].k). */
+function sumKgCurrent(t: Territory): number {
+  return t.kpi.daily.current.reduce((s, p) => s + p.k, 0);
+}
+
+/** Suma kilos del cierre del mismo mes 2025 (suma de daily.prevYear[].k). */
+function sumKgPrev(t: Territory): number {
+  return t.kpi.daily.prevYear.reduce((s, p) => s + p.k, 0);
+}
+
+/** Suma margen $ del cierre del mismo mes 2025. */
+function sumMargenPrev(t: Territory): number {
+  return t.kpi.daily.prevYear.reduce((s, p) => s + p.m, 0);
+}
+
+/** Suma venta del cierre del mismo mes 2025 (para calcular margen %). */
+function sumVentaPrev(t: Territory): number {
+  return t.kpi.daily.prevYear.reduce((s, p) => s + p.v, 0);
 }
 
 export function buildReportData(input: BuildReportInput): ReportData {
@@ -163,9 +196,8 @@ export function buildReportData(input: BuildReportInput): ReportData {
     ventaDiaPorDivision = ventaDia;
   }
 
-  // === Tabla "Por División" (solo modos all/multi) ===
-  let porDivision: ReportSummaryRow[] | undefined;
-  if (mode.kind !== "single") {
+  // === Tabla "Por División" (en cualquier modo; en single = 1 fila) ===
+  const porDivision: ReportSummaryRow[] = (() => {
     const grouped = new Map<string, Territory[]>();
     for (const t of reportTerrs) {
       const div = TERRITORY_DIVISION[t.name as (typeof REPORT_TERRITORIES)[number]];
@@ -173,42 +205,70 @@ export function buildReportData(input: BuildReportInput): ReportData {
       if (!grouped.has(div)) grouped.set(div, []);
       grouped.get(div)!.push(t);
     }
-    porDivision = Array.from(grouped.entries()).map(([div, ts]) => ({
+    return Array.from(grouped.entries()).map(([div, ts]) => ({
       name: div,
       ...summarize(ts, elapsedBizDays, totalBizDays),
     }));
-  }
+  })();
 
-  // === Tabla "Por Empresa" (Susazón / Suve) ===
-  // Heurística: como no tenemos campo `empresa` por territorio, asumimos:
-  //   - Ventas Retail → Suve (es la línea retail comercial)
-  //   - Todo lo demás → Susazón
-  // Esta es una APROXIMACIÓN. Para precisión real habría que sumar desde
-  // sales_rows con filter por empresa (cambio de scope futuro).
-  let porEmpresa: ReportSummaryRow[] | undefined;
-  if (mode.kind !== "single") {
+  // === Tabla "Por Empresa" (Susazón / Suve; en single = 1 fila) ===
+  // Heurística por territorio: Ventas Retail → Suve, resto → Susazón.
+  // Aproximación; para precisión real habría que sumar por sales_rows.empresa.
+  const porEmpresa: ReportSummaryRow[] = (() => {
     const susazon = reportTerrs.filter((t) => t.name !== "Ventas Retail");
     const suve = reportTerrs.filter((t) => t.name === "Ventas Retail");
-    porEmpresa = [];
+    const out: ReportSummaryRow[] = [];
     if (susazon.length > 0) {
-      porEmpresa.push({
+      out.push({
         name: "Susazón",
         ...summarize(susazon, elapsedBizDays, totalBizDays),
       });
     }
     if (suve.length > 0) {
-      porEmpresa.push({
+      out.push({
         name: "Suve",
         ...summarize(suve, elapsedBizDays, totalBizDays),
       });
     }
-  }
+    return out;
+  })();
 
-  // === Tabla "Por Territorio" (siempre, en cualquier modo) ===
+  // === Tabla A "Pesos por Territorio" (siempre) ===
   const porTerritorio: ReportSummaryRow[] = reportTerrs.map((t) => ({
     name: t.name,
     ...summarize([t], elapsedBizDays, totalBizDays),
   }));
+
+  // === Tabla B "Kilos por Territorio" (vs cierre 2025) ===
+  const porTerritorioKilos: ReportKilosRow[] = reportTerrs.map((t) => {
+    const kg26 = sumKgCurrent(t);
+    const kg25 = sumKgPrev(t);
+    const deltaKg = kg26 - kg25;
+    const varVsAnio: number | null =
+      kg25 > 0 ? (kg26 - kg25) / kg25 : null;
+    return { name: t.name, kg26, kg25, deltaKg, varVsAnio };
+  });
+
+  // === Tabla C "Margen por Territorio" (vs cierre 2025) ===
+  const porTerritorioMargen: ReportMargenRow[] = reportTerrs.map((t) => {
+    const margen26 = t.kpi.margen;
+    const venta26 = t.kpi.venta;
+    const margen25 = sumMargenPrev(t);
+    const venta25 = sumVentaPrev(t);
+    const marginPct26 = venta26 > 0 ? margen26 / venta26 : 0;
+    const marginPct25 = venta25 > 0 ? margen25 / venta25 : 0;
+    const deltaMargen = margen26 - margen25;
+    const deltaPp = (marginPct26 - marginPct25) * 100;
+    return {
+      name: t.name,
+      margen26,
+      marginPct26,
+      margen25,
+      marginPct25,
+      deltaMargen,
+      deltaPp,
+    };
+  });
 
   // === Trend mensual (los últimos ~16 meses + slot del mes actual) ===
   const trendMensual: ReportMonthlyPoint[] = [];
@@ -545,6 +605,8 @@ export function buildReportData(input: BuildReportInput): ReportData {
     porDivision,
     porEmpresa,
     porTerritorio,
+    porTerritorioKilos,
+    porTerritorioMargen,
     trendMensual,
     singleTerritoryKpis,
     topClientes,

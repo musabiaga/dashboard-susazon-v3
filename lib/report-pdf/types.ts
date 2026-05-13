@@ -46,7 +46,9 @@ export type ReportMode =
   | { kind: "multi"; territories: string[]; label: string }
   | { kind: "all"; territories: string[] };
 
-/** Fila resumen por (territorio | división | empresa). */
+/** Fila resumen Pesos por (territorio | división | empresa).
+ *  Incluye comparativo al-día 2025 (sumando kpi.currentMonthAlDia.v25 de los
+ *  territorios del grupo). */
 export interface ReportSummaryRow {
   name: string;
   objetivo: number;
@@ -54,6 +56,32 @@ export interface ReportSummaryRow {
   proyeccion: number;
   pctVsObjetivo: number; // proyeccion / objetivo
   marginPct: number;
+  /** Pesos al mismo día hábil del mismo mes 2025. */
+  avance2025AlDia: number;
+  /** (avance - avance2025AlDia) / avance2025AlDia. null si no hay base. */
+  varVsAnio: number | null;
+}
+
+/** Fila Kilos por territorio. Kilos no tiene objetivo, por eso solo comparamos
+ *  contra el cierre del mismo mes 2025. */
+export interface ReportKilosRow {
+  name: string;
+  kg26: number;
+  kg25: number; // cierre del mes 2025 (no al-día porque no está agregado en backend)
+  deltaKg: number;
+  varVsAnio: number | null;
+}
+
+/** Fila Margen $ y % por territorio. Compara contra el cierre del mes 2025. */
+export interface ReportMargenRow {
+  name: string;
+  margen26: number;
+  marginPct26: number; // 0-1
+  margen25: number; // cierre del mes 2025
+  marginPct25: number; // 0-1
+  deltaMargen: number;
+  /** Diferencia en puntos porcentuales (marginPct26 - marginPct25) × 100. */
+  deltaPp: number;
 }
 
 /** Punto del trend mensual para el chart de 16+ meses. */
@@ -189,10 +217,14 @@ export interface ReportData {
   totalPctVsObjetivo: number;
   totalMarginPct: number;
 
-  /** Tablas — solo en modo "all" o "multi" */
+  /** Tablas Pesos — siempre se generan (en single tienen 1 fila). */
   porDivision?: ReportSummaryRow[];
   porEmpresa?: ReportSummaryRow[];
   porTerritorio?: ReportSummaryRow[];
+  /** Tabla Kilos por territorio — comparativo vs cierre del mes 2025. */
+  porTerritorioKilos?: ReportKilosRow[];
+  /** Tabla Margen por territorio — comparativo vs cierre del mes 2025. */
+  porTerritorioMargen?: ReportMargenRow[];
 
   /** Trend mensual (~16 meses + slot may'26 con objetivo/proyección) */
   trendMensual: ReportMonthlyPoint[];

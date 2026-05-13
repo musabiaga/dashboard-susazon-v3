@@ -26,7 +26,13 @@ import {
   Line as SvgLine,
   Polyline,
 } from "@react-pdf/renderer";
-import type { ReportData, TrackingChartPoint } from "./types";
+import type {
+  ReportData,
+  TrackingChartPoint,
+  ReportKilosRow,
+  ReportMargenRow,
+  ReportSummaryRow,
+} from "./types";
 
 // ============================================================
 // Fonts — usamos Helvetica (built-in) para evitar carga de fonts externas.
@@ -450,34 +456,59 @@ function SingleTerritoryKpis({ data }: { data: ReportData }) {
   );
 }
 
-// === Tabla genérica resumen ===
+// === Tabla resumen Pesos (Por División / Por Empresa / Por Territorio) ===
 function SummaryTable({
   title,
   rows,
   showMargin,
-  totalRow,
+  nameHeader,
 }: {
   title: string;
-  rows: { name: string; objetivo: number; avance: number; proyeccion: number; pctVsObjetivo: number; marginPct?: number }[];
+  rows: ReportSummaryRow[];
   showMargin: boolean;
-  totalRow?: { objetivo: number; avance: number; proyeccion: number; pctVsObjetivo: number; marginPct?: number };
+  nameHeader: string;
 }) {
-  // Anchos relativos
-  const W_NAME = 26;
-  const W_NUM = 14;
-  const W_PCT = 9;
+  if (rows.length === 0) return null;
+  // Anchos relativos: con 7 columnas (nombre + 4 numéricas + 1 pct + 1 var)
+  // ó 8 (cuando showMargin agrega Margen %).
+  const W_NAME = 20;
+  const W_NUM = 11;
+  const W_PCT = 7;
+  const W_VAR = 7;
+
+  // Computar TOTAL como suma de todas las filas.
+  const sum = (k: keyof ReportSummaryRow) =>
+    rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+  const objetivoT = sum("objetivo");
+  const avanceT = sum("avance");
+  const proyeccionT = sum("proyeccion");
+  const avance25T = sum("avance2025AlDia");
+  const pctTotal = objetivoT > 0 ? proyeccionT / objetivoT : 0;
+  const varTotal: number | null =
+    avance25T > 0 ? (avanceT - avance25T) / avance25T : null;
+  // Margen ponderado por avance
+  const totalMargenAbs = rows.reduce(
+    (s, r) => s + (r.marginPct || 0) * (r.avance || 0),
+    0
+  );
+  const marginPctTotal = avanceT > 0 ? totalMargenAbs / avanceT : 0;
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
       <View style={styles.table}>
         <View style={styles.tableHeader}>
-          <Text style={[styles.cellHeader, { width: `${W_NAME}%` }]}>División</Text>
+          <Text style={[styles.cellHeader, { width: `${W_NAME}%` }]}>
+            {nameHeader}
+          </Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Objetivo</Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Avance</Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Proyección</Text>
           <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_PCT}%` }]}>% Obj.</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>25 al-día</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_VAR}%` }]}>Var % 25</Text>
           {showMargin && (
-            <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_PCT}%` }]}>Margen %</Text>
+            <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_PCT}%` }]}>Mg %</Text>
           )}
         </View>
         {rows.map((r, i) => (
@@ -495,8 +526,52 @@ function SummaryTable({
             <Text style={[styles.cell, styles.cellRight, { width: `${W_NUM}%` }]}>
               {formatMoney(r.proyeccion)}
             </Text>
-            <Text style={[styles.cell, styles.cellRight, styles.cellBold, { width: `${W_PCT}%`, color: r.pctVsObjetivo >= 1 ? COLORS.success : r.pctVsObjetivo >= 0.9 ? COLORS.warning : COLORS.danger }]}>
+            <Text
+              style={[
+                styles.cell,
+                styles.cellRight,
+                styles.cellBold,
+                {
+                  width: `${W_PCT}%`,
+                  color:
+                    r.pctVsObjetivo >= 1
+                      ? COLORS.success
+                      : r.pctVsObjetivo >= 0.9
+                        ? COLORS.warning
+                        : COLORS.danger,
+                },
+              ]}
+            >
               {formatPct(r.pctVsObjetivo)}
+            </Text>
+            <Text
+              style={[
+                styles.cell,
+                styles.cellRight,
+                { width: `${W_NUM}%`, color: COLORS.textSecondary },
+              ]}
+            >
+              {formatMoney(r.avance2025AlDia)}
+            </Text>
+            <Text
+              style={[
+                styles.cell,
+                styles.cellRight,
+                styles.cellBold,
+                {
+                  width: `${W_VAR}%`,
+                  color:
+                    r.varVsAnio === null
+                      ? COLORS.textMuted
+                      : r.varVsAnio >= 0
+                        ? COLORS.success
+                        : COLORS.danger,
+                },
+              ]}
+            >
+              {r.varVsAnio === null
+                ? "—"
+                : `${r.varVsAnio >= 0 ? "+" : ""}${formatPct(r.varVsAnio)}`}
             </Text>
             {showMargin && (
               <Text style={[styles.cell, styles.cellRight, { width: `${W_PCT}%`, color: COLORS.textSecondary }]}>
@@ -505,28 +580,291 @@ function SummaryTable({
             )}
           </View>
         ))}
-        {totalRow && (
-          <View style={styles.tableTotalRow}>
-            <Text style={[styles.cellBold, { width: `${W_NAME}%` }]}>TOTAL</Text>
-            <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
-              {formatMoney(totalRow.objetivo)}
-            </Text>
-            <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
-              {formatMoney(totalRow.avance)}
-            </Text>
-            <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
-              {formatMoney(totalRow.proyeccion)}
-            </Text>
+        <View style={styles.tableTotalRow}>
+          <Text style={[styles.cellBold, { width: `${W_NAME}%` }]}>TOTAL</Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
+            {formatMoney(objetivoT)}
+          </Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
+            {formatMoney(avanceT)}
+          </Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
+            {formatMoney(proyeccionT)}
+          </Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_PCT}%` }]}>
+            {formatPct(pctTotal)}
+          </Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textSecondary }]}>
+            {formatMoney(avance25T)}
+          </Text>
+          <Text
+            style={[
+              styles.cellBold,
+              styles.cellRight,
+              {
+                width: `${W_VAR}%`,
+                color:
+                  varTotal === null
+                    ? COLORS.textMuted
+                    : varTotal >= 0
+                      ? COLORS.success
+                      : COLORS.danger,
+              },
+            ]}
+          >
+            {varTotal === null
+              ? "—"
+              : `${varTotal >= 0 ? "+" : ""}${formatPct(varTotal)}`}
+          </Text>
+          {showMargin && (
             <Text style={[styles.cellBold, styles.cellRight, { width: `${W_PCT}%` }]}>
-              {formatPct(totalRow.pctVsObjetivo)}
+              {formatPct(marginPctTotal)}
             </Text>
-            {showMargin && (
-              <Text style={[styles.cellBold, styles.cellRight, { width: `${W_PCT}%` }]}>
-                {formatPct(totalRow.marginPct ?? 0)}
-              </Text>
-            )}
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// === Tabla Kilos por Territorio (vs cierre 2025) ===
+function KilosTable({ rows }: { rows: ReportKilosRow[] }) {
+  if (rows.length === 0) return null;
+  const W_NAME = 28;
+  const W_NUM = 16;
+  const W_VAR = 12;
+  const kg26T = rows.reduce((s, r) => s + r.kg26, 0);
+  const kg25T = rows.reduce((s, r) => s + r.kg25, 0);
+  const deltaT = kg26T - kg25T;
+  const varT = kg25T > 0 ? deltaT / kg25T : null;
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Kilos por Territorio · vs cierre 2025</Text>
+      <View style={styles.table}>
+        <View style={styles.tableHeader}>
+          <Text style={[styles.cellHeader, { width: `${W_NAME}%` }]}>Territorio</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>KG Mes</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>KG 25 cierre</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Δ KG</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_VAR}%` }]}>Var %</Text>
+        </View>
+        {rows.map((r, i) => (
+          <View
+            key={r.name}
+            style={i % 2 === 0 ? styles.tableRow : [styles.tableRow, styles.tableRowAlt]}
+          >
+            <Text style={[styles.cell, { width: `${W_NAME}%` }]}>{r.name}</Text>
+            <Text style={[styles.cell, styles.cellRight, styles.cellBold, { width: `${W_NUM}%` }]}>
+              {formatKilos(r.kg26)}
+            </Text>
+            <Text style={[styles.cell, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textSecondary }]}>
+              {formatKilos(r.kg25)}
+            </Text>
+            <Text
+              style={[
+                styles.cell,
+                styles.cellRight,
+                {
+                  width: `${W_NUM}%`,
+                  color: r.deltaKg >= 0 ? COLORS.success : COLORS.danger,
+                },
+              ]}
+            >
+              {r.deltaKg >= 0 ? "+" : ""}
+              {formatKilos(Math.abs(r.deltaKg))}
+            </Text>
+            <Text
+              style={[
+                styles.cell,
+                styles.cellRight,
+                styles.cellBold,
+                {
+                  width: `${W_VAR}%`,
+                  color:
+                    r.varVsAnio === null
+                      ? COLORS.textMuted
+                      : r.varVsAnio >= 0
+                        ? COLORS.success
+                        : COLORS.danger,
+                },
+              ]}
+            >
+              {r.varVsAnio === null
+                ? "—"
+                : `${r.varVsAnio >= 0 ? "+" : ""}${formatPct(r.varVsAnio)}`}
+            </Text>
           </View>
-        )}
+        ))}
+        <View style={styles.tableTotalRow}>
+          <Text style={[styles.cellBold, { width: `${W_NAME}%` }]}>TOTAL</Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
+            {formatKilos(kg26T)}
+          </Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textSecondary }]}>
+            {formatKilos(kg25T)}
+          </Text>
+          <Text
+            style={[
+              styles.cellBold,
+              styles.cellRight,
+              {
+                width: `${W_NUM}%`,
+                color: deltaT >= 0 ? COLORS.success : COLORS.danger,
+              },
+            ]}
+          >
+            {deltaT >= 0 ? "+" : ""}
+            {formatKilos(Math.abs(deltaT))}
+          </Text>
+          <Text
+            style={[
+              styles.cellBold,
+              styles.cellRight,
+              {
+                width: `${W_VAR}%`,
+                color:
+                  varT === null
+                    ? COLORS.textMuted
+                    : varT >= 0
+                      ? COLORS.success
+                      : COLORS.danger,
+              },
+            ]}
+          >
+            {varT === null
+              ? "—"
+              : `${varT >= 0 ? "+" : ""}${formatPct(varT)}`}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// === Tabla Margen por Territorio (vs cierre 2025) ===
+function MargenTable({ rows }: { rows: ReportMargenRow[] }) {
+  if (rows.length === 0) return null;
+  const W_NAME = 20;
+  const W_NUM = 13;
+  const W_PCT = 9;
+  const W_PP = 9;
+  const margen26T = rows.reduce((s, r) => s + r.margen26, 0);
+  const margen25T = rows.reduce((s, r) => s + r.margen25, 0);
+  const deltaT = margen26T - margen25T;
+  // Para margen % total, ponderado por venta
+  const venta26T = rows.reduce(
+    (s, r) => s + (r.marginPct26 > 0 ? r.margen26 / r.marginPct26 : 0),
+    0
+  );
+  const venta25T = rows.reduce(
+    (s, r) => s + (r.marginPct25 > 0 ? r.margen25 / r.marginPct25 : 0),
+    0
+  );
+  const marginPct26T = venta26T > 0 ? margen26T / venta26T : 0;
+  const marginPct25T = venta25T > 0 ? margen25T / venta25T : 0;
+  const deltaPpT = (marginPct26T - marginPct25T) * 100;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Margen por Territorio · vs cierre 2025</Text>
+      <View style={styles.table}>
+        <View style={styles.tableHeader}>
+          <Text style={[styles.cellHeader, { width: `${W_NAME}%` }]}>Territorio</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Mg $ Mes</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_PCT}%` }]}>Mg %</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Mg $ 25 cierre</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_PCT}%` }]}>Mg % 25</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_NUM}%` }]}>Δ $</Text>
+          <Text style={[styles.cellHeader, styles.cellRight, { width: `${W_PP}%` }]}>Δ pp</Text>
+        </View>
+        {rows.map((r, i) => (
+          <View
+            key={r.name}
+            style={i % 2 === 0 ? styles.tableRow : [styles.tableRow, styles.tableRowAlt]}
+          >
+            <Text style={[styles.cell, { width: `${W_NAME}%` }]}>{r.name}</Text>
+            <Text style={[styles.cell, styles.cellRight, styles.cellBold, { width: `${W_NUM}%` }]}>
+              {formatMoney(r.margen26)}
+            </Text>
+            <Text style={[styles.cell, styles.cellRight, { width: `${W_PCT}%` }]}>
+              {formatPct(r.marginPct26)}
+            </Text>
+            <Text style={[styles.cell, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textSecondary }]}>
+              {formatMoney(r.margen25)}
+            </Text>
+            <Text style={[styles.cell, styles.cellRight, { width: `${W_PCT}%`, color: COLORS.textSecondary }]}>
+              {formatPct(r.marginPct25)}
+            </Text>
+            <Text
+              style={[
+                styles.cell,
+                styles.cellRight,
+                {
+                  width: `${W_NUM}%`,
+                  color: r.deltaMargen >= 0 ? COLORS.success : COLORS.danger,
+                },
+              ]}
+            >
+              {r.deltaMargen >= 0 ? "+" : ""}
+              {formatMoney(Math.abs(r.deltaMargen))}
+            </Text>
+            <Text
+              style={[
+                styles.cell,
+                styles.cellRight,
+                styles.cellBold,
+                {
+                  width: `${W_PP}%`,
+                  color: r.deltaPp >= 0 ? COLORS.success : COLORS.danger,
+                },
+              ]}
+            >
+              {r.deltaPp >= 0 ? "+" : ""}
+              {r.deltaPp.toFixed(1)} pp
+            </Text>
+          </View>
+        ))}
+        <View style={styles.tableTotalRow}>
+          <Text style={[styles.cellBold, { width: `${W_NAME}%` }]}>TOTAL</Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%` }]}>
+            {formatMoney(margen26T)}
+          </Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_PCT}%` }]}>
+            {formatPct(marginPct26T)}
+          </Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_NUM}%`, color: COLORS.textSecondary }]}>
+            {formatMoney(margen25T)}
+          </Text>
+          <Text style={[styles.cellBold, styles.cellRight, { width: `${W_PCT}%`, color: COLORS.textSecondary }]}>
+            {formatPct(marginPct25T)}
+          </Text>
+          <Text
+            style={[
+              styles.cellBold,
+              styles.cellRight,
+              {
+                width: `${W_NUM}%`,
+                color: deltaT >= 0 ? COLORS.success : COLORS.danger,
+              },
+            ]}
+          >
+            {deltaT >= 0 ? "+" : ""}
+            {formatMoney(Math.abs(deltaT))}
+          </Text>
+          <Text
+            style={[
+              styles.cellBold,
+              styles.cellRight,
+              {
+                width: `${W_PP}%`,
+                color: deltaPpT >= 0 ? COLORS.success : COLORS.danger,
+              },
+            ]}
+          >
+            {deltaPpT >= 0 ? "+" : ""}
+            {deltaPpT.toFixed(1)} pp
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -1213,7 +1551,45 @@ export function AvanceComercialPDF({ data }: { data: ReportData }) {
         <DailyChart data={data} />
       </Page>
 
-      {/* === Página 2: Top 10 Clientes + Tracking Diario detallado === */}
+      {/* === Página 2: Avance Comercial por dimensión (estilo AvComSS) ===
+          Se auto-pagina si las 5 tablas se desbordan. */}
+      <Page size="LETTER" style={styles.page}>
+        <Header data={data} />
+        <FooterFixed data={data} />
+
+        {data.porDivision && (
+          <SummaryTable
+            title="Por División (canal)"
+            rows={data.porDivision}
+            showMargin={false}
+            nameHeader="División"
+          />
+        )}
+        {data.porEmpresa && data.porEmpresa.length > 0 && (
+          <SummaryTable
+            title="Por Empresa"
+            rows={data.porEmpresa}
+            showMargin={false}
+            nameHeader="Empresa"
+          />
+        )}
+        {data.porTerritorio && data.porTerritorio.length > 0 && (
+          <SummaryTable
+            title="Pesos por Territorio"
+            rows={data.porTerritorio}
+            showMargin
+            nameHeader="Territorio"
+          />
+        )}
+        {data.porTerritorioKilos && data.porTerritorioKilos.length > 0 && (
+          <KilosTable rows={data.porTerritorioKilos} />
+        )}
+        {data.porTerritorioMargen && data.porTerritorioMargen.length > 0 && (
+          <MargenTable rows={data.porTerritorioMargen} />
+        )}
+      </Page>
+
+      {/* === Página 3: Top 10 Clientes + Tracking Diario detallado === */}
       <Page size="LETTER" style={styles.page}>
         <Header data={data} />
         <FooterFixed data={data} />
