@@ -25,7 +25,10 @@ import type {
 } from "@/lib/export-excel";
 
 const PRODUCTOS_SELECTED_KEY = "productos-selected-skus";
+const PRODUCTOS_MODE_KEY = "productos-tab-mode";
 const MAX_CUSTOM_SELECTION = 15;
+
+type ProductosViewMode = "pesos" | "kg";
 
 interface Props {
   rows: DimensionRow[];
@@ -67,6 +70,29 @@ export function ProductosTab({
   reportInput = null,
 }: Props) {
   const [topNChart, setTopNChart] = useState<10 | 15>(topNChartDefault);
+
+  // ============ Toggle Pesos / Kilos ============
+  // Mismo patrón que Ventas: las BARRAS cambian (venta $ vs kg), las
+  // LÍNEAS DE MARGEN % NO CAMBIAN — quedan fijas en el eje Y derecho.
+  // Esto permite leer "cómo se mueve el margen vs volumen" por SKU.
+  const [mode, setMode] = useState<ProductosViewMode>("pesos");
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PRODUCTOS_MODE_KEY);
+      if (saved === "kg" || saved === "pesos") setMode(saved);
+    } catch {
+      // ignore
+    }
+  }, []);
+  const switchMode = (next: ProductosViewMode) => {
+    setMode(next);
+    try {
+      window.localStorage.setItem(PRODUCTOS_MODE_KEY, next);
+    } catch {
+      // ignore
+    }
+  };
+  const isKg = mode === "kg";
 
   // Selección custom de SKUs (multi-select). Si vacía → comportamiento default
   // (Top N). Si tiene items → override y se muestran SOLO esos. Persiste en
@@ -309,8 +335,9 @@ export function ProductosTab({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar superior: botones de exportación */}
+      {/* Toolbar superior: toggle Pesos/Kilos + botones de exportación */}
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <ModeToggle mode={mode} onChange={switchMode} />
         <ExportExcelButton
           onExport={handleExportExcel}
           disabled={tableRows.length === 0}
@@ -380,10 +407,6 @@ export function ProductosTab({
             <ResponsiveContainer width="100%" height={560}>
               <ComposedChart
                 data={top.map((r) => {
-                  // margen $ y margen % por año (solo para tooltip — Productos
-                  // no grafica margen por la decisión 2.a aprobada por Mauricio:
-                  // mantener chart limpio con Pesos+Kilos y poner margen sólo
-                  // en el tooltip para no agregar 3er eje Y).
                   const m24 = r.m24 ?? 0;
                   const m25 = r.m25 ?? 0;
                   const m26 = r.m26 ?? 0;
@@ -417,6 +440,7 @@ export function ProductosTab({
                     __rest_kg24: Math.max(0, (r.k24 ?? 0) - k24AlDia),
                     __rest_kg25: Math.max(0, (r.k25 ?? 0) - k25AlDia),
                     __rest_kg26: Math.max(0, (r.k26 ?? 0) - k26AlDia),
+                    // Margen $ y % por año (líneas + tooltip)
                     margen24: m24,
                     margen25: m25,
                     margen26: m26,
@@ -441,22 +465,26 @@ export function ProductosTab({
                   yAxisId="left"
                   tick={{ fontSize: 11, fill: "var(--text-secondary)" }}
                   stroke="var(--border-strong)"
-                  tickFormatter={(v) => formatKilos(v)}
+                  tickFormatter={(v) => (isKg ? formatKilos(v) : formatMoney(v))}
                   label={{
-                    value: "Kilos",
+                    value: isKg ? "Kilos" : "Pesos ($)",
                     angle: -90,
                     position: "insideLeft",
                     style: { fill: "var(--text-muted)", fontSize: 10 },
                   }}
                 />
+                {/* Eje Y derecho fijo en Margen % (0-50%) — NO depende del modo.
+                    Esto permite leer la evolución del margen entre SKUs
+                    independientemente del eje izquierdo (Pesos o KG). */}
                 <YAxis
                   yAxisId="right"
                   orientation="right"
+                  domain={[0, 50]}
                   tick={{ fontSize: 11, fill: "var(--text-secondary)" }}
                   stroke="var(--border-strong)"
-                  tickFormatter={(v) => formatMoney(v)}
+                  tickFormatter={(v) => `${v}%`}
                   label={{
-                    value: "Pesos ($)",
+                    value: "Margen %",
                     angle: 90,
                     position: "insideRight",
                     style: { fill: "var(--text-muted)", fontSize: 10 },
@@ -475,7 +503,7 @@ export function ProductosTab({
                     <ChartLegend
                       sections={[
                         {
-                          title: "Kilos",
+                          title: isKg ? "Kilos" : "Pesos",
                           visualKind: "barras apiladas",
                           items: [
                             { label: monthLabel24, color: "rgba(148, 163, 184, 0.85)", type: "bar-stacked" },
@@ -484,80 +512,77 @@ export function ProductosTab({
                           ],
                         },
                         {
-                          title: "Venta $",
+                          title: "Margen %",
                           visualKind: "líneas",
                           items: [
                             { label: monthLabel24, color: "#94a3b8", type: "line-dashed" },
-                            { label: monthLabel25, color: "#3b82f6", type: "line-solid" },
-                            { label: monthLabel26, color: "#f59e0b", type: "line-solid" },
+                            { label: monthLabel25, color: "#3b82f6", type: "line-dashed" },
+                            { label: monthLabel26, color: "#10b981", type: "line-dashed" },
                           ],
                         },
                       ]}
                     />
                   )}
                 />
-                {/* 3 series de barras Kilos APILADAS (Mejora 2 día-vs-día):
-                    cada año se compone de "al día N" (sólido) + "resto hasta
-                    cierre" (translúcido). Cada año tiene su propio stackId
-                    para que las barras NO se apilen entre años, sino solo
-                    los 2 segmentos del mismo año. */}
+                {/* Barras según modo (pesos o kg). 3 años apilados al-día/resto. */}
                 <Bar
                   yAxisId="left"
-                  dataKey="kg24_alDia"
-                  stackId="stack-kg24"
-                  name={`Kilos ${monthLabel24}`}
+                  dataKey={isKg ? "kg24_alDia" : "venta24_alDia"}
+                  stackId="stack-24"
+                  name={`${isKg ? "Kilos" : "Pesos"} ${monthLabel24}`}
                   fill="rgba(148, 163, 184, 0.85)"
                   radius={[0, 0, 0, 0]}
                 />
                 <Bar
                   yAxisId="left"
-                  dataKey="__rest_kg24"
-                  stackId="stack-kg24"
-                  name={`Kilos ${monthLabel24}`}
+                  dataKey={isKg ? "__rest_kg24" : "__rest_venta24"}
+                  stackId="stack-24"
+                  name={`${isKg ? "Kilos" : "Pesos"} ${monthLabel24}`}
                   legendType="none"
                   fill="rgba(148, 163, 184, 0.28)"
                   radius={[2, 2, 0, 0]}
                 />
                 <Bar
                   yAxisId="left"
-                  dataKey="kg25_alDia"
-                  stackId="stack-kg25"
-                  name={`Kilos ${monthLabel25}`}
+                  dataKey={isKg ? "kg25_alDia" : "venta25_alDia"}
+                  stackId="stack-25"
+                  name={`${isKg ? "Kilos" : "Pesos"} ${monthLabel25}`}
                   fill="rgba(59, 130, 246, 0.85)"
                   radius={[0, 0, 0, 0]}
                 />
                 <Bar
                   yAxisId="left"
-                  dataKey="__rest_kg25"
-                  stackId="stack-kg25"
-                  name={`Kilos ${monthLabel25}`}
+                  dataKey={isKg ? "__rest_kg25" : "__rest_venta25"}
+                  stackId="stack-25"
+                  name={`${isKg ? "Kilos" : "Pesos"} ${monthLabel25}`}
                   legendType="none"
                   fill="rgba(59, 130, 246, 0.28)"
                   radius={[2, 2, 0, 0]}
                 />
                 <Bar
                   yAxisId="left"
-                  dataKey="kg26_alDia"
-                  stackId="stack-kg26"
-                  name={`Kilos ${monthLabel26}`}
+                  dataKey={isKg ? "kg26_alDia" : "venta26_alDia"}
+                  stackId="stack-26"
+                  name={`${isKg ? "Kilos" : "Pesos"} ${monthLabel26}`}
                   fill="rgba(16, 185, 129, 0.85)"
                   radius={[0, 0, 0, 0]}
                 />
                 <Bar
                   yAxisId="left"
-                  dataKey="__rest_kg26"
-                  stackId="stack-kg26"
-                  name={`Kilos ${monthLabel26}`}
+                  dataKey={isKg ? "__rest_kg26" : "__rest_venta26"}
+                  stackId="stack-26"
+                  name={`${isKg ? "Kilos" : "Pesos"} ${monthLabel26}`}
                   legendType="none"
                   fill="rgba(16, 185, 129, 0.28)"
                   radius={[2, 2, 0, 0]}
                 />
-                {/* 3 series de lineas Venta/Pesos (eje derecho) */}
+                {/* 3 líneas de Margen % (eje derecho) — NO cambian con el
+                    toggle. Permite comparar el margen vs volumen por SKU. */}
                 <Line
                   yAxisId="right"
                   type="monotone"
-                  dataKey="venta24"
-                  name={`Venta ${monthLabel24}`}
+                  dataKey="margenPct24"
+                  name={`Margen% ${monthLabel24}`}
                   stroke="#94a3b8"
                   strokeWidth={1.5}
                   strokeDasharray="4 3"
@@ -567,8 +592,8 @@ export function ProductosTab({
                 <Line
                   yAxisId="right"
                   type="monotone"
-                  dataKey="venta25"
-                  name={`Venta ${monthLabel25}`}
+                  dataKey="margenPct25"
+                  name={`Margen% ${monthLabel25}`}
                   stroke="#3b82f6"
                   strokeWidth={2}
                   dot={{ r: 3, strokeWidth: 1, fill: "white" }}
@@ -577,9 +602,9 @@ export function ProductosTab({
                 <Line
                   yAxisId="right"
                   type="monotone"
-                  dataKey="venta26"
-                  name={`Venta ${monthLabel26}`}
-                  stroke="#f59e0b"
+                  dataKey="margenPct26"
+                  name={`Margen% ${monthLabel26}`}
+                  stroke="#10b981"
                   strokeWidth={2.5}
                   dot={{ r: 3.5, strokeWidth: 1, fill: "white" }}
                   connectNulls={false}
@@ -630,6 +655,11 @@ export function ProductosTab({
                   <Th align="right" subtle>{`KG ${monthLabel25}`}</Th>
                   <Th align="right" subtle>{`KG ${monthLabel26}`}</Th>
                   <Th align="right" subtle>Var % KG</Th>
+                  {/* Margen del mes actual */}
+                  <Th align="right">{`Mg $ ${monthLabel26}`}</Th>
+                  <Th align="right">{`Mg % ${monthLabel26}`}</Th>
+                  <Th align="right" subtle>{`Mg % ${monthLabel25}`}</Th>
+                  <Th align="right">Δ pp</Th>
                 </tr>
               </thead>
               <tbody>
@@ -641,10 +671,20 @@ export function ProductosTab({
                   const k24Show = r.k24_alDia ?? r.k24 ?? 0;
                   const k25Show = r.k25_alDia ?? r.k25 ?? 0;
                   const k26Show = r.k26_alDia ?? r.k26 ?? 0;
+                  const m26Show = r.m26_alDia ?? r.m26 ?? 0;
+                  const m25Show = r.m25_alDia ?? r.m25 ?? 0;
                   const varPct =
                     v25Show > 0 ? ((v26Show - v25Show) / v25Show) * 100 : null;
                   const varKgPct =
                     k25Show > 0 ? ((k26Show - k25Show) / k25Show) * 100 : null;
+                  // Margen % al-día por año (con base la venta al-día del año)
+                  const mgPct26 = v26Show > 0 ? (m26Show / v26Show) * 100 : null;
+                  const mgPct25 = v25Show > 0 ? (m25Show / v25Show) * 100 : null;
+                  // Δ pp del margen vs 2025
+                  const deltaPp =
+                    mgPct26 != null && mgPct25 != null
+                      ? mgPct26 - mgPct25
+                      : null;
                   return (
                     <tr
                       key={r.name}
@@ -692,6 +732,29 @@ export function ProductosTab({
                         {varKgPct == null
                           ? "—"
                           : `${varKgPct >= 0 ? "+" : ""}${varKgPct.toFixed(1)}%`}
+                      </Td>
+                      {/* Margen del mes actual + comparativo % vs 2025 */}
+                      <Td align="right">{formatMoney(m26Show)}</Td>
+                      <Td align="right" bold>
+                        {mgPct26 == null ? "—" : `${mgPct26.toFixed(1)}%`}
+                      </Td>
+                      <Td align="right" subtle>
+                        {mgPct25 == null ? "—" : `${mgPct25.toFixed(1)}%`}
+                      </Td>
+                      <Td
+                        align="right"
+                        bold
+                        color={
+                          deltaPp == null
+                            ? "var(--text-muted)"
+                            : deltaPp >= 0
+                              ? "var(--success)"
+                              : "var(--danger)"
+                        }
+                      >
+                        {deltaPp == null
+                          ? "—"
+                          : `${deltaPp >= 0 ? "+" : ""}${deltaPp.toFixed(1)} pp`}
                       </Td>
                     </tr>
                   );
@@ -1034,6 +1097,61 @@ function RowDual({
           </span>
         )}
       </span>
+    </div>
+  );
+}
+
+// ============================================================
+// Toggle Pesos / Kilos — mismo look que TrackingDiarioTab / VentasTab
+// ============================================================
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: ProductosViewMode;
+  onChange: (next: ProductosViewMode) => void;
+}) {
+  const baseBtn =
+    "flex items-center justify-center px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider transition-colors";
+  return (
+    <div
+      role="tablist"
+      aria-label="Modo de vista"
+      className="inline-flex items-center gap-0 rounded-[var(--radius)] border p-0.5"
+      style={{
+        background: "var(--bg-surface-muted)",
+        borderColor: "var(--border)",
+      }}
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "pesos"}
+        onClick={() => onChange("pesos")}
+        className={`${baseBtn} rounded-[var(--radius-sm)]`}
+        style={{
+          background: mode === "pesos" ? "var(--bg-surface)" : "transparent",
+          color:
+            mode === "pesos" ? "var(--accent)" : "var(--text-secondary)",
+          boxShadow: mode === "pesos" ? "var(--shadow-card)" : "none",
+        }}
+      >
+        Pesos
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "kg"}
+        onClick={() => onChange("kg")}
+        className={`${baseBtn} rounded-[var(--radius-sm)]`}
+        style={{
+          background: mode === "kg" ? "var(--bg-surface)" : "transparent",
+          color: mode === "kg" ? "var(--accent)" : "var(--text-secondary)",
+          boxShadow: mode === "kg" ? "var(--shadow-card)" : "none",
+        }}
+      >
+        Kilos
+      </button>
     </div>
   );
 }
