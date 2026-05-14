@@ -1021,6 +1021,7 @@ export default async function DashboardPage({
       k.currentMonthAlDia = {
         v24: 0, v25: 0, v26: 0,
         m24: 0, m25: 0, m26: 0,
+        k24: 0, k25: 0, k26: 0,
       };
     }
     return k.currentMonthAlDia;
@@ -1033,6 +1034,7 @@ export default async function DashboardPage({
     const ald = ensureCurrentMonthAlDia(t);
     ald.v24 += Number(row.total_venta) || 0;
     ald.m24 += Number(row.total_margen) || 0;
+    ald.k24 += Number(row.total_kg) || 0;
   }
   // 2025 (cutoff25) — aprovechamos dailyPrevYear que ya tenemos cargado
   for (const row of dailyPrevYear ?? []) {
@@ -1042,6 +1044,7 @@ export default async function DashboardPage({
     const ald = ensureCurrentMonthAlDia(t);
     ald.v25 += Number(row.total_venta) || 0;
     ald.m25 += Number(row.total_margen) || 0;
+    ald.k25 += Number(row.total_kg) || 0;
   }
   // 2026 (cutoff26 = daysCurrent) — aprovechamos dailyCurrent ya cargado
   for (const row of dailyCurrent ?? []) {
@@ -1051,6 +1054,7 @@ export default async function DashboardPage({
     const ald = ensureCurrentMonthAlDia(t);
     ald.v26 += Number(row.total_venta) || 0;
     ald.m26 += Number(row.total_margen) || 0;
+    ald.k26 += Number(row.total_kg) || 0;
   }
 
   for (const [name, k] of kpiByTerritory) {
@@ -1140,10 +1144,14 @@ export default async function DashboardPage({
       }
       // Sumar currentMonthAlDia de cada territorio al total
       const accAld = acc.currentMonthAlDia ?? {
-        v24: 0, v25: 0, v26: 0, m24: 0, m25: 0, m26: 0,
+        v24: 0, v25: 0, v26: 0,
+        m24: 0, m25: 0, m26: 0,
+        k24: 0, k25: 0, k26: 0,
       };
       const kAld = k.currentMonthAlDia ?? {
-        v24: 0, v25: 0, v26: 0, m24: 0, m25: 0, m26: 0,
+        v24: 0, v25: 0, v26: 0,
+        m24: 0, m25: 0, m26: 0,
+        k24: 0, k25: 0, k26: 0,
       };
       const currentMonthAlDia = {
         v24: accAld.v24 + kAld.v24,
@@ -1152,6 +1160,9 @@ export default async function DashboardPage({
         m24: accAld.m24 + kAld.m24,
         m25: accAld.m25 + kAld.m25,
         m26: accAld.m26 + kAld.m26,
+        k24: accAld.k24 + kAld.k24,
+        k25: accAld.k25 + kAld.k25,
+        k26: accAld.k26 + kAld.k26,
       };
       return {
         venta: acc.venta + k.venta,

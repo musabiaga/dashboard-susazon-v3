@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ComposedChart,
   Bar,
@@ -12,7 +12,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatKilos } from "@/lib/format";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
@@ -22,6 +22,9 @@ import type {
   ExcelColumn,
   ExcelSummaryRow,
 } from "@/lib/export-excel";
+
+type VentasViewMode = "pesos" | "kg";
+const VENTAS_MODE_KEY = "ventas-tab-mode";
 
 const MONTHS_SHORT_ES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -65,11 +68,40 @@ export function VentasTab({
   canExportExcel = false,
   reportInput = null,
 }: Props) {
+  // ============ Toggle Pesos / Kilos ============
+  // Default = "pesos". Persiste en localStorage para que la preferencia
+  // sobreviva entre sesiones. El margen % NO cambia con el toggle —
+  // siempre se muestra como (margen $ / venta $) × 100 sobre el eje Y
+  // derecho, para que se pueda ver el comportamiento del margen vs el
+  // volumen de venta (en pesos o en kilos).
+  const [mode, setMode] = useState<VentasViewMode>("pesos");
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(VENTAS_MODE_KEY);
+      if (saved === "kg" || saved === "pesos") setMode(saved);
+    } catch {
+      // ignore
+    }
+  }, []);
+  const switchMode = (next: VentasViewMode) => {
+    setMode(next);
+    try {
+      window.localStorage.setItem(VENTAS_MODE_KEY, next);
+    } catch {
+      // ignore
+    }
+  };
+  const isKg = mode === "kg";
+
   const chartData = useMemo(() => {
     // Index por (anio, mes) → MonthlyPoint
-    const byKey = new Map<string, { v: number; m: number }>();
+    const byKey = new Map<string, { v: number; m: number; k: number }>();
     for (const p of kpi.monthly) {
-      byKey.set(`${p.anio}-${p.mes}`, { v: p.venta, m: p.margen });
+      byKey.set(`${p.anio}-${p.mes}`, {
+        v: p.venta,
+        m: p.margen,
+        k: p.kg,
+      });
     }
 
     // 12 filas, una por mes. Cada fila tiene venta y margen% por año.
@@ -91,6 +123,9 @@ export function VentasTab({
       const venta24 = future(2024) ? null : v24?.v ?? 0;
       const venta25 = future(2025) ? null : v25?.v ?? 0;
       const venta26 = future(2026) ? null : v26?.v ?? 0;
+      const kg24Raw = future(2024) ? null : v24?.k ?? 0;
+      const kg25Raw = future(2025) ? null : v25?.k ?? 0;
+      const kg26Raw = future(2026) ? null : v26?.k ?? 0;
 
       // Para el slot del mes actual, calculamos al-día y resto.
       // Para los demás meses, al-día = cierre y resto = 0 (las barras
@@ -115,6 +150,29 @@ export function VentasTab({
         ? Math.max(0, (venta26 ?? 0) - v26AlDia)
         : 0;
 
+      // Mismo patrón al-día / resto pero para KG.
+      const k24AlDia = isCurrentSlot && ald
+        ? Math.min(kg24Raw ?? 0, ald.k24)
+        : (kg24Raw ?? 0);
+      const k25AlDia = isCurrentSlot && ald
+        ? Math.min(kg25Raw ?? 0, ald.k25)
+        : (kg25Raw ?? 0);
+      const k26AlDia = isCurrentSlot && ald
+        ? Math.min(kg26Raw ?? 0, ald.k26)
+        : (kg26Raw ?? 0);
+      const k24Rest = isCurrentSlot && ald
+        ? Math.max(0, (kg24Raw ?? 0) - k24AlDia)
+        : 0;
+      const k25Rest = isCurrentSlot && ald
+        ? Math.max(0, (kg25Raw ?? 0) - k25AlDia)
+        : 0;
+      const k26Rest = isCurrentSlot && ald
+        ? Math.max(0, (kg26Raw ?? 0) - k26AlDia)
+        : 0;
+
+      // Margen % = margen $ / venta $ × 100. NO depende del modo del
+      // toggle — siempre se calcula así, para ver el margen vs venta
+      // tanto cuando las barras muestran pesos como cuando muestran kg.
       const margenPct = (
         agg: { v: number; m: number } | undefined
       ): number | null =>
@@ -122,18 +180,29 @@ export function VentasTab({
 
       return {
         month: label,
+        // Pesos (cierre + al-día apilado)
         venta24,
         venta25,
         venta26,
-        // Segmentos apilados (Mejora 2 Commit B)
         venta24_alDia: future(2024) ? null : v24AlDia,
         venta25_alDia: future(2025) ? null : v25AlDia,
         venta26_alDia: future(2026) ? null : v26AlDia,
         __rest_v24: future(2024) ? null : v24Rest,
         __rest_v25: future(2025) ? null : v25Rest,
         __rest_v26: future(2026) ? null : v26Rest,
+        // Kilos (mismo patrón cierre + al-día apilado)
+        kg24: kg24Raw,
+        kg25: kg25Raw,
+        kg26: kg26Raw,
+        kg24_alDia: future(2024) ? null : k24AlDia,
+        kg25_alDia: future(2025) ? null : k25AlDia,
+        kg26_alDia: future(2026) ? null : k26AlDia,
+        __rest_k24: future(2024) ? null : k24Rest,
+        __rest_k25: future(2025) ? null : k25Rest,
+        __rest_k26: future(2026) ? null : k26Rest,
         // Flag para que el tooltip sepa si mostrar info de día-vs-día
         __isCurrentSlot: isCurrentSlot,
+        // Margen % se calcula a partir de venta $ siempre (no depende del modo).
         margenPct24: future(2024) ? null : margenPct(v24),
         margenPct25: future(2025) ? null : margenPct(v25),
         margenPct26: future(2026) ? null : margenPct(v26),
@@ -149,11 +218,15 @@ export function VentasTab({
     const territorioLabel =
       exportTerritory && exportTerritory !== "" ? exportTerritory : "Todos";
 
-    // Re-construir data full (con venta + margen + al-día) — no podemos
-    // reusar chartData porque no carga margen $ desagregado.
-    const byKey = new Map<string, { v: number; m: number }>();
+    // Re-construir data full (con venta + margen + kg + al-día) — no
+    // podemos reusar chartData porque no carga margen $ desagregado.
+    const byKey = new Map<string, { v: number; m: number; k: number }>();
     for (const p of kpi.monthly) {
-      byKey.set(`${p.anio}-${p.mes}`, { v: p.venta, m: p.margen });
+      byKey.set(`${p.anio}-${p.mes}`, {
+        v: p.venta,
+        m: p.margen,
+        k: p.kg,
+      });
     }
     const ald = kpi.currentMonthAlDia;
 
@@ -174,6 +247,9 @@ export function VentasTab({
       const margen24 = future(2024) ? null : v24?.m ?? 0;
       const margen25 = future(2025) ? null : v25?.m ?? 0;
       const margen26 = future(2026) ? null : v26?.m ?? 0;
+      const kg24 = future(2024) ? null : v24?.k ?? 0;
+      const kg25 = future(2025) ? null : v25?.k ?? 0;
+      const kg26 = future(2026) ? null : v26?.k ?? 0;
 
       const v24Ald =
         isCurrentSlot && ald ? Math.min(venta24 ?? 0, ald.v24) : venta24;
@@ -187,6 +263,12 @@ export function VentasTab({
         isCurrentSlot && ald ? Math.min(margen25 ?? 0, ald.m25) : margen25;
       const m26Ald =
         isCurrentSlot && ald ? Math.min(margen26 ?? 0, ald.m26) : margen26;
+      const k24Ald =
+        isCurrentSlot && ald ? Math.min(kg24 ?? 0, ald.k24) : kg24;
+      const k25Ald =
+        isCurrentSlot && ald ? Math.min(kg25 ?? 0, ald.k25) : kg25;
+      const k26Ald =
+        isCurrentSlot && ald ? Math.min(kg26 ?? 0, ald.k26) : kg26;
 
       const mp24 =
         venta24 != null && margen24 != null && venta24 > 0
@@ -204,26 +286,44 @@ export function VentasTab({
       return {
         mes: label,
         mes_num: mes,
+        // Venta
         venta24,
         venta25,
         venta26,
         venta24_alDia: v24Ald,
         venta25_alDia: v25Ald,
         venta26_alDia: v26Ald,
+        // Margen $
         margen24,
         margen25,
         margen26,
         margen24_alDia: m24Ald,
         margen25_alDia: m25Ald,
         margen26_alDia: m26Ald,
+        // Margen %
         mp24,
         mp25,
         mp26,
+        // KG (cierre + al-día)
+        kg24,
+        kg25,
+        kg26,
+        kg24_alDia: k24Ald,
+        kg25_alDia: k25Ald,
+        kg26_alDia: k26Ald,
+        // Variaciones — venta
         var_pct_25: venta24 && venta25 != null && venta24 > 0
           ? (venta25 - venta24) / venta24
           : null,
         var_pct_26: venta25 && venta26 != null && venta25 > 0
           ? (venta26 - venta25) / venta25
+          : null,
+        // Variaciones — kg
+        var_kg_25: kg24 && kg25 != null && kg24 > 0
+          ? (kg25 - kg24) / kg24
+          : null,
+        var_kg_26: kg25 && kg26 != null && kg25 > 0
+          ? (kg26 - kg25) / kg25
           : null,
       };
     });
@@ -240,6 +340,9 @@ export function VentasTab({
     const tot_m24 = sum("margen24");
     const tot_m25 = sum("margen25");
     const tot_m26 = sum("margen26");
+    const tot_k24 = sum("kg24");
+    const tot_k25 = sum("kg25");
+    const tot_k26 = sum("kg26");
 
     const summary: ExcelSummaryRow[] = [
       ...(exportPeriodLabel
@@ -256,6 +359,9 @@ export function VentasTab({
       { label: "Margen YTD 2024", value: tot_m24, numFmt: "$#,##0" },
       { label: "Margen YTD 2025", value: tot_m25, numFmt: "$#,##0" },
       { label: "Margen YTD 2026", value: tot_m26, numFmt: "$#,##0" },
+      { label: "KG YTD 2024 (al cierre)", value: tot_k24, numFmt: "#,##0" },
+      { label: "KG YTD 2025 (al cierre)", value: tot_k25, numFmt: "#,##0" },
+      { label: "KG YTD 2026", value: tot_k26, numFmt: "#,##0" },
     ];
 
     const columns: ExcelColumn[] = [
@@ -269,7 +375,7 @@ export function VentasTab({
       { header: "Venta 2024 al-día", key: "venta24_alDia", width: 16, numFmt: "$#,##0" },
       { header: "Venta 2025 al-día", key: "venta25_alDia", width: 16, numFmt: "$#,##0" },
       { header: "Venta 2026 al-día", key: "venta26_alDia", width: 16, numFmt: "$#,##0" },
-      // Variaciones
+      // Variaciones venta
       { header: "Var % 25 vs 24", key: "var_pct_25", width: 14, numFmt: "0.0%" },
       { header: "Var % 26 vs 25", key: "var_pct_26", width: 14, numFmt: "0.0%" },
       // Margen
@@ -283,6 +389,17 @@ export function VentasTab({
       { header: "Margen % 2024", key: "mp24", width: 12, numFmt: "0.0%" },
       { header: "Margen % 2025", key: "mp25", width: 12, numFmt: "0.0%" },
       { header: "Margen % 2026", key: "mp26", width: 12, numFmt: "0.0%" },
+      // KG cierre
+      { header: "KG 2024 cierre", key: "kg24", width: 14, numFmt: "#,##0" },
+      { header: "KG 2025 cierre", key: "kg25", width: 14, numFmt: "#,##0" },
+      { header: "KG 2026 cierre", key: "kg26", width: 14, numFmt: "#,##0" },
+      // KG al-día
+      { header: "KG 2024 al-día", key: "kg24_alDia", width: 14, numFmt: "#,##0" },
+      { header: "KG 2025 al-día", key: "kg25_alDia", width: 14, numFmt: "#,##0" },
+      { header: "KG 2026 al-día", key: "kg26_alDia", width: 14, numFmt: "#,##0" },
+      // Variaciones KG
+      { header: "Var KG 25 vs 24", key: "var_kg_25", width: 14, numFmt: "0.0%" },
+      { header: "Var KG 26 vs 25", key: "var_kg_26", width: 14, numFmt: "0.0%" },
     ];
 
     const totalRow: Record<string, unknown> = {
@@ -305,6 +422,14 @@ export function VentasTab({
       mp24: tot_v24 > 0 ? tot_m24 / tot_v24 : 0,
       mp25: tot_v25 > 0 ? tot_m25 / tot_v25 : 0,
       mp26: tot_v26 > 0 ? tot_m26 / tot_v26 : 0,
+      kg24: tot_k24,
+      kg25: tot_k25,
+      kg26: tot_k26,
+      kg24_alDia: sum("kg24_alDia"),
+      kg25_alDia: sum("kg25_alDia"),
+      kg26_alDia: sum("kg26_alDia"),
+      var_kg_25: tot_k24 > 0 ? (tot_k25 - tot_k24) / tot_k24 : 0,
+      var_kg_26: tot_k25 > 0 ? (tot_k26 - tot_k25) / tot_k25 : 0,
     };
 
     const territoriosForFile =
@@ -325,9 +450,21 @@ export function VentasTab({
     });
   };
 
+  // DataKeys de barras según modo (pesos o kg). El "_alDia" es el
+  // segmento sólido y "__rest_*" es el translúcido apilado encima. En
+  // meses pasados el resto = 0, así que se ve igual que una barra simple.
+  const barKeyAlDia = (year: 24 | 25 | 26) =>
+    isKg ? `kg${year}_alDia` : `venta${year}_alDia`;
+  const barKeyRest = (year: 24 | 25 | 26) =>
+    isKg ? `__rest_k${year}` : `__rest_v${year}`;
+
+  const barTitle = isKg ? "Kilos" : "Venta";
+  const yLeftFormatter = isKg ? formatKilos : formatMoney;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <ModeToggle mode={mode} onChange={switchMode} />
         <ExportExcelButton
           onExport={handleExportExcel}
           canExport={canExportExcel}
@@ -358,7 +495,7 @@ export function VentasTab({
             yAxisId="left"
             tick={{ fontSize: 11, fill: "var(--text-secondary)" }}
             stroke="var(--border-strong)"
-            tickFormatter={(v) => formatMoney(v)}
+            tickFormatter={(v) => yLeftFormatter(v)}
           />
           <YAxis
             yAxisId="right"
@@ -369,7 +506,7 @@ export function VentasTab({
             tickFormatter={(v) => `${v}%`}
           />
           <Tooltip
-            content={<VentasTooltip />}
+            content={<VentasTooltip isKg={isKg} />}
             cursor={{ fill: "rgba(0,0,0,0.04)" }}
           />
           <Legend
@@ -381,7 +518,7 @@ export function VentasTab({
               <ChartLegend
                 sections={[
                   {
-                    title: "Venta",
+                    title: barTitle,
                     visualKind: "barras",
                     items: [
                       { label: "2024", color: "rgba(148, 163, 184, 0.85)", type: "bar" },
@@ -402,64 +539,64 @@ export function VentasTab({
               />
             )}
           />
-          {/* Barras de venta APILADAS (Mejora 2 Commit B):
-              - Slot del mes actual: segmento sólido (al-día) + segmento
-                translúcido (resto hasta cierre)
-              - Demás slots: __rest = 0 → solo se ve segmento sólido
-                (que es el cierre completo). Visualmente idéntico a barra
-                simple. */}
+          {/* Barras APILADAS (cierre + al-día) — dataKeys cambian según
+              modo (pesos vs kilos). Key del ComposedChart se nombra para
+              que Recharts re-monte las barras al cambiar el modo y se
+              re-anime el eje Y izquierdo. */}
           <Bar
             yAxisId="left"
-            dataKey="venta24_alDia"
-            stackId="stack-v24"
-            name="Venta 2024"
+            dataKey={barKeyAlDia(24)}
+            stackId="stack-24"
+            name={`${barTitle} 2024`}
             fill="rgba(148, 163, 184, 0.85)"
             radius={[0, 0, 0, 0]}
           />
           <Bar
             yAxisId="left"
-            dataKey="__rest_v24"
-            stackId="stack-v24"
-            name="Venta 2024"
+            dataKey={barKeyRest(24)}
+            stackId="stack-24"
+            name={`${barTitle} 2024`}
             legendType="none"
             fill="rgba(148, 163, 184, 0.28)"
             radius={[2, 2, 0, 0]}
           />
           <Bar
             yAxisId="left"
-            dataKey="venta25_alDia"
-            stackId="stack-v25"
-            name="Venta 2025"
+            dataKey={barKeyAlDia(25)}
+            stackId="stack-25"
+            name={`${barTitle} 2025`}
             fill="rgba(59, 130, 246, 0.85)"
             radius={[0, 0, 0, 0]}
           />
           <Bar
             yAxisId="left"
-            dataKey="__rest_v25"
-            stackId="stack-v25"
-            name="Venta 2025"
+            dataKey={barKeyRest(25)}
+            stackId="stack-25"
+            name={`${barTitle} 2025`}
             legendType="none"
             fill="rgba(59, 130, 246, 0.28)"
             radius={[2, 2, 0, 0]}
           />
           <Bar
             yAxisId="left"
-            dataKey="venta26_alDia"
-            stackId="stack-v26"
-            name="Venta 2026"
+            dataKey={barKeyAlDia(26)}
+            stackId="stack-26"
+            name={`${barTitle} 2026`}
             fill="rgba(16, 185, 129, 0.85)"
             radius={[0, 0, 0, 0]}
           />
           <Bar
             yAxisId="left"
-            dataKey="__rest_v26"
-            stackId="stack-v26"
-            name="Venta 2026"
+            dataKey={barKeyRest(26)}
+            stackId="stack-26"
+            name={`${barTitle} 2026`}
             legendType="none"
             fill="rgba(16, 185, 129, 0.28)"
             radius={[2, 2, 0, 0]}
           />
-          {/* Líneas de margen % (eje derecho) */}
+          {/* Líneas de margen % (eje derecho) — NO cambian con el toggle.
+              Esto permite leer el comportamiento del margen vs el
+              volumen (en pesos o kg). */}
           <Line
             yAxisId="right"
             type="monotone"
@@ -499,6 +636,61 @@ export function VentasTab({
 }
 
 // ============================================================
+// Toggle Pesos / Kilos — mismo look que el de TrackingDiarioTab
+// ============================================================
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: VentasViewMode;
+  onChange: (next: VentasViewMode) => void;
+}) {
+  const baseBtn =
+    "flex items-center justify-center px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider transition-colors";
+  return (
+    <div
+      role="tablist"
+      aria-label="Modo de vista"
+      className="inline-flex items-center gap-0 rounded-[var(--radius)] border p-0.5"
+      style={{
+        background: "var(--bg-surface-muted)",
+        borderColor: "var(--border)",
+      }}
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "pesos"}
+        onClick={() => onChange("pesos")}
+        className={`${baseBtn} rounded-[var(--radius-sm)]`}
+        style={{
+          background: mode === "pesos" ? "var(--bg-surface)" : "transparent",
+          color:
+            mode === "pesos" ? "var(--accent)" : "var(--text-secondary)",
+          boxShadow: mode === "pesos" ? "var(--shadow-card)" : "none",
+        }}
+      >
+        Pesos
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "kg"}
+        onClick={() => onChange("kg")}
+        className={`${baseBtn} rounded-[var(--radius-sm)]`}
+        style={{
+          background: mode === "kg" ? "var(--bg-surface)" : "transparent",
+          color: mode === "kg" ? "var(--accent)" : "var(--text-secondary)",
+          boxShadow: mode === "kg" ? "var(--shadow-card)" : "none",
+        }}
+      >
+        Kilos
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
 // Custom Tooltip — separates Venta vs Margen% en 2 secciones
 // ============================================================
 interface TooltipPayloadItem {
@@ -512,10 +704,14 @@ function VentasTooltip({
   active,
   payload,
   label,
+  isKg = false,
 }: {
   active?: boolean;
   payload?: TooltipPayloadItem[];
   label?: string;
+  /** Si true muestra Kilos en lugar de Pesos en la sección de barras.
+   *  La sección Margen % nunca cambia. */
+  isKg?: boolean;
 }) {
   if (!active || !payload || payload.length === 0) return null;
 
@@ -538,7 +734,8 @@ function VentasTooltip({
   // Margen items se mantienen del payload (líneas, no apiladas)
   const margenItems = payload.filter((p) => p.name?.startsWith("Margen%"));
 
-  // Cierres por año (suma de al-día + resto) — para YoY del header
+  // YoY del header — siempre compara CIERRES de 2025 vs 2026 (pesos)
+  // porque es la métrica más útil para identificar tendencias.
   const v25 = num("venta25");
   const v26 = num("venta26");
   const yoyDelta =
@@ -546,13 +743,21 @@ function VentasTooltip({
       ? ((v26 - v25) / v25) * 100
       : null;
 
-  // Series de Venta para mostrar en sección — usamos al-día como principal
-  // y cierre como referencia (solo cuando es el mes actual).
-  const ventaShow = [
-    { label: "2024", colorBar: "rgba(148, 163, 184, 0.85)", cierreKey: "venta24", alDiaKey: "venta24_alDia" },
-    { label: "2025", colorBar: "rgba(59, 130, 246, 0.85)",  cierreKey: "venta25", alDiaKey: "venta25_alDia" },
-    { label: "2026", colorBar: "rgba(16, 185, 129, 0.85)",  cierreKey: "venta26", alDiaKey: "venta26_alDia" },
-  ];
+  // Series de la sección principal — cambia según modo (pesos o kilos).
+  // Usamos al-día como principal y cierre como referencia (solo en mes actual).
+  const ventaShow = isKg
+    ? [
+        { label: "2024", colorBar: "rgba(148, 163, 184, 0.85)", cierreKey: "kg24", alDiaKey: "kg24_alDia" },
+        { label: "2025", colorBar: "rgba(59, 130, 246, 0.85)",  cierreKey: "kg25", alDiaKey: "kg25_alDia" },
+        { label: "2026", colorBar: "rgba(16, 185, 129, 0.85)",  cierreKey: "kg26", alDiaKey: "kg26_alDia" },
+      ]
+    : [
+        { label: "2024", colorBar: "rgba(148, 163, 184, 0.85)", cierreKey: "venta24", alDiaKey: "venta24_alDia" },
+        { label: "2025", colorBar: "rgba(59, 130, 246, 0.85)",  cierreKey: "venta25", alDiaKey: "venta25_alDia" },
+        { label: "2026", colorBar: "rgba(16, 185, 129, 0.85)",  cierreKey: "venta26", alDiaKey: "venta26_alDia" },
+      ];
+  const fmtValue = (v: number) => (isKg ? formatKilos(v) : formatMoney(v));
+  const sectionTitle = isKg ? "Kilos" : "Venta";
 
   return (
     <div
@@ -590,13 +795,13 @@ function VentasTooltip({
         )}
       </div>
 
-      {/* Sección Venta — al día N (oscuro) + cierre (referencia) si mes actual */}
+      {/* Sección Venta o Kilos — al día N (oscuro) + cierre (referencia) si mes actual */}
       <div className="px-3 py-2">
         <div
           className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
           style={{ color: "var(--text-muted)" }}
         >
-          Venta {isCurrentSlot ? "· al mismo día laboral" : ""}
+          {sectionTitle} {isCurrentSlot ? "· al mismo día laboral" : ""}
         </div>
         {ventaShow.map((s) => {
           const cierre = num(s.cierreKey);
@@ -604,7 +809,7 @@ function VentasTooltip({
           if (cierre == null && alDia == null) return null;
           // Si NO es slot actual, al-día = cierre; mostramos solo el cierre.
           // Si SÍ es slot actual, al-día puede ser distinto del cierre →
-          // mostramos al-día como principal + "cierre $X" como referencia.
+          // mostramos al-día como principal + "cierre X" como referencia.
           const showSecondary =
             isCurrentSlot &&
             alDia != null &&
@@ -618,13 +823,13 @@ function VentasTooltip({
               label={s.label}
               value={
                 isCurrentSlot && alDia != null
-                  ? formatMoney(alDia)
+                  ? fmtValue(alDia)
                   : cierre != null
-                    ? formatMoney(cierre)
+                    ? fmtValue(cierre)
                     : "—"
               }
               valueSecondary={
-                showSecondary ? `cierre ${formatMoney(cierre)}` : undefined
+                showSecondary ? `cierre ${fmtValue(cierre)}` : undefined
               }
             />
           );

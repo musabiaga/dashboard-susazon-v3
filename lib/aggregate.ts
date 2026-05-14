@@ -61,6 +61,7 @@ export function aggregateKpis(kpis: TerritoryKpi[]): TerritoryKpi {
   let aldExists = false;
   let v24 = 0, v25 = 0, v26 = 0;
   let m24 = 0, m25 = 0, m26 = 0;
+  let k24 = 0, k25 = 0, k26 = 0;
 
   for (const k of kpis) {
     venta += k.venta;
@@ -109,6 +110,9 @@ export function aggregateKpis(kpis: TerritoryKpi[]): TerritoryKpi {
       m24 += k.currentMonthAlDia.m24;
       m25 += k.currentMonthAlDia.m25;
       m26 += k.currentMonthAlDia.m26;
+      k24 += k.currentMonthAlDia.k24;
+      k25 += k.currentMonthAlDia.k25;
+      k26 += k.currentMonthAlDia.k26;
     }
   }
 
@@ -125,7 +129,7 @@ export function aggregateKpis(kpis: TerritoryKpi[]): TerritoryKpi {
     },
     monthly: Array.from(monthlyMap.values()),
     currentMonthAlDia: aldExists
-      ? { v24, v25, v26, m24, m25, m26 }
+      ? { v24, v25, v26, m24, m25, m26, k24, k25, k26 }
       : undefined,
   };
 }

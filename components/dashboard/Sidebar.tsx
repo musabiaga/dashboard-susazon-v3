@@ -53,6 +53,7 @@ export interface TerritoryKpi {
   currentMonthAlDia?: {
     v24: number; v25: number; v26: number;
     m24: number; m25: number; m26: number;
+    k24: number; k25: number; k26: number;
   };
 }
 
