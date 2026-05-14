@@ -258,7 +258,7 @@ function buildDimDataset<
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string }>;
+  searchParams: Promise<{ year?: string; month?: string; asOf?: string }>;
 }) {
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -318,9 +318,41 @@ export default async function DashboardPage({
   const monthIdx = currentMonth - 1; // 0-11 para indexar arrays MONTH_*
   // Día 0 del mes siguiente = último día del mes actual = días totales.
   const daysTotal = new Date(currentYear, currentMonth, 0).getDate();
-  const daysCurrent = isHistorical
-    ? daysTotal // mes pasado: día actual = último día del mes (mes cerrado)
-    : today.day;
+
+  // === Toggle "Cierre [X-may] / Hoy [Y-may]" ===
+  // Permite ver el dashboard "como si fuera ayer" cuando hoy aún no hay
+  // venta del día (típico: refrescas en la mañana, comparar contra meta
+  // de hoy sería engañoso porque la data llega hasta ayer).
+  //
+  // Si viene ?asOf=YYYY-MM-DD: validamos formato y rango (mismo año/mes,
+  // día 1..daysTotal, no futuro). Si pasa todo, override daysCurrent con
+  // ese día. Todo el resto del pipeline (elapsedBizDays, *_alDia, etc.)
+  // se recalcula solo a partir de daysCurrent.
+  let daysCurrent: number;
+  let asOfDay: number | null = null; // null = "Hoy en curso" (default)
+  if (isHistorical) {
+    daysCurrent = daysTotal; // mes histórico = cierre completo
+  } else {
+    const asOfRaw = sp.asOf?.trim();
+    if (asOfRaw && /^\d{4}-\d{2}-\d{2}$/.test(asOfRaw)) {
+      const [yy, mm, dd] = asOfRaw.split("-").map((s) => parseInt(s, 10));
+      const valid =
+        yy === currentYear &&
+        mm === currentMonth &&
+        dd >= 1 &&
+        dd <= daysTotal &&
+        // No permitir fechas futuras (más allá de hoy CDMX)
+        dd <= today.day;
+      if (valid) {
+        asOfDay = dd;
+        daysCurrent = dd;
+      } else {
+        daysCurrent = today.day;
+      }
+    } else {
+      daysCurrent = today.day;
+    }
+  }
 
   const currentMonthLabel = `${MONTH_NAMES_ES[monthIdx]} ${currentYear}`;
   const monthShortYY = `${MONTH_SHORT_ES[monthIdx]} ${currentYear % 100}`;
@@ -374,6 +406,25 @@ export default async function DashboardPage({
       .eq("mes", currentMonth)
       .order("fecha"),
   ]);
+
+  // === lastDayWithSale ===
+  // Última fecha del mes actual con venta > 0 (global across territorios
+  // visibles). Sirve para detectar el desfase data vs calendario:
+  //   - Si hoy es 14-may pero la última venta es del 13-may → toggle "Cierre
+  //     13-may / Hoy 14-may" aparece en el header del dashboard.
+  //   - Si lastDayWithSale === today.day → no aparece (no hay desfase).
+  // Solo aplica para el mes en curso; en histórico el toggle no tiene sentido.
+  let lastDayWithSale: number | null = null;
+  if (!isHistorical) {
+    let maxDay = 0;
+    for (const r of dailyCurrent ?? []) {
+      const v = Number(r.total_venta) || 0;
+      if (v <= 0) continue;
+      const d = new Date(r.fecha + "T12:00:00").getDate();
+      if (d > maxDay) maxDay = d;
+    }
+    lastDayWithSale = maxDay > 0 ? maxDay : null;
+  }
 
   // Fetch dimension data en paralelo. Con max-rows = 50000 en Supabase,
   // single queries con .in([3 anos]) caben sin problema.
@@ -1165,6 +1216,9 @@ export default async function DashboardPage({
         isHistorical={isHistorical}
         todayYear={today.year}
         todayMonth={today.month}
+        actualTodayDay={today.day}
+        asOfDay={asOfDay}
+        lastDayWithSale={lastDayWithSale}
         canExportExcel={permissions?.can_export_excel ?? false}
         newCustomerCutoffDate={(() => {
           // Hoy CDMX menos 90 días → fecha ISO YYYY-MM-DD.

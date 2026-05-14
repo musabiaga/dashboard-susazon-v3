@@ -19,6 +19,7 @@ import {
   type PerdidoRow,
 } from "@/components/dashboard/PerdidosTab";
 import { MonthSelector } from "@/components/dashboard/MonthSelector";
+import { CutoffToggle } from "@/components/dashboard/CutoffToggle";
 import { AlertCircle, Clock } from "lucide-react";
 import {
   aggregateKpis,
@@ -77,6 +78,14 @@ interface DashboardClientProps {
   todayYear: number;
   /** Mes "hoy" CDMX 1-12 (para el MonthSelector). */
   todayMonth: number;
+  /** Día calendario "hoy" CDMX (para el CutoffToggle). */
+  actualTodayDay: number;
+  /** Día seleccionado vía ?asOf= (null = "Hoy" default). */
+  asOfDay: number | null;
+  /** Último día del mes en curso con venta > 0 globalmente. null = no hay
+   *  venta este mes todavía. Usado para mostrar el CutoffToggle solo cuando
+   *  hay desfase data-vs-calendario. */
+  lastDayWithSale: number | null;
   /** Permiso para descargar Excel desde los tabs (de users_permissions.can_export_excel). */
   canExportExcel: boolean;
   /** Fecha ISO "hoy - 90 días" (CDMX). Cliente "Nuevo" en Perdidos si su
@@ -117,6 +126,9 @@ export function DashboardClient({
   isHistorical,
   todayYear,
   todayMonth,
+  actualTodayDay,
+  asOfDay,
+  lastDayWithSale,
   canExportExcel,
   newCustomerCutoffDate,
 }: DashboardClientProps) {
@@ -501,21 +513,37 @@ export function DashboardClient({
             </div>
           )}
 
-          {/* Contexto actual + selector de mes */}
-          <div className="flex items-center justify-between gap-3">
+          {/* Contexto actual + selector de mes + (opcional) toggle de corte */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h1
               className="text-xl font-semibold"
               style={{ color: "var(--text-primary)" }}
             >
               {contextLabel}
             </h1>
-            <MonthSelector
-              currentYear={currentYear}
-              currentMonth={currentMonth}
-              todayYear={todayYear}
-              todayMonth={todayMonth}
-              monthsBack={24}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Toggle "Cierre vs Hoy" — solo si la data llega antes que
+                  el día calendario (típico al refrescar en la mañana).
+                  No aplica en histórico ni cuando ya hay venta de hoy. */}
+              {!isHistorical &&
+                lastDayWithSale !== null &&
+                lastDayWithSale < actualTodayDay && (
+                  <CutoffToggle
+                    currentYear={currentYear}
+                    currentMonth={currentMonth}
+                    actualTodayDay={actualTodayDay}
+                    lastDayWithSale={lastDayWithSale}
+                    asOfDay={asOfDay}
+                  />
+                )}
+              <MonthSelector
+                currentYear={currentYear}
+                currentMonth={currentMonth}
+                todayYear={todayYear}
+                todayMonth={todayMonth}
+                monthsBack={24}
+              />
+            </div>
           </div>
 
           {/* KPIs del mes actual — Todos o del territorio seleccionado */}
