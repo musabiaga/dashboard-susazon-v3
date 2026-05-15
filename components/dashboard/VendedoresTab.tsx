@@ -99,6 +99,7 @@ export function VendedoresTab({
         exportTerritory={exportTerritory}
         canExportExcel={canExportExcel}
         reportInput={reportInput}
+        modeStorageKey="vendedores-tab-mode"
       />
     </div>
   );

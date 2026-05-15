@@ -624,6 +624,7 @@ export function DashboardClient({
                     exportTerritory={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
                     reportInput={reportInput}
+                    modeStorageKey="grupo-tab-mode"
                   />
                 );
               }
@@ -662,6 +663,7 @@ export function DashboardClient({
                     exportTerritory={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
                     reportInput={reportInput}
+                    modeStorageKey="clientes-tab-mode"
                   />
                 );
               }

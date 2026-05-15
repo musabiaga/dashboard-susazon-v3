@@ -15,6 +15,8 @@ import type {
   ExcelSummaryRow,
 } from "@/lib/export-excel";
 
+type DimensionViewMode = "pesos" | "kg";
+
 export interface DimensionRow {
   name: string;
   // Cierre del mes (mes completo de cada año). 2026 = mes en curso.
@@ -85,6 +87,12 @@ interface Props {
   /** Input para el reporte PDF "Avance Comercial". Si null, el botón se
    *  renderiza disabled (sin data, ej. modo agregado vacío). */
   reportInput?: BuildReportInput | null;
+  /** Si se pasa, habilita el toggle Pesos/Kilos en este tab y usa esta key
+   *  para persistir el modo en localStorage. Cada tab que use DimensionTab
+   *  debe pasar una key distinta (ej. "grupo-tab-mode", "clientes-tab-mode",
+   *  "vendedores-tab-mode") para que los toggles sean independientes.
+   *  Si NO se pasa, no se muestra el toggle (modo Pesos hardcoded). */
+  modeStorageKey?: string;
 }
 
 /**
@@ -119,7 +127,33 @@ export function DimensionTab({
   exportTerritory = "",
   canExportExcel = false,
   reportInput = null,
+  modeStorageKey,
 }: Props) {
+  // ============ Toggle Pesos / Kilos ============
+  // Solo se renderiza si se pasa modeStorageKey. Cada tab tiene su propio
+  // key para que el modo sea independiente: Grupo en Pesos, Clientes en Kg
+  // si quieren. Las LÍNEAS DE MARGEN % siempre se mantienen fijas en el
+  // eje Y derecho — el toggle solo afecta las barras y el eje Y izquierdo.
+  const [mode, setMode] = useState<DimensionViewMode>("pesos");
+  useEffect(() => {
+    if (!modeStorageKey) return;
+    try {
+      const saved = window.localStorage.getItem(modeStorageKey);
+      if (saved === "kg" || saved === "pesos") setMode(saved);
+    } catch {
+      // ignore
+    }
+  }, [modeStorageKey]);
+  const switchMode = (next: DimensionViewMode) => {
+    setMode(next);
+    if (!modeStorageKey) return;
+    try {
+      window.localStorage.setItem(modeStorageKey, next);
+    } catch {
+      // ignore
+    }
+  };
+  const isKg = mode === "kg";
   // Selección custom (multi-select). Vacía = comportamiento default Top N.
   // Persistencia en localStorage si selectionStorageKey está definido.
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -188,14 +222,25 @@ export function DimensionTab({
     return topNTable == null ? sorted : sorted.slice(0, topNTable);
   }, [isCustomMode, top, sorted, topNTable]);
 
-  const series: GroupedBarSeries[] = [
-    { key: "v24", label: monthLabel24, color: "#94a3b8" },
-    { key: "v25", label: monthLabel25, color: "#3b82f6" },
-    { key: "v26", label: monthLabel26, color: "#10b981" },
-  ];
+  // Series de barras (cambian según modo Pesos/Kilos).
+  // Las labels son los meses (Abr 24/25/26). El título "Venta" vs "Kilos"
+  // lo decide barSeriesTitle del GroupedBarChart.
+  const series: GroupedBarSeries[] = isKg
+    ? [
+        { key: "k24", label: monthLabel24, color: "#94a3b8" },
+        { key: "k25", label: monthLabel25, color: "#3b82f6" },
+        { key: "k26", label: monthLabel26, color: "#10b981" },
+      ]
+    : [
+        { key: "v24", label: monthLabel24, color: "#94a3b8" },
+        { key: "v25", label: monthLabel25, color: "#3b82f6" },
+        { key: "v26", label: monthLabel26, color: "#10b981" },
+      ];
 
-  // Series de margen para chart + tooltip. Las labels añaden "Margen" para
-  // distinguir de las barras de venta en la leyenda.
+  // Series de margen para tooltip + chart — NO dependen del modo del
+  // toggle. Las líneas de margen % se mantienen fijas en el eje Y derecho,
+  // que es el insight clave: leer la evolución del margen vs el volumen
+  // (sea pesos o kilos).
   const marginAmountSeries: GroupedBarSeries[] = [
     { key: "m24", label: `Margen ${monthLabel24}`, color: "#94a3b8" },
     { key: "m25", label: `Margen ${monthLabel25}`, color: "#3b82f6" },
@@ -206,6 +251,19 @@ export function DimensionTab({
     { key: "mp25", label: `Margen % ${monthLabel25}`, color: "#3b82f6" },
     { key: "mp26", label: `Margen % ${monthLabel26}`, color: "#10b981" },
   ];
+
+  // Mapeo de cierre → al-día según modo (para barras apiladas).
+  const alDiaKeyByCierre: Record<string, string> = isKg
+    ? {
+        k24: "k24_alDia",
+        k25: "k25_alDia",
+        k26: "k26_alDia",
+      }
+    : {
+        v24: "v24_alDia",
+        v25: "v25_alDia",
+        v26: "v26_alDia",
+      };
 
   // ============ Export Excel ============
   // Lazy import (exceljs ~700KB se carga solo al click). WYSIWYG: respeta
@@ -402,11 +460,15 @@ export function DimensionTab({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar superior: botones de exportación (alineados a la derecha).
-          Se renderiza si tiene permiso, aunque algún botón esté disabled. */}
-      {canExportExcel && (handleExportExcel || reportInput !== undefined) && (
+      {/* Toolbar superior: toggle Pesos/Kilos (si aplica) + botones de
+          exportación. Se renderiza si hay toggle o si tiene permiso. */}
+      {(modeStorageKey ||
+        (canExportExcel && (handleExportExcel || reportInput !== undefined))) && (
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {handleExportExcel && (
+          {modeStorageKey && (
+            <ModeToggle mode={mode} onChange={switchMode} />
+          )}
+          {canExportExcel && handleExportExcel && (
             <ExportExcelButton
               onExport={handleExportExcel}
               disabled={tableRows.length === 0}
@@ -418,7 +480,9 @@ export function DimensionTab({
               }
             />
           )}
-          <ReportButton reportInput={reportInput} canExport={canExportExcel} />
+          {canExportExcel && (
+            <ReportButton reportInput={reportInput} canExport={canExportExcel} />
+          )}
         </div>
       )}
 
@@ -492,41 +556,49 @@ export function DimensionTab({
                   const v24AlDia = Math.min(r.v24, r.v24_alDia ?? r.v24);
                   const v25AlDia = Math.min(r.v25, r.v25_alDia ?? r.v25);
                   const v26AlDia = Math.min(r.v26, r.v26_alDia ?? r.v26);
+                  const k24Raw = r.k24 ?? 0;
+                  const k25Raw = r.k25 ?? 0;
+                  const k26Raw = r.k26 ?? 0;
+                  const k24AlDia = Math.min(k24Raw, r.k24_alDia ?? k24Raw);
+                  const k25AlDia = Math.min(k25Raw, r.k25_alDia ?? k25Raw);
+                  const k26AlDia = Math.min(k26Raw, r.k26_alDia ?? k26Raw);
                   return {
                     name: r.name,
-                    // Cierre del mes (segmento total)
+                    // ===== Pesos (cierre + al-día + resto) =====
                     v24: r.v24,
                     v25: r.v25,
                     v26: r.v26,
-                    // Al día N (segmento sólido inferior)
                     v24_alDia: v24AlDia,
                     v25_alDia: v25AlDia,
                     v26_alDia: v26AlDia,
-                    // "Resto hasta cierre" (segmento translúcido superior)
                     __rest_v24: Math.max(0, r.v24 - v24AlDia),
                     __rest_v25: Math.max(0, r.v25 - v25AlDia),
                     __rest_v26: Math.max(0, r.v26 - v26AlDia),
-                    // Margen $ y margen % (van al tooltip)
+                    // ===== Kilos (cierre + al-día + resto) =====
+                    k24: k24Raw,
+                    k25: k25Raw,
+                    k26: k26Raw,
+                    k24_alDia: k24AlDia,
+                    k25_alDia: k25AlDia,
+                    k26_alDia: k26AlDia,
+                    __rest_k24: Math.max(0, k24Raw - k24AlDia),
+                    __rest_k25: Math.max(0, k25Raw - k25AlDia),
+                    __rest_k26: Math.max(0, k26Raw - k26AlDia),
+                    // ===== Margen $ y margen % (líneas + tooltip) =====
                     m24,
                     m25,
                     m26,
                     mp24: r.v24 > 0 ? (m24 / r.v24) * 100 : 0,
                     mp25: r.v25 > 0 ? (m25 / r.v25) * 100 : 0,
                     mp26: r.v26 > 0 ? (m26 / r.v26) * 100 : 0,
-                    // KG (al tooltip)
-                    k24: r.k24 ?? 0,
-                    k25: r.k25 ?? 0,
-                    k26: r.k26 ?? 0,
                   };
                 })}
                 series={series}
                 marginAmountSeries={marginAmountSeries}
                 marginPctSeries={marginPctSeries}
-                alDiaKeyByCierre={{
-                  v24: "v24_alDia",
-                  v25: "v25_alDia",
-                  v26: "v26_alDia",
-                }}
+                alDiaKeyByCierre={alDiaKeyByCierre}
+                barSeriesTitle={isKg ? "Kilos" : "Venta"}
+                yFormatter={isKg ? formatKilos : formatMoney}
                 height={520}
                 xAngle={-30}
                 xLabelHeight={130}
@@ -582,6 +654,13 @@ export function DimensionTab({
                       <Th align="right" subtle>Var % KG</Th>
                     </>
                   )}
+                  {/* Margen del mes actual (siempre visible, no depende del
+                      toggle ni de showKg). 4 columnas: Mg $ / Mg % / Mg % prev
+                      / Δ pp para leer evolución del margen vs año anterior. */}
+                  <Th align="right">{`Mg $ ${monthLabel26}`}</Th>
+                  <Th align="right">{`Mg % ${monthLabel26}`}</Th>
+                  <Th align="right" subtle>{`Mg % ${monthLabel25}`}</Th>
+                  <Th align="right">Δ pp</Th>
                 </tr>
               </thead>
               <tbody>
@@ -594,10 +673,21 @@ export function DimensionTab({
                   const k24Show = r.k24_alDia ?? r.k24 ?? 0;
                   const k25Show = r.k25_alDia ?? r.k25 ?? 0;
                   const k26Show = r.k26_alDia ?? r.k26 ?? 0;
+                  const m26Show = r.m26_alDia ?? r.m26 ?? 0;
+                  const m25Show = r.m25_alDia ?? r.m25 ?? 0;
                   const varPct =
                     v25Show > 0 ? ((v26Show - v25Show) / v25Show) * 100 : null;
                   const varKgPct =
                     k25Show > 0 ? ((k26Show - k25Show) / k25Show) * 100 : null;
+                  // Margen % al-día por año (con base la venta al-día del año)
+                  const mgPct26 =
+                    v26Show > 0 ? (m26Show / v26Show) * 100 : null;
+                  const mgPct25 =
+                    v25Show > 0 ? (m25Show / v25Show) * 100 : null;
+                  const deltaPp =
+                    mgPct26 != null && mgPct25 != null
+                      ? mgPct26 - mgPct25
+                      : null;
                   return (
                     <tr
                       key={r.name + i}
@@ -649,6 +739,29 @@ export function DimensionTab({
                           </Td>
                         </>
                       )}
+                      {/* Margen del mes actual + comparativo % vs año ant. */}
+                      <Td align="right">{formatMoney(m26Show)}</Td>
+                      <Td align="right" bold>
+                        {mgPct26 == null ? "—" : `${mgPct26.toFixed(1)}%`}
+                      </Td>
+                      <Td align="right" subtle>
+                        {mgPct25 == null ? "—" : `${mgPct25.toFixed(1)}%`}
+                      </Td>
+                      <Td
+                        align="right"
+                        bold
+                        color={
+                          deltaPp == null
+                            ? "var(--text-muted)"
+                            : deltaPp >= 0
+                              ? "var(--success)"
+                              : "var(--danger)"
+                        }
+                      >
+                        {deltaPp == null
+                          ? "—"
+                          : `${deltaPp >= 0 ? "+" : ""}${deltaPp.toFixed(1)} pp`}
+                      </Td>
                     </tr>
                   );
                 })}
@@ -669,6 +782,61 @@ export function DimensionTab({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// Toggle Pesos / Kilos — mismo look que Ventas/Productos/TrackingDiario
+// ============================================================
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: DimensionViewMode;
+  onChange: (next: DimensionViewMode) => void;
+}) {
+  const baseBtn =
+    "flex items-center justify-center px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider transition-colors";
+  return (
+    <div
+      role="tablist"
+      aria-label="Modo de vista"
+      className="inline-flex items-center gap-0 rounded-[var(--radius)] border p-0.5"
+      style={{
+        background: "var(--bg-surface-muted)",
+        borderColor: "var(--border)",
+      }}
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "pesos"}
+        onClick={() => onChange("pesos")}
+        className={`${baseBtn} rounded-[var(--radius-sm)]`}
+        style={{
+          background: mode === "pesos" ? "var(--bg-surface)" : "transparent",
+          color:
+            mode === "pesos" ? "var(--accent)" : "var(--text-secondary)",
+          boxShadow: mode === "pesos" ? "var(--shadow-card)" : "none",
+        }}
+      >
+        Pesos
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "kg"}
+        onClick={() => onChange("kg")}
+        className={`${baseBtn} rounded-[var(--radius-sm)]`}
+        style={{
+          background: mode === "kg" ? "var(--bg-surface)" : "transparent",
+          color: mode === "kg" ? "var(--accent)" : "var(--text-secondary)",
+          boxShadow: mode === "kg" ? "var(--shadow-card)" : "none",
+        }}
+      >
+        Kilos
+      </button>
     </div>
   );
 }

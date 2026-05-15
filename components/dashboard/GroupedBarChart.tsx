@@ -52,6 +52,10 @@ interface Props {
    *  barras se renderizan como apiladas (segmento sólido al-día + segmento
    *  translúcido del resto hasta cierre). Mejora 2 día-vs-día. */
   alDiaKeyByCierre?: Record<string, string>;
+  /** Título de la sección de barras en la leyenda. Default "Venta".
+   *  Útil para distinguir cuando las barras representan Kilos en lugar
+   *  de Pesos (toggle Pesos/Kilos en DimensionTab/ProductosTab/etc). */
+  barSeriesTitle?: string;
 }
 
 /**
@@ -83,6 +87,7 @@ export function GroupedBarChart({
   marginPctSeries,
   marginAmountSeries,
   alDiaKeyByCierre,
+  barSeriesTitle = "Venta",
 }: Props) {
   const hasMargin = (marginPctSeries?.length ?? 0) > 0;
   const hasAlDia =
@@ -137,6 +142,7 @@ export function GroupedBarChart({
               {...props}
               yFormatter={yFormatter}
               ventaSeries={series}
+              barSectionTitle={barSeriesTitle}
               marginAmountSeries={marginAmountSeries}
               marginPctSeries={marginPctSeries}
             />
@@ -154,7 +160,7 @@ export function GroupedBarChart({
             <ChartLegend
               sections={[
                 {
-                  title: "Venta",
+                  title: barSeriesTitle,
                   visualKind: hasAlDia ? "barras apiladas" : "barras",
                   items: series.map((s) => ({
                     label: s.label,
@@ -259,6 +265,7 @@ function GroupedBarTooltip({
   label,
   yFormatter,
   ventaSeries,
+  barSectionTitle = "Venta",
   marginAmountSeries,
   marginPctSeries,
 }: {
@@ -267,6 +274,9 @@ function GroupedBarTooltip({
   label?: string | number;
   yFormatter: (value: number) => string;
   ventaSeries: GroupedBarSeries[];
+  /** Título de la sección principal del tooltip. Coincide con barSeriesTitle
+   *  del chart ("Venta" o "Kilos" según modo). */
+  barSectionTitle?: string;
   marginAmountSeries?: GroupedBarSeries[];
   marginPctSeries?: GroupedBarSeries[];
 }) {
@@ -313,13 +323,16 @@ function GroupedBarTooltip({
         </div>
       </div>
 
-      {/* Sección Venta — al día N (oscuro) + cierre (translúcido) si Mejora 2 activa */}
+      {/* Sección principal (Venta o Kilos) — al día N (oscuro) + cierre */}
       <div className="px-3 py-2">
         <div
           className="mb-1 text-[9px] font-semibold uppercase tracking-wider"
           style={{ color: "var(--text-muted)" }}
         >
-          Venta {row && row["v24_alDia"] != null ? "· al mismo día laboral" : ""}
+          {barSectionTitle}
+          {ventaSeries.some((s) => num(`${s.key}_alDia`) != null)
+            ? " · al mismo día laboral"
+            : ""}
         </div>
         {ventaSeries.map((s) => {
           // Si hay al-día, mostramos al-día como valor principal y cierre
@@ -350,7 +363,8 @@ function GroupedBarTooltip({
         })}
       </div>
 
-      {/* Sección Margen $ */}
+      {/* Sección Margen $ — siempre en formato moneda (NO usa yFormatter
+          porque en modo KG yFormatter es formatKilos y el margen es en $). */}
       {marginAmountSeries && marginAmountSeries.length > 0 && (
         <div
           className="px-3 py-2"
@@ -369,7 +383,7 @@ function GroupedBarTooltip({
                 key={s.key}
                 color={s.color}
                 label={s.label}
-                value={v != null ? yFormatter(v) : "—"}
+                value={v != null ? formatMoney(v) : "—"}
               />
             );
           })}
