@@ -520,8 +520,17 @@ export function PerdidosTab({
     dim === "mes"
       ? `Mes ${monthShortYY}`
       : `YTD (Ene–${monthShortYY.split(" ")[0]} ${monthShortYY.split(" ")[1]})`;
-  const labelPrev = dim === "mes" ? prevMonthShortYY : "Ene–Abr 25";
-  const labelCurr = dim === "mes" ? monthShortYY : "Ene–Abr 26";
+  // En modo YTD, los labels deben reflejar dinámicamente el mes actual:
+  // si hoy es May 26, labelPrev = "Ene–May 25" y labelCurr = "Ene–May 26".
+  // Antes estaban hardcoded a "Ene–Abr 25/26", quedaban congelados al cambiar de mes.
+  const labelPrev =
+    dim === "mes"
+      ? prevMonthShortYY
+      : `Ene–${monthShortYY.split(" ")[0]} ${prevMonthShortYY.split(" ")[1]}`;
+  const labelCurr =
+    dim === "mes"
+      ? monthShortYY
+      : `Ene–${monthShortYY.split(" ")[0]} ${monthShortYY.split(" ")[1]}`;
 
   // ============ Export Excel ============
   // WYSIWYG: respeta filtros activos en pantalla (territorios + status +
