@@ -711,14 +711,15 @@ export function ConcentracionAnalysis({ today }: Props) {
             </Treemap>
           </ResponsiveContainer>
         ) : (
-          // Radar adaptativo: ajusta font y truncado según cantidad de ejes
-          // para que con 10-15 items sigan siendo legibles los labels.
+          // Radar adaptativo: ajusta font/truncado según cantidad de ejes
+          // + gradiente radial moderno + dots visibles en cada vértice.
           (() => {
             const n = radarData.length;
             const labelFont = n <= 8 ? 11 : n <= 11 ? 10 : 9;
             const truncLen = n <= 8 ? 24 : n <= 11 ? 18 : 14;
-            // Más margen horizontal cuando hay muchos ejes para no cortar labels
             const horizMargin = n <= 8 ? 60 : n <= 11 ? 80 : 100;
+            // ID único para no colisionar entre re-mounts
+            const gradientId = "radar-gradient-insights";
             return (
               <ResponsiveContainer width="100%" height={n <= 8 ? 520 : 580}>
                 <RadarChart
@@ -734,12 +735,32 @@ export function ConcentracionAnalysis({ today }: Props) {
                     left: horizMargin,
                   }}
                 >
-                  <PolarGrid stroke="var(--border)" />
+                  {/* SVG defs para el gradiente radial del fill del polígono */}
+                  <defs>
+                    <radialGradient id={gradientId} cx="50%" cy="50%" r="60%">
+                      <stop
+                        offset="0%"
+                        stopColor="var(--accent)"
+                        stopOpacity={0.55}
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor="var(--accent)"
+                        stopOpacity={0.12}
+                      />
+                    </radialGradient>
+                  </defs>
+                  <PolarGrid
+                    stroke="var(--border)"
+                    strokeDasharray="2 4"
+                    radialLines={true}
+                  />
                   <PolarAngleAxis
                     dataKey="name"
                     tick={{
                       fontSize: labelFont,
                       fill: "var(--text-secondary)",
+                      fontWeight: 500,
                     }}
                   />
                   <PolarRadiusAxis
@@ -747,6 +768,7 @@ export function ConcentracionAnalysis({ today }: Props) {
                     domain={[0, radarMax]}
                     tick={{ fontSize: 9, fill: "var(--text-muted)" }}
                     tickFormatter={(v) => `${v}%`}
+                    axisLine={false}
                   />
                   <Radar
                     name={
@@ -756,9 +778,21 @@ export function ConcentracionAnalysis({ today }: Props) {
                     }
                     dataKey="value"
                     stroke="var(--accent)"
-                    fill="var(--accent)"
-                    fillOpacity={0.35}
-                    strokeWidth={2}
+                    fill={`url(#${gradientId})`}
+                    fillOpacity={1}
+                    strokeWidth={2.5}
+                    dot={{
+                      r: 4,
+                      strokeWidth: 2,
+                      stroke: "var(--accent)",
+                      fill: "var(--bg-surface)",
+                    }}
+                    activeDot={{
+                      r: 6,
+                      strokeWidth: 2,
+                      stroke: "var(--accent)",
+                      fill: "var(--accent)",
+                    }}
                   />
                   <Tooltip
                     content={
@@ -768,6 +802,11 @@ export function ConcentracionAnalysis({ today }: Props) {
                         isAdditive={isAdditive}
                       />
                     }
+                    cursor={{
+                      stroke: "var(--accent)",
+                      strokeWidth: 1,
+                      strokeDasharray: "3 3",
+                    }}
                   />
                 </RadarChart>
               </ResponsiveContainer>
@@ -1305,92 +1344,146 @@ function TreemapBlock(props: TreemapPayload) {
 
   const isResto = name === "Resto del universo";
 
-  // Color/intensidad del bloque
+  // Intensidad por importancia (0–1)
   const intensity =
     maxValue && maxValue > 0 ? Math.min(1, (value ?? 0) / maxValue) : 0;
 
   // Fill principal:
-  //  - Items: gradient naranja Susazón, opacidad 0.65 → 1.0 por importancia
-  //  - Resto: gris-azulado distintivo (NO el bg-surface-muted que se mezcla con el fondo)
+  //  - Items: naranja Susazón con opacidad creciente por importancia (0.78 → 1.0).
+  //    Funciona en ambos themes (light y dark) porque el naranja es vibrante.
+  //  - Resto: usa CSS var → se adapta automáticamente al theme activo.
+  //    En "Susazón Moderno" (dark) será #1f1f1f, en "Clean" (light) será #f1f5f9.
   const fill = isResto
-    ? "rgba(100, 116, 139, 0.85)" // slate-500 sólido — claramente visible
-    : `rgba(237, 104, 8, ${0.65 + intensity * 0.35})`;
+    ? "var(--bg-surface-muted)"
+    : `rgba(237, 104, 8, ${0.78 + intensity * 0.22})`;
 
-  // Estilo de texto
-  const titleColor = "#ffffff";
-  const subtleColor = isResto ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.82)";
-  const badgeBg = isResto ? "rgba(0,0,0,0.18)" : "rgba(0,0,0,0.22)";
-  const badgeText = "#ffffff";
+  // Stroke: usa el bg-page como "gutter" entre bloques (gap visual limpio).
+  // En dark theme = negro casi total, en light = casi blanco. Universal.
+  const strokeColor = "var(--bg-page)";
+  const strokeWidth = 3;
 
-  // Padding interno para que el texto no se pegue al borde
-  const padding = Math.max(6, Math.min(14, Math.min(width, height) * 0.08));
+  // Inset para no recortar el border-radius con el stroke
+  const inset = strokeWidth / 2;
+  const rectX = x + inset;
+  const rectY = y + inset;
+  const rectW = Math.max(0, width - strokeWidth);
+  const rectH = Math.max(0, height - strokeWidth);
+
+  // Texto:
+  //  - Items: blanco puro (legible sobre naranja saturado)
+  //  - Resto: var(--text-primary) (se adapta al theme)
+  const titleColor = isResto ? "var(--text-primary)" : "#ffffff";
+  const valueColor = isResto
+    ? "var(--text-secondary)"
+    : "rgba(255,255,255,0.85)";
+
+  // Badge del %: pill blanco semi-translúcido con texto del color del bloque.
+  // En items: pill blanco + texto naranja oscuro (orange-900 #9a3412)
+  // En resto: pill var(--bg-page) + texto var(--text-primary) → adapta a theme
+  const badgeBg = isResto ? "var(--bg-page)" : "rgba(255, 255, 255, 0.96)";
+  const badgeText = isResto ? "var(--text-primary)" : "#9a3412";
+  const badgeBorder = isResto ? "var(--border-strong)" : "transparent";
+
+  // Padding interno generoso para look "espacioso"
+  const padding = Math.max(10, Math.min(18, Math.min(width, height) * 0.09));
   const innerLeft = x + padding;
   const innerTop = y + padding;
   const innerW = Math.max(0, width - padding * 2);
   const innerH = Math.max(0, height - padding * 2);
 
-  // Decisión qué mostrar según área disponible
-  const showTitle = innerW > 40 && innerH > 16;
-  const showValue = innerW > 60 && innerH > 38;
-  const showBadge = innerW > 50 && innerH > 50;
+  // Mostrar/ocultar según área disponible
+  const showTitle = innerW > 36 && innerH > 16;
+  const showValue = innerW > 60 && innerH > 42;
+  const showBadge = innerW > 56 && innerH > 56;
 
-  // Font size dinámico para el título: proporcional al ancho pero acotado.
-  // Bloques grandes → fuente grande; chicos → fuente pequeña.
-  const baseFont = Math.sqrt(width * height) * 0.13;
-  const titleFontSize = Math.max(10, Math.min(20, baseFont));
-  const valueFontSize = Math.max(9, Math.min(13, titleFontSize * 0.7));
-  const badgeFontSize = Math.max(10, Math.min(14, titleFontSize * 0.75));
+  // Font size dinámico — bloques grandes texto grande, chicos texto chico
+  const baseFont = Math.sqrt(width * height) * 0.12;
+  const titleFontSize = Math.max(11, Math.min(22, baseFont));
+  const valueFontSize = Math.max(10, Math.min(14, titleFontSize * 0.68));
+  const badgeFontSize = Math.max(10, Math.min(13, titleFontSize * 0.62));
 
   const displayName = truncate(
     name ?? "",
     maxCharsForWidth(innerW, titleFontSize)
   );
 
-  // Badge para el % (esquina inferior derecha)
-  const badgeText_ = `${(pct ?? 0).toFixed(1)}%`;
-  const badgeFontWidth = badgeText_.length * badgeFontSize * 0.55;
-  const badgePaddingX = 6;
-  const badgePaddingY = 3;
-  const badgeW = badgeFontWidth + badgePaddingX * 2;
-  const badgeH = badgeFontSize + badgePaddingY * 2;
+  // Badge del % (esquina inferior derecha, pill)
+  const badgeLabel = `${(pct ?? 0).toFixed(1)}%`;
+  const badgeFontWidth = badgeLabel.length * badgeFontSize * 0.58;
+  const badgePadX = 8;
+  const badgePadY = 4;
+  const badgeW = badgeFontWidth + badgePadX * 2;
+  const badgeH = badgeFontSize + badgePadY * 2;
   const badgeX = x + width - padding - badgeW;
   const badgeY = y + height - padding - badgeH;
 
   return (
     <g>
-      {/* Background con esquinas redondeadas */}
+      {/* Bloque principal */}
       <rect
-        x={x + 1}
-        y={y + 1}
-        width={Math.max(0, width - 2)}
-        height={Math.max(0, height - 2)}
-        rx={5}
-        ry={5}
+        x={rectX}
+        y={rectY}
+        width={rectW}
+        height={rectH}
+        rx={6}
+        ry={6}
         style={{
           fill,
-          stroke: isResto
-            ? "rgba(100, 116, 139, 0.4)"
-            : "rgba(255,255,255,0.18)",
-          strokeWidth: 1,
+          stroke: strokeColor,
+          strokeWidth,
         }}
       />
-      {/* Highlight superior sutil para profundidad */}
-      {!isResto && height > 30 && (
+
+      {/* Highlight superior translúcido (profundidad) — solo items, no resto */}
+      {!isResto && height > 36 && (
         <rect
-          x={x + 1}
-          y={y + 1}
-          width={Math.max(0, width - 2)}
-          height={Math.min(6, height / 6)}
-          rx={5}
-          ry={5}
+          x={rectX}
+          y={rectY}
+          width={rectW}
+          height={Math.min(8, height / 8)}
+          rx={6}
+          ry={6}
           style={{
-            fill: "rgba(255,255,255,0.12)",
+            fill: "rgba(255,255,255,0.13)",
             pointerEvents: "none",
           }}
         />
       )}
 
-      {/* Título (esquina superior izquierda) */}
+      {/* Borde sutil interno (separa la "luz" del fill) */}
+      {!isResto && (
+        <rect
+          x={rectX + 1}
+          y={rectY + 1}
+          width={Math.max(0, rectW - 2)}
+          height={Math.max(0, rectH - 2)}
+          rx={5}
+          ry={5}
+          fill="none"
+          style={{
+            stroke: "rgba(255,255,255,0.10)",
+            strokeWidth: 1,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+
+      {/* Patrón diagonal sutil para el "Resto del universo" (sin pattern SVG,
+          solo una franja decorativa horizontal para diferenciar visualmente) */}
+      {isResto && height > 30 && (
+        <rect
+          x={rectX}
+          y={rectY + rectH / 2 - 0.5}
+          width={rectW}
+          height={1}
+          style={{
+            fill: "var(--border)",
+            pointerEvents: "none",
+          }}
+        />
+      )}
+
+      {/* Título (top-left, peso 700) */}
       {showTitle && (
         <text
           x={innerLeft}
@@ -1412,12 +1505,12 @@ function TreemapBlock(props: TreemapPayload) {
       {showValue && (
         <text
           x={innerLeft}
-          y={innerTop + titleFontSize + valueFontSize + 6}
+          y={innerTop + titleFontSize + valueFontSize + 8}
           textAnchor="start"
           style={{
             fontSize: valueFontSize,
             fontWeight: 500,
-            fill: subtleColor,
+            fill: valueColor,
             pointerEvents: "none",
           }}
         >
@@ -1425,7 +1518,7 @@ function TreemapBlock(props: TreemapPayload) {
         </text>
       )}
 
-      {/* Badge con % (esquina inferior derecha) */}
+      {/* Badge pill con % (esquina inferior derecha) */}
       {showBadge && (
         <g>
           <rect
@@ -1433,9 +1526,14 @@ function TreemapBlock(props: TreemapPayload) {
             y={badgeY}
             width={badgeW}
             height={badgeH}
-            rx={3}
-            ry={3}
-            style={{ fill: badgeBg, pointerEvents: "none" }}
+            rx={badgeH / 2}
+            ry={badgeH / 2}
+            style={{
+              fill: badgeBg,
+              stroke: badgeBorder,
+              strokeWidth: isResto ? 1 : 0,
+              pointerEvents: "none",
+            }}
           />
           <text
             x={badgeX + badgeW / 2}
@@ -1450,7 +1548,7 @@ function TreemapBlock(props: TreemapPayload) {
               pointerEvents: "none",
             }}
           >
-            {badgeText_}
+            {badgeLabel}
           </text>
         </g>
       )}
@@ -1468,6 +1566,41 @@ interface TooltipPayloadItem {
   };
 }
 
+/** Wrapper común para los tooltips: card moderna con accent bar a la izquierda,
+ *  shadow rica y backdrop sutil. */
+function TooltipCard({
+  children,
+  isResto = false,
+}: {
+  children: React.ReactNode;
+  isResto?: boolean;
+}) {
+  return (
+    <div
+      className="overflow-hidden rounded-[var(--radius-lg)] border text-xs tabular-nums"
+      style={{
+        background: "var(--bg-surface)",
+        borderColor: "var(--border-strong)",
+        boxShadow:
+          "0 10px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)",
+        minWidth: 220,
+        maxWidth: 320,
+      }}
+    >
+      {/* Accent bar a la izquierda — naranja para items, gris para Resto */}
+      <div className="flex">
+        <div
+          style={{
+            width: 3,
+            background: isResto ? "var(--text-muted)" : "var(--accent)",
+          }}
+        />
+        <div className="flex-1 p-3">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 function TreemapTooltip({
   active,
   payload,
@@ -1480,31 +1613,55 @@ function TreemapTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const d = payload[0].payload;
   if (!d) return null;
+  const isResto = d.name === "Resto del universo";
   return (
-    <div
-      className="rounded-[var(--radius)] border px-3 py-2 text-xs shadow-lg"
-      style={{
-        background: "var(--bg-surface)",
-        borderColor: "var(--border-strong)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
-      }}
-    >
-      <div className="font-semibold" style={{ color: "var(--text-primary)" }}>
+    <TooltipCard isResto={isResto}>
+      {/* Header con nombre */}
+      <div
+        className="mb-2 truncate text-[11px] font-bold uppercase tracking-wider"
+        style={{ color: "var(--text-primary)" }}
+        title={d.name}
+      >
         {d.name}
       </div>
-      <div
-        className="mt-1 tabular-nums"
-        style={{ color: "var(--text-secondary)" }}
-      >
-        {formatValue(d.value ?? 0)}
+
+      {/* Valor grande */}
+      <div className="mb-1.5">
+        <div
+          className="text-[9px] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {isResto ? "Restante en el universo" : "Valor en el periodo"}
+        </div>
+        <div
+          className="text-base font-bold leading-tight"
+          style={{ color: isResto ? "var(--text-secondary)" : "var(--accent)" }}
+        >
+          {formatValue(d.value ?? 0)}
+        </div>
       </div>
-      <div
-        className="tabular-nums"
-        style={{ color: "var(--accent)", fontWeight: 600 }}
-      >
-        {(d.pct ?? 0).toFixed(1)}% del universo
+
+      {/* Pill con % del universo */}
+      <div className="flex items-center gap-2">
+        <span
+          className="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+          style={{
+            background: isResto
+              ? "var(--bg-surface-muted)"
+              : "var(--accent-soft)",
+            color: isResto ? "var(--text-secondary)" : "var(--accent)",
+          }}
+        >
+          {(d.pct ?? 0).toFixed(1)}%
+        </span>
+        <span
+          className="text-[10px]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          del universo total
+        </span>
       </div>
-    </div>
+    </TooltipCard>
   );
 }
 
@@ -1524,45 +1681,79 @@ function RadarTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const d = payload[0].payload;
   if (!d) return null;
-  // Mostrar nombre completo (fullName) si está disponible (es decir, si
-  // el name del eje fue truncado), si no usar name.
-  const displayName = d.fullName ?? d.name;
+  const displayName = d.fullName ?? d.name ?? "";
+  const isResto = displayName === "Resto";
   return (
-    <div
-      className="rounded-[var(--radius)] border px-3 py-2 text-xs shadow-lg"
-      style={{
-        background: "var(--bg-surface)",
-        borderColor: "var(--border-strong)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
-      }}
-    >
-      <div className="font-semibold" style={{ color: "var(--text-primary)" }}>
+    <TooltipCard isResto={isResto}>
+      {/* Header con nombre completo (sin truncar) */}
+      <div
+        className="mb-2 text-[11px] font-bold uppercase tracking-wider"
+        style={{
+          color: "var(--text-primary)",
+          wordBreak: "break-word",
+        }}
+      >
         {displayName}
       </div>
+
       {isAdditive ? (
         <>
-          <div
-            className="mt-1 tabular-nums"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            {metricLabel}: {formatValue(d.raw ?? 0)}
+          {/* Valor de la métrica */}
+          <div className="mb-1.5">
+            <div
+              className="text-[9px] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {metricLabel}
+            </div>
+            <div
+              className="text-base font-bold leading-tight"
+              style={{ color: "var(--accent)" }}
+            >
+              {formatValue(d.raw ?? 0)}
+            </div>
           </div>
-          <div
-            className="tabular-nums"
-            style={{ color: "var(--accent)", fontWeight: 600 }}
-          >
-            {(d.value ?? 0).toFixed(1)}% del universo
+          {/* Pill con % del universo */}
+          <div className="flex items-center gap-2">
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+              style={{
+                background: isResto
+                  ? "var(--bg-surface-muted)"
+                  : "var(--accent-soft)",
+                color: isResto ? "var(--text-secondary)" : "var(--accent)",
+              }}
+            >
+              {(d.value ?? 0).toFixed(1)}%
+            </span>
+            <span
+              className="text-[10px]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              del universo total
+            </span>
           </div>
         </>
       ) : (
-        <div
-          className="mt-1 tabular-nums"
-          style={{ color: "var(--accent)", fontWeight: 600 }}
-        >
-          Margen: {(d.value ?? 0).toFixed(1)}%
-        </div>
+        <>
+          {/* Para Margen %: valor grande sin "% del universo" */}
+          <div>
+            <div
+              className="text-[9px] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Margen %
+            </div>
+            <div
+              className="text-base font-bold leading-tight"
+              style={{ color: "var(--accent)" }}
+            >
+              {(d.value ?? 0).toFixed(1)}%
+            </div>
+          </div>
+        </>
       )}
-    </div>
+    </TooltipCard>
   );
 }
 
