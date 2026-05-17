@@ -1658,38 +1658,58 @@ function TreemapBlock(props: TreemapPayload) {
   const badgeText = isResto ? "var(--text-primary)" : "#9a3412";
   const badgeBorder = isResto ? "var(--border-strong)" : "transparent";
 
-  // Padding interno generoso para look "espacioso"
-  const padding = Math.max(10, Math.min(18, Math.min(width, height) * 0.09));
+  // Padding adaptativo: pequeño para bloques chicos, generoso para grandes
+  const padding = Math.max(5, Math.min(18, Math.min(width, height) * 0.09));
   const innerLeft = x + padding;
   const innerTop = y + padding;
   const innerW = Math.max(0, width - padding * 2);
   const innerH = Math.max(0, height - padding * 2);
 
-  // Mostrar/ocultar según área disponible
-  const showTitle = innerW > 36 && innerH > 16;
-  const showValue = innerW > 60 && innerH > 42;
-  const showBadge = innerW > 56 && innerH > 56;
+  // ===== Sistema de tiers según área disponible =====
+  // Tier FULL: bloque grande, muestra todo (título + valor + badge esquina)
+  // Tier COMPACT: mediano, título corto + badge esquina
+  // Tier BADGE_ONLY: pequeño pero útil → solo el % centrado (legible)
+  // Tier MICRO: muy pequeño → solo color, sin texto (hover muestra info)
+  const tier: "full" | "compact" | "badge_only" | "micro" =
+    innerW > 70 && innerH > 60
+      ? "full"
+      : innerW > 50 && innerH > 30
+        ? "compact"
+        : innerW > 24 && innerH > 14
+          ? "badge_only"
+          : "micro";
 
-  // Font size dinámico — bloques grandes texto grande, chicos texto chico
+  // Font size dinámico — más sensible al área para bloques chicos
   const baseFont = Math.sqrt(width * height) * 0.12;
-  const titleFontSize = Math.max(11, Math.min(22, baseFont));
-  const valueFontSize = Math.max(10, Math.min(14, titleFontSize * 0.68));
-  const badgeFontSize = Math.max(10, Math.min(13, titleFontSize * 0.62));
+  const titleFontSize = Math.max(10, Math.min(22, baseFont));
+  const valueFontSize = Math.max(9, Math.min(14, titleFontSize * 0.68));
+  const badgeFontSize = Math.max(9, Math.min(13, titleFontSize * 0.62));
 
   const displayName = truncate(
     name ?? "",
     maxCharsForWidth(innerW, titleFontSize)
   );
 
-  // Badge del % (esquina inferior derecha, pill)
+  // Badge del % (esquina inferior derecha en FULL/COMPACT)
   const badgeLabel = `${(pct ?? 0).toFixed(1)}%`;
   const badgeFontWidth = badgeLabel.length * badgeFontSize * 0.58;
-  const badgePadX = 8;
-  const badgePadY = 4;
+  const badgePadX = 7;
+  const badgePadY = 3;
   const badgeW = badgeFontWidth + badgePadX * 2;
   const badgeH = badgeFontSize + badgePadY * 2;
   const badgeX = x + width - padding - badgeW;
   const badgeY = y + height - padding - badgeH;
+
+  // Para tier BADGE_ONLY: mini-badge centrado con solo el %
+  const miniBadgeFontSize = Math.max(8, Math.min(11, Math.min(width, height) * 0.15));
+  const miniBadgeLabel = `${(pct ?? 0).toFixed(1)}%`;
+  const miniBadgeFontWidth = miniBadgeLabel.length * miniBadgeFontSize * 0.58;
+  const miniBadgePadX = 5;
+  const miniBadgePadY = 2;
+  const miniBadgeW = miniBadgeFontWidth + miniBadgePadX * 2;
+  const miniBadgeH = miniBadgeFontSize + miniBadgePadY * 2;
+  const miniBadgeX = x + width / 2 - miniBadgeW / 2;
+  const miniBadgeY = y + height / 2 - miniBadgeH / 2;
 
   return (
     <g>
@@ -1757,46 +1777,39 @@ function TreemapBlock(props: TreemapPayload) {
         />
       )}
 
-      {/* Título (top-left, peso 700) */}
-      {showTitle && (
-        <text
-          x={innerLeft}
-          y={innerTop + titleFontSize}
-          textAnchor="start"
-          stroke="none"
-          style={{
-            fontSize: titleFontSize,
-            fontWeight: 700,
-            fill: titleColor,
-            letterSpacing: "0.01em",
-            pointerEvents: "none",
-          }}
-        >
-          {displayName}
-        </text>
-      )}
-
-      {/* Valor (debajo del título) */}
-      {showValue && (
-        <text
-          x={innerLeft}
-          y={innerTop + titleFontSize + valueFontSize + 8}
-          textAnchor="start"
-          stroke="none"
-          style={{
-            fontSize: valueFontSize,
-            fontWeight: 500,
-            fill: valueColor,
-            pointerEvents: "none",
-          }}
-        >
-          {formatValue ? formatValue(value ?? 0) : (value ?? 0).toFixed(0)}
-        </text>
-      )}
-
-      {/* Badge pill con % (esquina inferior derecha) */}
-      {showBadge && (
-        <g>
+      {/* === Tier FULL: título + valor + badge esquina === */}
+      {tier === "full" && (
+        <>
+          <text
+            x={innerLeft}
+            y={innerTop + titleFontSize}
+            textAnchor="start"
+            stroke="none"
+            style={{
+              fontSize: titleFontSize,
+              fontWeight: 700,
+              fill: titleColor,
+              letterSpacing: "0.01em",
+              pointerEvents: "none",
+            }}
+          >
+            {displayName}
+          </text>
+          <text
+            x={innerLeft}
+            y={innerTop + titleFontSize + valueFontSize + 8}
+            textAnchor="start"
+            stroke="none"
+            style={{
+              fontSize: valueFontSize,
+              fontWeight: 500,
+              fill: valueColor,
+              pointerEvents: "none",
+            }}
+          >
+            {formatValue ? formatValue(value ?? 0) : (value ?? 0).toFixed(0)}
+          </text>
+          {/* Badge pill esquina inferior derecha */}
           <rect
             x={badgeX}
             y={badgeY}
@@ -1827,7 +1840,118 @@ function TreemapBlock(props: TreemapPayload) {
           >
             {badgeLabel}
           </text>
-        </g>
+        </>
+      )}
+
+      {/* === Tier COMPACT: título truncado + badge esquina === */}
+      {tier === "compact" && (
+        <>
+          <text
+            x={innerLeft}
+            y={innerTop + titleFontSize}
+            textAnchor="start"
+            stroke="none"
+            style={{
+              fontSize: Math.max(9, titleFontSize * 0.85),
+              fontWeight: 700,
+              fill: titleColor,
+              letterSpacing: "0.01em",
+              pointerEvents: "none",
+            }}
+          >
+            {truncate(
+              name ?? "",
+              maxCharsForWidth(innerW, titleFontSize * 0.85)
+            )}
+          </text>
+          {/* Badge pill abajo-derecha (más chico) */}
+          <rect
+            x={badgeX}
+            y={badgeY}
+            width={badgeW}
+            height={badgeH}
+            rx={badgeH / 2}
+            ry={badgeH / 2}
+            style={{
+              fill: badgeBg,
+              stroke: isResto ? badgeBorder : "none",
+              strokeWidth: isResto ? 1 : 0,
+              pointerEvents: "none",
+            }}
+          />
+          <text
+            x={badgeX + badgeW / 2}
+            y={badgeY + badgeH / 2}
+            textAnchor="middle"
+            dominantBaseline="central"
+            stroke="none"
+            style={{
+              fontSize: badgeFontSize,
+              fontWeight: 700,
+              fill: badgeText,
+              letterSpacing: "0.02em",
+              pointerEvents: "none",
+            }}
+          >
+            {badgeLabel}
+          </text>
+        </>
+      )}
+
+      {/* === Tier BADGE_ONLY: solo el % centrado en bloque pequeño === */}
+      {tier === "badge_only" && (
+        <>
+          <rect
+            x={miniBadgeX}
+            y={miniBadgeY}
+            width={miniBadgeW}
+            height={miniBadgeH}
+            rx={miniBadgeH / 2}
+            ry={miniBadgeH / 2}
+            style={{
+              fill: badgeBg,
+              stroke: isResto ? badgeBorder : "none",
+              strokeWidth: isResto ? 1 : 0,
+              pointerEvents: "none",
+            }}
+          />
+          <text
+            x={miniBadgeX + miniBadgeW / 2}
+            y={miniBadgeY + miniBadgeH / 2}
+            textAnchor="middle"
+            dominantBaseline="central"
+            stroke="none"
+            style={{
+              fontSize: miniBadgeFontSize,
+              fontWeight: 700,
+              fill: badgeText,
+              letterSpacing: "0.02em",
+              pointerEvents: "none",
+            }}
+          >
+            {miniBadgeLabel}
+          </text>
+        </>
+      )}
+
+      {/* === Tier MICRO: nada de texto, solo color/border bien visible.
+          El usuario ve % al hover. Aumentamos el strokeWidth del borde
+          interno para que el bloque sea identificable como tal. === */}
+      {tier === "micro" && !isResto && (
+        <rect
+          x={rectX + 0.5}
+          y={rectY + 0.5}
+          width={Math.max(0, rectW - 1)}
+          height={Math.max(0, rectH - 1)}
+          rx={5}
+          ry={5}
+          fill="none"
+          style={{
+            stroke: "rgba(255,255,255,0.35)",
+            strokeWidth: 1,
+            pointerEvents: "none",
+          }}
+        />
       )}
     </g>
   );
