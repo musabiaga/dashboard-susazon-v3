@@ -71,10 +71,13 @@ const METRIC_LABEL: Record<Metric, string> = {
   margen_pct: "Margen %",
 };
 
-const DEFAULT_TOP_N = 7;
+type TopN = 7 | 10 | 15;
+const DEFAULT_TOP_N: TopN = 7;
+const TOP_N_OPTIONS: TopN[] = [7, 10, 15];
 const STORAGE_KEY_DIMENSION = "insights-concentracion-dimension";
 const STORAGE_KEY_METRIC = "insights-concentracion-metric";
 const STORAGE_KEY_CHART = "insights-concentracion-chart";
+const STORAGE_KEY_TOPN = "insights-concentracion-topn";
 
 interface ApiItem {
   name: string;
@@ -141,6 +144,7 @@ export function ConcentracionAnalysis({ today }: Props) {
   const [dimension, setDimension] = useState<Dimension>("clientes");
   const [metric, setMetric] = useState<Metric>("venta");
   const [chartKind, setChartKind] = useState<ChartKind>("treemap");
+  const [topN, setTopN] = useState<TopN>(DEFAULT_TOP_N);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isCustom, setIsCustom] = useState(false);
 
@@ -162,6 +166,9 @@ export function ConcentracionAnalysis({ today }: Props) {
       }
       const chart = window.localStorage.getItem(STORAGE_KEY_CHART);
       if (chart === "treemap" || chart === "radar") setChartKind(chart);
+      const tn = window.localStorage.getItem(STORAGE_KEY_TOPN);
+      const parsed = tn ? Number(tn) : NaN;
+      if (parsed === 7 || parsed === 10 || parsed === 15) setTopN(parsed);
     } catch {
       // ignore
     }
@@ -186,6 +193,12 @@ export function ConcentracionAnalysis({ today }: Props) {
     setChartKind(c);
     try {
       window.localStorage.setItem(STORAGE_KEY_CHART, c);
+    } catch {}
+  };
+  const persistTopN = (n: TopN) => {
+    setTopN(n);
+    try {
+      window.localStorage.setItem(STORAGE_KEY_TOPN, String(n));
     } catch {}
   };
 
@@ -278,8 +291,8 @@ export function ConcentracionAnalysis({ today }: Props) {
         .map((n) => byName.get(n))
         .filter((x): x is ApiItem => x != null);
     }
-    return sortedItems.slice(0, DEFAULT_TOP_N);
-  }, [data, isCustom, selectedItems, sortedItems]);
+    return sortedItems.slice(0, topN);
+  }, [data, isCustom, selectedItems, sortedItems, topN]);
 
   // Para métricas aditivas: "Resto del universo" = lo que NO está en visibleItems
   // Para margen_pct: NO aplica el concepto de resto
@@ -569,6 +582,15 @@ export function ConcentracionAnalysis({ today }: Props) {
           value={chartKind}
           onChange={(v) => persistChart(v as ChartKind)}
         />
+        <ChipToggle
+          label="Top N"
+          options={TOP_N_OPTIONS.map((n) => ({
+            value: String(n),
+            label: `Top ${n}`,
+          }))}
+          value={String(topN)}
+          onChange={(v) => persistTopN(Number(v) as TopN)}
+        />
       </div>
 
       {/* ============ Multi-select de items ============ */}
@@ -579,7 +601,7 @@ export function ConcentracionAnalysis({ today }: Props) {
         >
           {isCustom
             ? `${selectedItems.length} ${DIMENSION_LABEL[dimension].pl.toLowerCase()} en análisis`
-            : `Top ${Math.min(DEFAULT_TOP_N, visibleItems.length)} default`}
+            : `Top ${Math.min(topN, visibleItems.length)} default`}
         </span>
         <MultiSelectChips
           options={availableItems}
@@ -600,7 +622,7 @@ export function ConcentracionAnalysis({ today }: Props) {
               background: "var(--bg-surface)",
             }}
           >
-            Volver al Top {DEFAULT_TOP_N}
+            Volver al Top {topN}
           </button>
         )}
       </div>
@@ -672,8 +694,10 @@ export function ConcentracionAnalysis({ today }: Props) {
             <Treemap
               data={treemapData}
               dataKey="size"
-              stroke="var(--bg-surface)"
+              aspectRatio={4 / 3}
+              stroke="var(--bg-page)"
               fill="var(--accent)"
+              isAnimationActive={false}
               content={
                 <TreemapBlock
                   formatValue={formatMetricValue}
@@ -687,45 +711,68 @@ export function ConcentracionAnalysis({ today }: Props) {
             </Treemap>
           </ResponsiveContainer>
         ) : (
-          <ResponsiveContainer width="100%" height={520}>
-            <RadarChart
-              data={radarData}
-              margin={{ top: 30, right: 60, bottom: 30, left: 60 }}
-            >
-              <PolarGrid stroke="var(--border)" />
-              <PolarAngleAxis
-                dataKey="name"
-                tick={{ fontSize: 10, fill: "var(--text-secondary)" }}
-              />
-              <PolarRadiusAxis
-                angle={90}
-                domain={[0, radarMax]}
-                tick={{ fontSize: 9, fill: "var(--text-muted)" }}
-                tickFormatter={(v) => `${v}%`}
-              />
-              <Radar
-                name={
-                  isAdditive
-                    ? `${METRIC_LABEL[metric]} (% del universo)`
-                    : "Margen %"
-                }
-                dataKey="value"
-                stroke="var(--accent)"
-                fill="var(--accent)"
-                fillOpacity={0.35}
-                strokeWidth={2}
-              />
-              <Tooltip
-                content={
-                  <RadarTooltip
-                    formatValue={formatMetricValue}
-                    metricLabel={METRIC_LABEL[metric]}
-                    isAdditive={isAdditive}
+          // Radar adaptativo: ajusta font y truncado según cantidad de ejes
+          // para que con 10-15 items sigan siendo legibles los labels.
+          (() => {
+            const n = radarData.length;
+            const labelFont = n <= 8 ? 11 : n <= 11 ? 10 : 9;
+            const truncLen = n <= 8 ? 24 : n <= 11 ? 18 : 14;
+            // Más margen horizontal cuando hay muchos ejes para no cortar labels
+            const horizMargin = n <= 8 ? 60 : n <= 11 ? 80 : 100;
+            return (
+              <ResponsiveContainer width="100%" height={n <= 8 ? 520 : 580}>
+                <RadarChart
+                  data={radarData.map((d) => ({
+                    ...d,
+                    name: truncate(d.name, truncLen),
+                    fullName: d.name,
+                  }))}
+                  margin={{
+                    top: 30,
+                    right: horizMargin,
+                    bottom: 30,
+                    left: horizMargin,
+                  }}
+                >
+                  <PolarGrid stroke="var(--border)" />
+                  <PolarAngleAxis
+                    dataKey="name"
+                    tick={{
+                      fontSize: labelFont,
+                      fill: "var(--text-secondary)",
+                    }}
                   />
-                }
-              />
-            </RadarChart>
-          </ResponsiveContainer>
+                  <PolarRadiusAxis
+                    angle={90}
+                    domain={[0, radarMax]}
+                    tick={{ fontSize: 9, fill: "var(--text-muted)" }}
+                    tickFormatter={(v) => `${v}%`}
+                  />
+                  <Radar
+                    name={
+                      isAdditive
+                        ? `${METRIC_LABEL[metric]} (% del universo)`
+                        : "Margen %"
+                    }
+                    dataKey="value"
+                    stroke="var(--accent)"
+                    fill="var(--accent)"
+                    fillOpacity={0.35}
+                    strokeWidth={2}
+                  />
+                  <Tooltip
+                    content={
+                      <RadarTooltip
+                        formatValue={formatMetricValue}
+                        metricLabel={METRIC_LABEL[metric]}
+                        isAdditive={isAdditive}
+                      />
+                    }
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            );
+          })()
         )}
       </div>
 
@@ -1213,7 +1260,10 @@ function StatCell({
 }
 
 // ============================================================
-// Treemap custom block — gradient por importancia
+// Treemap custom block — diseño moderno con tipografía top-left,
+// padding interno, esquinas redondeadas y badge translúcido para %.
+// El "Resto del universo" se distingue con un patrón diagonal sutil
+// y color diferenciado para ser perfectamente visible.
 // ============================================================
 interface TreemapPayload {
   x?: number;
@@ -1228,6 +1278,18 @@ interface TreemapPayload {
   formatValue?: (n: number) => string;
 }
 
+/** Estima cuántos caracteres caben en un ancho dado a un fontSize dado.
+ *  Aproximación: 0.55 × fontSize por carácter para Helvetica/Inter. */
+function maxCharsForWidth(widthPx: number, fontSize: number): number {
+  return Math.max(3, Math.floor(widthPx / (fontSize * 0.55)));
+}
+
+/** Trunca con elipsis si el texto excede maxChars. */
+function truncate(s: string, maxChars: number): string {
+  if (s.length <= maxChars) return s;
+  return s.slice(0, Math.max(1, maxChars - 1)) + "…";
+}
+
 function TreemapBlock(props: TreemapPayload) {
   const {
     x = 0,
@@ -1240,80 +1302,157 @@ function TreemapBlock(props: TreemapPayload) {
     maxValue,
     formatValue,
   } = props;
+
+  const isResto = name === "Resto del universo";
+
+  // Color/intensidad del bloque
   const intensity =
     maxValue && maxValue > 0 ? Math.min(1, (value ?? 0) / maxValue) : 0;
-  const isResto = name === "Resto del universo";
-  const fill = isResto
-    ? "var(--bg-surface-muted)"
-    : `rgba(237, 104, 8, ${0.35 + intensity * 0.55})`;
-  const textColor = isResto ? "var(--text-secondary)" : "white";
 
-  const showLabel = width > 60 && height > 30;
-  const showValue = width > 80 && height > 50;
+  // Fill principal:
+  //  - Items: gradient naranja Susazón, opacidad 0.65 → 1.0 por importancia
+  //  - Resto: gris-azulado distintivo (NO el bg-surface-muted que se mezcla con el fondo)
+  const fill = isResto
+    ? "rgba(100, 116, 139, 0.85)" // slate-500 sólido — claramente visible
+    : `rgba(237, 104, 8, ${0.65 + intensity * 0.35})`;
+
+  // Estilo de texto
+  const titleColor = "#ffffff";
+  const subtleColor = isResto ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.82)";
+  const badgeBg = isResto ? "rgba(0,0,0,0.18)" : "rgba(0,0,0,0.22)";
+  const badgeText = "#ffffff";
+
+  // Padding interno para que el texto no se pegue al borde
+  const padding = Math.max(6, Math.min(14, Math.min(width, height) * 0.08));
+  const innerLeft = x + padding;
+  const innerTop = y + padding;
+  const innerW = Math.max(0, width - padding * 2);
+  const innerH = Math.max(0, height - padding * 2);
+
+  // Decisión qué mostrar según área disponible
+  const showTitle = innerW > 40 && innerH > 16;
+  const showValue = innerW > 60 && innerH > 38;
+  const showBadge = innerW > 50 && innerH > 50;
+
+  // Font size dinámico para el título: proporcional al ancho pero acotado.
+  // Bloques grandes → fuente grande; chicos → fuente pequeña.
+  const baseFont = Math.sqrt(width * height) * 0.13;
+  const titleFontSize = Math.max(10, Math.min(20, baseFont));
+  const valueFontSize = Math.max(9, Math.min(13, titleFontSize * 0.7));
+  const badgeFontSize = Math.max(10, Math.min(14, titleFontSize * 0.75));
+
+  const displayName = truncate(
+    name ?? "",
+    maxCharsForWidth(innerW, titleFontSize)
+  );
+
+  // Badge para el % (esquina inferior derecha)
+  const badgeText_ = `${(pct ?? 0).toFixed(1)}%`;
+  const badgeFontWidth = badgeText_.length * badgeFontSize * 0.55;
+  const badgePaddingX = 6;
+  const badgePaddingY = 3;
+  const badgeW = badgeFontWidth + badgePaddingX * 2;
+  const badgeH = badgeFontSize + badgePaddingY * 2;
+  const badgeX = x + width - padding - badgeW;
+  const badgeY = y + height - padding - badgeH;
 
   return (
     <g>
+      {/* Background con esquinas redondeadas */}
       <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
+        x={x + 1}
+        y={y + 1}
+        width={Math.max(0, width - 2)}
+        height={Math.max(0, height - 2)}
+        rx={5}
+        ry={5}
         style={{
           fill,
-          stroke: "var(--bg-surface)",
-          strokeWidth: 2,
+          stroke: isResto
+            ? "rgba(100, 116, 139, 0.4)"
+            : "rgba(255,255,255,0.18)",
+          strokeWidth: 1,
         }}
       />
-      {showLabel && (
-        <text
-          x={x + width / 2}
-          y={y + height / 2 - (showValue ? 8 : 0)}
-          textAnchor="middle"
-          dominantBaseline="middle"
+      {/* Highlight superior sutil para profundidad */}
+      {!isResto && height > 30 && (
+        <rect
+          x={x + 1}
+          y={y + 1}
+          width={Math.max(0, width - 2)}
+          height={Math.min(6, height / 6)}
+          rx={5}
+          ry={5}
           style={{
-            fontSize: Math.min(
-              13,
-              width / Math.max(8, (name?.length ?? 1) * 0.6)
-            ),
-            fontWeight: 600,
-            fill: textColor,
+            fill: "rgba(255,255,255,0.12)",
+            pointerEvents: "none",
+          }}
+        />
+      )}
+
+      {/* Título (esquina superior izquierda) */}
+      {showTitle && (
+        <text
+          x={innerLeft}
+          y={innerTop + titleFontSize}
+          textAnchor="start"
+          style={{
+            fontSize: titleFontSize,
+            fontWeight: 700,
+            fill: titleColor,
+            letterSpacing: "0.01em",
             pointerEvents: "none",
           }}
         >
-          {(name ?? "").length > 28 ? (name ?? "").slice(0, 27) + "…" : name}
+          {displayName}
         </text>
       )}
+
+      {/* Valor (debajo del título) */}
       {showValue && (
-        <>
+        <text
+          x={innerLeft}
+          y={innerTop + titleFontSize + valueFontSize + 6}
+          textAnchor="start"
+          style={{
+            fontSize: valueFontSize,
+            fontWeight: 500,
+            fill: subtleColor,
+            pointerEvents: "none",
+          }}
+        >
+          {formatValue ? formatValue(value ?? 0) : (value ?? 0).toFixed(0)}
+        </text>
+      )}
+
+      {/* Badge con % (esquina inferior derecha) */}
+      {showBadge && (
+        <g>
+          <rect
+            x={badgeX}
+            y={badgeY}
+            width={badgeW}
+            height={badgeH}
+            rx={3}
+            ry={3}
+            style={{ fill: badgeBg, pointerEvents: "none" }}
+          />
           <text
-            x={x + width / 2}
-            y={y + height / 2 + 6}
+            x={badgeX + badgeW / 2}
+            y={badgeY + badgeH / 2}
             textAnchor="middle"
-            dominantBaseline="middle"
+            dominantBaseline="central"
             style={{
-              fontSize: 11,
-              fill: textColor,
-              opacity: 0.9,
-              pointerEvents: "none",
-            }}
-          >
-            {formatValue ? formatValue(value ?? 0) : (value ?? 0).toFixed(0)}
-          </text>
-          <text
-            x={x + width / 2}
-            y={y + height / 2 + 20}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            style={{
-              fontSize: 10,
+              fontSize: badgeFontSize,
               fontWeight: 700,
-              fill: textColor,
+              fill: badgeText,
+              letterSpacing: "0.02em",
               pointerEvents: "none",
             }}
           >
-            {(pct ?? 0).toFixed(1)}%
+            {badgeText_}
           </text>
-        </>
+        </g>
       )}
     </g>
   );
@@ -1322,6 +1461,7 @@ function TreemapBlock(props: TreemapPayload) {
 interface TooltipPayloadItem {
   payload?: {
     name?: string;
+    fullName?: string;
     value?: number;
     pct?: number;
     raw?: number;
@@ -1384,6 +1524,9 @@ function RadarTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const d = payload[0].payload;
   if (!d) return null;
+  // Mostrar nombre completo (fullName) si está disponible (es decir, si
+  // el name del eje fue truncado), si no usar name.
+  const displayName = d.fullName ?? d.name;
   return (
     <div
       className="rounded-[var(--radius)] border px-3 py-2 text-xs shadow-lg"
@@ -1394,7 +1537,7 @@ function RadarTooltip({
       }}
     >
       <div className="font-semibold" style={{ color: "var(--text-primary)" }}>
-        {d.name}
+        {displayName}
       </div>
       {isAdditive ? (
         <>
