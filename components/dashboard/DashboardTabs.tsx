@@ -8,6 +8,7 @@ import {
   Users,
   UserCircle2,
   AlertOctagon,
+  Lightbulb,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -18,7 +19,8 @@ export type TabKey =
   | "productos"
   | "clientes"
   | "vendedores"
-  | "perdidos";
+  | "perdidos"
+  | "insights";
 
 interface TabConfig {
   key: TabKey;
@@ -34,6 +36,7 @@ const TABS: TabConfig[] = [
   { key: "clientes", label: "Clientes", icon: <Users size={14} /> },
   { key: "vendedores", label: "Vendedores", icon: <UserCircle2 size={14} /> },
   { key: "perdidos", label: "Perdidos", icon: <AlertOctagon size={14} /> },
+  { key: "insights", label: "Insights", icon: <Lightbulb size={14} /> },
 ];
 
 interface DashboardTabsProps {

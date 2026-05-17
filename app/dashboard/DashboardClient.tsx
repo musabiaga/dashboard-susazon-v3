@@ -21,6 +21,7 @@ import {
 import { MonthSelector } from "@/components/dashboard/MonthSelector";
 import { CutoffToggle } from "@/components/dashboard/CutoffToggle";
 import { SessionSecurityProvider } from "@/components/dashboard/SessionSecurityProvider";
+import { InsightsTab } from "@/components/dashboard/InsightsTab";
 import { AlertCircle, Clock } from "lucide-react";
 import {
   aggregateKpis,
@@ -707,6 +708,17 @@ export function DashboardClient({
                     exportTerritory={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
                     reportInput={reportInput}
+                  />
+                );
+              }
+              if (activeTab === "insights") {
+                return (
+                  <InsightsTab
+                    today={{
+                      year: todayYear,
+                      month: todayMonth,
+                      day: actualTodayDay,
+                    }}
                   />
                 );
               }
