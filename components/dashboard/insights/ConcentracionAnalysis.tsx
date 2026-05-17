@@ -132,9 +132,17 @@ type DetailResponse =
 
 interface Props {
   today: { year: number; month: number; day: number };
+  /** Territorios efectivos del sidebar (null = todos visibles). */
+  territorios: string[] | null;
+  /** Etiqueta del contexto para mostrar al usuario qué está viendo. */
+  contextLabel: string;
 }
 
-export function ConcentracionAnalysis({ today }: Props) {
+export function ConcentracionAnalysis({
+  today,
+  territorios,
+  contextLabel,
+}: Props) {
   // ============== Estado de controles ==============
   const initialRange: DateRange = useMemo(
     () => ({
@@ -239,6 +247,15 @@ export function ConcentracionAnalysis({ today }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Serializar territorios al CSV que espera el endpoint. Usamos memo
+  // estable para evitar refetches innecesarios cuando el array es
+  // referencialmente distinto pero idéntico en contenido.
+  const territoriosKey = useMemo(() => {
+    if (territorios === null) return "__ALL__";
+    if (territorios.length === 0) return "__NONE__";
+    return [...territorios].sort().join("|");
+  }, [territorios]);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -248,6 +265,13 @@ export function ConcentracionAnalysis({ today }: Props) {
       to: range.to,
       dimension,
     });
+    // Filtro de territorios: null = no param (todos visibles via RLS),
+    // [] = param vacío ("") = 0 resultados, [X,Y] = CSV
+    if (territoriosKey === "__NONE__") {
+      params.set("territorios", "");
+    } else if (territoriosKey !== "__ALL__") {
+      params.set("territorios", territoriosKey.split("|").join(","));
+    }
     fetch(`/api/insights/concentracion?${params.toString()}`, {
       credentials: "include",
     })
@@ -274,7 +298,7 @@ export function ConcentracionAnalysis({ today }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [range.from, range.to, dimension]);
+  }, [range.from, range.to, dimension, territoriosKey]);
 
   // ============== Items EXCLUIDOS del universo ==============
   // Set de los excluidos para la dimensión actual. Estos items NO se
@@ -613,6 +637,12 @@ export function ConcentracionAnalysis({ today }: Props) {
         dimension,
         name: itemName,
       });
+      // Mismo filtro de territorios que el endpoint principal
+      if (territoriosKey === "__NONE__") {
+        params.set("territorios", "");
+      } else if (territoriosKey !== "__ALL__") {
+        params.set("territorios", territoriosKey.split("|").join(","));
+      }
       const r = await fetch(
         `/api/insights/item-detail?${params.toString()}`,
         { credentials: "include" }
@@ -642,6 +672,40 @@ export function ConcentracionAnalysis({ today }: Props) {
   // ============== Render ==============
   return (
     <div className="space-y-4">
+      {/* Banner del contexto activo — muestra qué territorios se están
+          analizando. Consistente con el filtro del sidebar del dashboard. */}
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] border px-3 py-2 text-xs"
+        style={{
+          background: "var(--accent-soft)",
+          borderColor: "var(--accent)",
+          color: "var(--text-primary)",
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: "var(--accent)" }}
+          >
+            Analizando:
+          </span>
+          <span
+            className="font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {contextLabel}
+          </span>
+          {territorios !== null && territorios.length > 0 && (
+            <span
+              className="text-[10px]"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              · El universo del 100% incluye solo este filtro
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* ============ Toolbar superior ============ */}
       <div className="flex flex-wrap items-center justify-end gap-2">
         <DateRangePicker value={range} onChange={setRange} today={today} />

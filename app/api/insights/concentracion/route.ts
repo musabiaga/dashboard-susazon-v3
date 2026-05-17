@@ -37,6 +37,21 @@ export async function GET(request: NextRequest) {
   const fromParam = sp.get("from") ?? "";
   const toParam = sp.get("to") ?? "";
   const dimensionParam = (sp.get("dimension") ?? "clientes").toLowerCase();
+  // territorios: lista CSV opcional. Si NO viene → null = todos los visibles
+  // por RLS. Si viene vacío "" → array vacío = 0 resultados. Si viene con
+  // valores → filtrar a esos territorios específicos (intersección con RLS).
+  const territoriosParamRaw = sp.get("territorios");
+  let territoriosFilter: string[] | null;
+  if (territoriosParamRaw === null) {
+    territoriosFilter = null;
+  } else if (territoriosParamRaw === "") {
+    territoriosFilter = [];
+  } else {
+    territoriosFilter = territoriosParamRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
 
   // Validación
   if (!ISO_DATE.test(fromParam) || !ISO_DATE.test(toParam)) {
@@ -79,6 +94,7 @@ export async function GET(request: NextRequest) {
     p_from: fromParam,
     p_to: toParam,
     p_dimension: dimensionParam,
+    p_territorios: territoriosFilter,
   });
 
   if (error) {

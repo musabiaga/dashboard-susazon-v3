@@ -21,6 +21,16 @@ const STORAGE_KEY = "insights-sub-analysis";
 interface Props {
   /** Hoy CDMX para los date pickers de los sub-análisis. */
   today: { year: number; month: number; day: number };
+  /** Territorios efectivos según selección del sidebar:
+   *   - null = "Todos los territorios visibles" (RLS hace su trabajo)
+   *   - [] = "Ninguno" (universo vacío)
+   *   - ["X", "Y"] = filtrar a esos específicos
+   *  Si cambia, los sub-análisis re-fetchean para mantener consistencia
+   *  con el resto del dashboard. */
+  territorios: string[] | null;
+  /** Etiqueta del contexto actual ("Todos", "Cancún", "3 territorios…")
+   *  para mostrar al usuario claramente qué está viendo. */
+  contextLabel: string;
 }
 
 interface SubAnalysisDef {
@@ -41,7 +51,7 @@ const SUB_ANALYSES: SubAnalysisDef[] = [
   // { key: "crecimiento", label: "Crecimiento YoY", description: "..." },
 ];
 
-export function InsightsTab({ today }: Props) {
+export function InsightsTab({ today, territorios, contextLabel }: Props) {
   const [active, setActive] = useState<SubAnalysis>("concentracion");
 
   // Recordar último sub-análisis usado
@@ -148,7 +158,13 @@ export function InsightsTab({ today }: Props) {
       </div>
 
       {/* Render del sub-análisis activo */}
-      {active === "concentracion" && <ConcentracionAnalysis today={today} />}
+      {active === "concentracion" && (
+        <ConcentracionAnalysis
+          today={today}
+          territorios={territorios}
+          contextLabel={contextLabel}
+        />
+      )}
     </div>
   );
 }

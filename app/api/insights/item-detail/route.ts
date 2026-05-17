@@ -37,6 +37,20 @@ export async function GET(request: NextRequest) {
   const toParam = sp.get("to") ?? "";
   const dimension = (sp.get("dimension") ?? "").toLowerCase();
   const name = sp.get("name") ?? "";
+  // Mismo patrón que /concentracion: null = todos visibles por RLS,
+  // "" = array vacío (cero), CSV = filtrar a esos territorios.
+  const territoriosParamRaw = sp.get("territorios");
+  let territoriosFilter: string[] | null;
+  if (territoriosParamRaw === null) {
+    territoriosFilter = null;
+  } else if (territoriosParamRaw === "") {
+    territoriosFilter = [];
+  } else {
+    territoriosFilter = territoriosParamRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
 
   if (!ISO_DATE.test(fromParam) || !ISO_DATE.test(toParam)) {
     return NextResponse.json(
@@ -68,16 +82,29 @@ export async function GET(request: NextRequest) {
   // Para grupos y productos: agrupar por cliente (resume cuáles clientes
   // compraron ese grupo/producto). Para clientes: agrupar por fecha
   // (= facturas individuales del cliente).
+  // Si territoriosFilter es array vacío → no hay nada que mostrar
+  if (territoriosFilter !== null && territoriosFilter.length === 0) {
+    return NextResponse.json({
+      kind: dimension === "clientes" ? "facturas_por_fecha" : "clientes_por_dim",
+      total_records: 0,
+      items: [],
+    });
+  }
+
   if (dimension === "clientes") {
     // Para clientes: devolver filas por fecha (agregadas si hay múltiples
     // tickets el mismo día — lo cual es común con datos de comercial).
     // Suma venta/kg/margen por fecha + lista de territorios.
-    const { data, error } = await supabase
+    let query = supabase
       .from("sales_rows")
       .select("fecha, territorio, venta, margen, kg, vendedor, sku, grupo")
       .eq(column, name)
       .gte("fecha", fromParam)
-      .lte("fecha", toParam)
+      .lte("fecha", toParam);
+    if (territoriosFilter !== null) {
+      query = query.in("territorio", territoriosFilter);
+    }
+    const { data, error } = await query
       .order("fecha", { ascending: false })
       .limit(MAX_ROWS);
 
@@ -145,13 +172,16 @@ export async function GET(request: NextRequest) {
   }
 
   // Para grupos / productos: agrupar por cliente (qué clientes compraron)
-  const { data, error } = await supabase
+  let query2 = supabase
     .from("sales_rows")
     .select("cliente, venta, margen, kg")
     .eq(column, name)
     .gte("fecha", fromParam)
-    .lte("fecha", toParam)
-    .limit(50000); // hasta 50k filas; el GROUP BY queda client-side
+    .lte("fecha", toParam);
+  if (territoriosFilter !== null) {
+    query2 = query2.in("territorio", territoriosFilter);
+  }
+  const { data, error } = await query2.limit(50000); // hasta 50k filas; el GROUP BY queda client-side
 
   if (error) {
     return NextResponse.json(

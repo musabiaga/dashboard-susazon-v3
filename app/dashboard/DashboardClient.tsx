@@ -712,6 +712,20 @@ export function DashboardClient({
                 );
               }
               if (activeTab === "insights") {
+                // Calcular qué territorios pasar al tab Insights según
+                // el modo del sidebar:
+                //  - single: solo ese territorio
+                //  - aggregated-custom: el subset configurado
+                //  - aggregated-all: NULL = todos los visibles (no filtra)
+                //  - aggregated-none: array vacío = 0 resultados
+                const insightsTerritorios: string[] | null =
+                  selectionMode === "single"
+                    ? [effectiveSelected]
+                    : selectionMode === "aggregated-custom"
+                      ? Array.from(aggregatedTerritories)
+                      : selectionMode === "aggregated-none"
+                        ? []
+                        : null; // aggregated-all → no filtrar
                 return (
                   <InsightsTab
                     today={{
@@ -719,6 +733,8 @@ export function DashboardClient({
                       month: todayMonth,
                       day: actualTodayDay,
                     }}
+                    territorios={insightsTerritorios}
+                    contextLabel={contextLabel}
                   />
                 );
               }
