@@ -20,6 +20,7 @@ import {
 } from "@/components/dashboard/PerdidosTab";
 import { MonthSelector } from "@/components/dashboard/MonthSelector";
 import { CutoffToggle } from "@/components/dashboard/CutoffToggle";
+import { SessionSecurityProvider } from "@/components/dashboard/SessionSecurityProvider";
 import { AlertCircle, Clock } from "lucide-react";
 import {
   aggregateKpis,
@@ -88,6 +89,10 @@ interface DashboardClientProps {
   lastDayWithSale: number | null;
   /** Permiso para descargar Excel desde los tabs (de users_permissions.can_export_excel). */
   canExportExcel: boolean;
+  /** Setting global de timeout de inactividad (de app_settings). null = sin timeout. */
+  sessionIdleTimeoutMinutes: number | null;
+  /** Flag del usuario actual: si true, el timeout no le aplica. */
+  sessionTimeoutExempt: boolean;
   /** Fecha ISO "hoy - 90 días" (CDMX). Cliente "Nuevo" en Perdidos si su
    *  first_purchase_date >= este cutoff. */
   newCustomerCutoffDate: string;
@@ -130,6 +135,8 @@ export function DashboardClient({
   asOfDay,
   lastDayWithSale,
   canExportExcel,
+  sessionIdleTimeoutMinutes,
+  sessionTimeoutExempt,
   newCustomerCutoffDate,
 }: DashboardClientProps) {
   // Selección uni-select del sidebar: "" = modo "Todos", o nombre = single.
@@ -432,6 +439,12 @@ export function DashboardClient({
 
   return (
     <div className="flex flex-1">
+      {/* Security: idle timeout + remote logout polling. Componente cliente
+          que no renderiza nada visible salvo cuando el warning modal aplica. */}
+      <SessionSecurityProvider
+        sessionIdleTimeoutMinutes={sessionIdleTimeoutMinutes}
+        sessionTimeoutExempt={sessionTimeoutExempt}
+      />
       <Sidebar
         territories={territories}
         selected={effectiveSelected}

@@ -280,7 +280,9 @@ export default async function DashboardPage({
   const [{ data: permissions }, appSettings] = await Promise.all([
     supabase
       .from("users_permissions")
-      .select("full_name, role, allowed_territories, can_edit_ptto, can_export_excel")
+      .select(
+        "full_name, role, allowed_territories, can_edit_ptto, can_export_excel, session_timeout_exempt"
+      )
       .eq("user_id", user.id)
       .single(),
     getAppSettings(),
@@ -1231,6 +1233,8 @@ export default async function DashboardPage({
         asOfDay={asOfDay}
         lastDayWithSale={lastDayWithSale}
         canExportExcel={permissions?.can_export_excel ?? false}
+        sessionIdleTimeoutMinutes={appSettings.sessionIdleTimeoutMinutes}
+        sessionTimeoutExempt={permissions?.session_timeout_exempt ?? false}
         newCustomerCutoffDate={(() => {
           // Hoy CDMX menos 90 días → fecha ISO YYYY-MM-DD.
           // Cliente "Nuevo" si first_purchase_date >= cutoff.

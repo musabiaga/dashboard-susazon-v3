@@ -19,10 +19,22 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  // Banner contextual cuando el usuario llegó aquí por logout automático.
+  // Lo leemos del query string `?reason=idle | admin`.
+  const [reason, setReason] = useState<"idle" | "admin" | null>(null);
 
   // Trigger de la intro: cambia `mounted` después del primer render
   useEffect(() => {
     const t = requestAnimationFrame(() => setMounted(true));
+    // Leer el reason del query string (browser-side, evita Suspense
+    // boundary que useSearchParams requiere).
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const r = params.get("reason");
+      if (r === "idle" || r === "admin") setReason(r);
+    } catch {
+      // ignore
+    }
     return () => cancelAnimationFrame(t);
   }, []);
 
@@ -230,6 +242,49 @@ export default function LoginPage() {
               Acceso restringido. Personal autorizado únicamente.
             </p>
           </div>
+
+          {/* Banner de motivo de logout (idle / admin) — solo si viene
+              ?reason=idle ó ?reason=admin en la URL. */}
+          {reason === "idle" && (
+            <div
+              className="mb-4 flex items-start gap-2 rounded-[var(--radius)] border px-3 py-2.5 text-xs"
+              style={{
+                background: "var(--warning-soft)",
+                borderColor: "var(--warning)",
+                color: "var(--text-primary)",
+              }}
+            >
+              <ShieldAlert
+                size={14}
+                className="mt-0.5 shrink-0"
+                style={{ color: "var(--warning)" }}
+              />
+              <span>
+                <strong>Sesión cerrada por inactividad.</strong> Vuelve a
+                iniciar sesión para continuar.
+              </span>
+            </div>
+          )}
+          {reason === "admin" && (
+            <div
+              className="mb-4 flex items-start gap-2 rounded-[var(--radius)] border px-3 py-2.5 text-xs"
+              style={{
+                background: "var(--danger-soft)",
+                borderColor: "var(--danger)",
+                color: "var(--text-primary)",
+              }}
+            >
+              <ShieldAlert
+                size={14}
+                className="mt-0.5 shrink-0"
+                style={{ color: "var(--danger)" }}
+              />
+              <span>
+                <strong>Tu sesión fue cerrada por un administrador.</strong>{" "}
+                Si crees que es un error, contacta a tu administrador.
+              </span>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">

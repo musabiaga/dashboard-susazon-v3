@@ -12,6 +12,9 @@ import {
   X,
   Check,
   CheckCircle2,
+  LogOut,
+  Clock,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 
 export type RoleKey = "admin" | "director" | "gerente_regional" | "vendedor";
@@ -39,6 +42,8 @@ export interface UserRow {
   allowed_territories: string[] | null;
   can_edit_ptto: boolean;
   can_export_excel: boolean;
+  /** Si true, este usuario NO está sujeto al timeout global de inactividad. */
+  session_timeout_exempt: boolean;
   is_active: boolean;
   last_login: string | null;
   created_at: string;
@@ -179,6 +184,125 @@ export function UsuariosClient({ initial, territories }: Props) {
     }
   }
 
+  // ============ Force signout: cerrar sesión de un usuario específico ============
+  async function handleForceSignout(u: UserRow) {
+    if (
+      !confirm(
+        `¿Cerrar sesión de ${u.full_name}?\n\nEl usuario será redirigido a /login en su próxima acción (máximo 30 min si está observando sin tocar nada).`
+      )
+    )
+      return;
+    setError(null);
+    setPendingId(u.user_id);
+    try {
+      const res = await fetch("/api/admin/users/force-signout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: u.user_id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+      flashSuccess(`Sesión de ${u.full_name} cerrada.`);
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error desconocido");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  // ============ Force signout-all: cerrar sesión de TODOS (excepto admin actual + exentos) ============
+  async function handleForceSignoutAll() {
+    // Calcular cuántos van a verse afectados (sin contar exentos)
+    const targets = users.filter(
+      (u) => u.is_active && !u.session_timeout_exempt
+    );
+    if (targets.length === 0) {
+      setError(
+        "No hay usuarios para cerrar sesión (todos están exentos o inactivos)."
+      );
+      return;
+    }
+    if (
+      !confirm(
+        `¿Cerrar sesión de ${targets.length} usuario${
+          targets.length === 1 ? "" : "s"
+        }?\n\nSe excluirá tu propia sesión y a los usuarios marcados como exentos del timeout. Esta acción NO se puede deshacer.`
+      )
+    )
+      return;
+    setError(null);
+    setPendingId("__signout_all__");
+    try {
+      const res = await fetch("/api/admin/users/force-signout-all", {
+        method: "POST",
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? `HTTP ${res.status}`);
+      flashSuccess(
+        `${j.signed_out} sesión${j.signed_out === 1 ? "" : "es"} cerrada${
+          j.signed_out === 1 ? "" : "s"
+        }. ${
+          j.skipped.exempt_users.length > 0
+            ? `Exentos: ${j.skipped.exempt_users.length}.`
+            : ""
+        }`
+      );
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error desconocido");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  // ============ Toggle exención del timeout de inactividad ============
+  async function handleToggleExempt(u: UserRow) {
+    const newValue = !u.session_timeout_exempt;
+    setError(null);
+    setPendingId(u.user_id);
+    // Optimistic
+    setUsers((prev) =>
+      prev.map((x) =>
+        x.user_id === u.user_id
+          ? { ...x, session_timeout_exempt: newValue }
+          : x
+      )
+    );
+    try {
+      const res = await fetch(
+        "/api/admin/users/toggle-timeout-exemption",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: u.user_id, exempt: newValue }),
+        }
+      );
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Revertir
+        setUsers((prev) =>
+          prev.map((x) =>
+            x.user_id === u.user_id
+              ? { ...x, session_timeout_exempt: !newValue }
+              : x
+          )
+        );
+        throw new Error(j.error ?? `HTTP ${res.status}`);
+      }
+      flashSuccess(
+        newValue
+          ? `${u.full_name} EXENTO del timeout (sesión indefinida).`
+          : `${u.full_name} sujeto al timeout global.`
+      );
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error desconocido");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
   // Abre modal con 2 opciones de reset (email vs password directa).
   function handleResetPassword(u: UserRow) {
     setModal({ kind: "reset", user: u });
@@ -240,19 +364,41 @@ export function UsuariosClient({ initial, territories }: Props) {
             color="var(--accent)"
           />
         </div>
-        <button
-          type="button"
-          onClick={() => setModal({ kind: "invite" })}
-          className="inline-flex items-center gap-2 rounded-[var(--radius)] border px-3 py-2 text-sm font-medium"
-          style={{
-            background: "var(--accent)",
-            borderColor: "var(--accent)",
-            color: "white",
-          }}
-        >
-          <UserPlus size={14} />
-          Invitar usuario
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Cerrar todas las sesiones — excluye admin actual + exentos. */}
+          <button
+            type="button"
+            onClick={handleForceSignoutAll}
+            disabled={pendingId === "__signout_all__"}
+            title="Cierra sesión de todos los usuarios excepto tu propia sesión y los marcados como exentos del timeout"
+            className="inline-flex items-center gap-2 rounded-[var(--radius)] border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            style={{
+              background: "var(--danger-soft)",
+              borderColor: "var(--danger)",
+              color: "var(--danger)",
+            }}
+          >
+            {pendingId === "__signout_all__" ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <LogOut size={14} />
+            )}
+            Cerrar todas las sesiones
+          </button>
+          <button
+            type="button"
+            onClick={() => setModal({ kind: "invite" })}
+            className="inline-flex items-center gap-2 rounded-[var(--radius)] border px-3 py-2 text-sm font-medium"
+            style={{
+              background: "var(--accent)",
+              borderColor: "var(--accent)",
+              color: "white",
+            }}
+          >
+            <UserPlus size={14} />
+            Invitar usuario
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -283,6 +429,7 @@ export function UsuariosClient({ initial, territories }: Props) {
                 <Th>Territorios</Th>
                 <Th align="center">PTTO</Th>
                 <Th align="center">Excel</Th>
+                <Th align="center">Sesión</Th>
                 <Th align="center">Estado</Th>
                 <Th>Último login</Th>
                 <Th align="right">Acciones</Th>
@@ -363,6 +510,36 @@ export function UsuariosClient({ initial, territories }: Props) {
                       )}
                     </Td>
                     <Td align="center">
+                      {/* Sesión: clickeable para toggle exempt.
+                          🟢 InfinityIcon = exento (sesión indefinida)
+                          ⏱️ Clock = sujeto al timeout global */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleExempt(u)}
+                        disabled={isPending}
+                        title={
+                          u.session_timeout_exempt
+                            ? "EXENTO del timeout — sesión indefinida. Click para sujetar al timeout global."
+                            : "Sujeto al timeout global. Click para EXIMIR (sesión indefinida)."
+                        }
+                        className="mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{
+                          background: u.session_timeout_exempt
+                            ? "var(--success-soft)"
+                            : "var(--bg-surface-muted)",
+                          color: u.session_timeout_exempt
+                            ? "var(--success)"
+                            : "var(--text-muted)",
+                        }}
+                      >
+                        {u.session_timeout_exempt ? (
+                          <InfinityIcon size={12} />
+                        ) : (
+                          <Clock size={12} />
+                        )}
+                      </button>
+                    </Td>
+                    <Td align="center">
                       <ActiveBadge active={u.is_active} />
                     </Td>
                     <Td>
@@ -388,6 +565,14 @@ export function UsuariosClient({ initial, territories }: Props) {
                           disabled={isPending}
                         >
                           <KeyRound size={12} />
+                        </IconBtn>
+                        <IconBtn
+                          title="Cerrar sesión del usuario"
+                          onClick={() => handleForceSignout(u)}
+                          disabled={isPending}
+                          danger
+                        >
+                          <LogOut size={12} />
                         </IconBtn>
                         <IconBtn
                           title={u.is_active ? "Desactivar" : "Activar"}

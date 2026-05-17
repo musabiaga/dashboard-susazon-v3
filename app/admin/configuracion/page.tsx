@@ -16,10 +16,22 @@ export default async function ConfiguracionPage() {
   const instructivoEnabled =
     (instructivo?.value as { enabled?: boolean } | undefined)?.enabled ?? true;
 
+  // Timeout de inactividad
+  const sessionTimeout = byKey.get("session_idle_timeout_minutes");
+  const rawMinutes = (
+    sessionTimeout?.value as { minutes?: number | null } | undefined
+  )?.minutes;
+  const sessionTimeoutMinutes =
+    rawMinutes != null && [35, 45, 60, 90, 120].includes(rawMinutes)
+      ? (rawMinutes as 35 | 45 | 60 | 90 | 120)
+      : null;
+
   return (
     <ConfiguracionClient
       initialInstructivoEnabled={instructivoEnabled}
       instructivoUpdatedAt={instructivo?.updated_at ?? null}
+      initialSessionTimeoutMinutes={sessionTimeoutMinutes}
+      sessionTimeoutUpdatedAt={sessionTimeout?.updated_at ?? null}
     />
   );
 }

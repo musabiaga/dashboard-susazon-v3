@@ -14,10 +14,15 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export interface AppSettings {
   /** Si true, todos los usuarios ven el botón "Instructivo" en el header */
   instructivoVisible: boolean;
+  /** Minutos de inactividad antes del auto-logout. null = sin timeout.
+   *  Valores válidos UI: 35, 45, 60, 90, 120. El timeout NO aplica a
+   *  usuarios con session_timeout_exempt=true. */
+  sessionIdleTimeoutMinutes: number | null;
 }
 
 const DEFAULTS: AppSettings = {
   instructivoVisible: true,
+  sessionIdleTimeoutMinutes: null,
 };
 
 /**
@@ -39,8 +44,21 @@ export async function getAppSettings(): Promise<AppSettings> {
       | { enabled?: boolean }
       | undefined;
 
+    const sessionTimeout = byKey.get("session_idle_timeout_minutes") as
+      | { minutes?: number | null }
+      | undefined;
+
+    // Validar el rango: solo aceptamos null o 35-120 min.
+    const rawMinutes = sessionTimeout?.minutes;
+    const validMinutes =
+      rawMinutes != null && typeof rawMinutes === "number" &&
+      rawMinutes >= 35 && rawMinutes <= 120
+        ? rawMinutes
+        : null;
+
     return {
       instructivoVisible: instructivo?.enabled ?? DEFAULTS.instructivoVisible,
+      sessionIdleTimeoutMinutes: validMinutes,
     };
   } catch {
     return DEFAULTS;
