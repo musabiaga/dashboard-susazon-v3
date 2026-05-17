@@ -804,20 +804,21 @@
   <div class="cover-logo">
     <span class="cover-logo-text">S</span>
   </div>
-  <div class="cover-eyebrow">Grupo Susazón · V3.0</div>
+  <div class="cover-eyebrow">Grupo Susazón · InCom V3.8</div>
   <h1>Dashboard Comercial</h1>
   <p class="cover-subtitle">
-    Guía visual para entender tu nuevo dashboard.
-    Pantalla principal, KPIs, navegación y todos los tabs explicados.
+    Guía visual para entender tu dashboard.
+    Pantalla principal, KPIs, navegación, los 8 tabs, toggles avanzados,
+    PDF descargable, Tab Insights y seguridad de sesión.
   </p>
   <div class="cover-meta">
     <div class="cover-meta-item">
       <span class="cover-meta-label">Versión</span>
-      <span class="cover-meta-value">1.2.0</span>
+      <span class="cover-meta-value">3.8.0</span>
     </div>
     <div class="cover-meta-item">
-      <span class="cover-meta-label">Fecha</span>
-      <span class="cover-meta-value">Abril 2026</span>
+      <span class="cover-meta-label">Actualizado</span>
+      <span class="cover-meta-value">17 Mayo 2026</span>
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">URL</span>
@@ -888,6 +889,18 @@
       <tr>
         <td class="question">¿Qué clientes dejaron de comprar?</td>
         <td class="destination">Tab Perdidos</td>
+      </tr>
+      <tr>
+        <td class="question">¿Qué tan concentrada está mi venta en mis top clientes / productos / grupos?</td>
+        <td class="destination">Tab Insights 💡</td>
+      </tr>
+      <tr>
+        <td class="question">¿Cómo bajo un PDF "Avance Comercial" para una junta?</td>
+        <td class="destination">Botón "Generar PDF" arriba a la derecha de cualquier tab operativo</td>
+      </tr>
+      <tr>
+        <td class="question">¿Cómo exporto la tabla a Excel?</td>
+        <td class="destination">Botón "Excel" arriba a la derecha de cada tab</td>
       </tr>
     </tbody>
   </table>
@@ -991,6 +1004,7 @@
         <span class="anatomy-tab">Clientes</span>
         <span class="anatomy-tab">Vendedores</span>
         <span class="anatomy-tab">Perdidos</span>
+        <span class="anatomy-tab">💡 Insights</span>
       </div>
       <div style="background: rgba(255,255,255,0.04); border: 1px dashed var(--glass-border); border-radius: 8px; padding: 14px; text-align: center; font-size: 11px; color: var(--text-muted); flex: 1;">
         Contenido del tab seleccionado<br>
@@ -1030,11 +1044,12 @@
       </div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-card-label">D · Tabs (7 secciones)</div>
+      <div class="kpi-card-label">D · Tabs (8 secciones)</div>
       <div class="kpi-card-value" style="font-size: 18px;">Análisis especializado</div>
       <div class="kpi-card-detail">
-        7 perspectivas distintas del mismo dato: Tracking Diario, Ventas, Grupo Producto,
-        Productos, Clientes, Vendedores, Perdidos. El tab activo se subraya en naranja.
+        8 perspectivas distintas del mismo dato: Tracking Diario, Ventas, Grupo Producto,
+        Productos, Clientes, Vendedores, Perdidos y 💡 <strong>Insights</strong> (análisis
+        Pareto avanzado). El tab activo se subraya en naranja.
       </div>
     </div>
   </div>
@@ -1129,7 +1144,7 @@
   <div class="section-header">
     <div class="section-number">5</div>
     <div>
-      <div class="section-title">Los 7 tabs del dashboard</div>
+      <div class="section-title">Los 8 tabs del dashboard</div>
       <div class="section-subtitle">Cada uno una perspectiva distinta del negocio</div>
     </div>
   </div>
@@ -1163,6 +1178,8 @@
           comparar trimestres entre años.
         </div>
         <div class="tab-detail">
+          <strong>🆕 Toggle Pesos / Kilos.</strong> Cambia toda la vista a kilos. Las líneas de
+          margen % se mantienen fijas — el insight clave es <em>"¿cuándo vendí más kg, mi margen % subió o bajó?"</em>.<br>
           <strong>Tip:</strong> pasa el cursor sobre cualquier mes para ver el tooltip con
           venta total, % margen y delta vs el año anterior.
         </div>
@@ -1178,6 +1195,8 @@
           año actual vs año anterior. Tabla scrollable con todos los grupos debajo.
         </div>
         <div class="tab-detail">
+          <strong>🆕 Toggle Pesos / Kilos.</strong> Cambia toda la vista a kilos con líneas de
+          margen % fijas en eje derecho.<br>
           Si la API de Susazón aún no está enviando el campo "GrupoProducto" actualizado,
           este tab muestra el campo "Familia" como fallback temporal.
         </div>
@@ -1193,6 +1212,7 @@
           y línea en kilos (eje derecho). Tabla detallada debajo con todos los SKUs activos.
         </div>
         <div class="tab-detail">
+          <strong>🆕 Toggle Pesos / Kilos.</strong> Cambia la perspectiva del chart entre pesos y kilos.<br>
           <strong>Útil para:</strong> identificar qué productos crecen, cuáles están cayendo,
           y cuál es el mix entre alto valor (\$/kg) y alto volumen.
         </div>
@@ -1209,8 +1229,11 @@
           decreció vs el año pasado.
         </div>
         <div class="tab-detail">
+          <strong>🆕 Toggle Pesos / Kilos.</strong> Cambia el ranking a kilos para detectar
+          clientes de alto volumen pero margen bajo (o viceversa).<br>
           <strong>Tip estratégico:</strong> si tus Top 5 representan +60% de la venta, tienes
-          riesgo de concentración. Diversifica.
+          riesgo de concentración. Diversifica. <em>Para análisis a profundidad usa el</em>
+          <strong>Tab Insights 💡</strong>.
         </div>
       </div>
     </li>
@@ -1225,6 +1248,7 @@
           <span class="pill blue">Separados</span> para ver agregado o desglosado por empresa.
         </div>
         <div class="tab-detail">
+          <strong>🆕 Toggle Pesos / Kilos.</strong> Disponible también en este tab.<br>
           <strong>Modo "Separados":</strong> Si un vendedor trabaja en ambas empresas, aparece como
           dos filas (ej. "Juan Pérez (Sus)" y "Juan Pérez (Suve)"). En modo "Unidos" se suma todo.
         </div>
@@ -1243,6 +1267,30 @@
         <div class="tab-detail">
           <strong>Toggle Mes / YTD:</strong> alterna entre comparar el mes actual vs mismo mes año
           ant., o el acumulado del año vs YTD del año anterior.
+        </div>
+      </div>
+    </li>
+
+    <li class="tab-item">
+      <div class="tab-icon" style="background: linear-gradient(135deg, var(--accent-yellow), var(--accent-orange)); color: #1a1a2e;">💡</div>
+      <div class="tab-content">
+        <div class="tab-name">🆕 Insights · Análisis de Concentración (Pareto)</div>
+        <div class="tab-summary">
+          <strong>Nuevo en V3.8.</strong> Tab dedicado a análisis avanzados, no operativos.
+          Responde la pregunta clásica: <em>"¿qué tan dependientes somos del top X clientes /
+          grupos / productos?"</em>. Visualización con <strong>Treemap squarify</strong>
+          (bloques cuadrados con área proporcional al valor) + <strong>Radar adaptativo</strong>.
+        </div>
+        <div class="tab-detail">
+          <strong>3 dimensiones</strong> (Grupos / Clientes / Productos) × <strong>4 métricas</strong>
+          (Pesos / Kilos / Margen $ / Margen %).
+          <strong>Date Range Picker</strong> con 7 atajos: Este mes, Mes anterior, 30d, 90d, YTD, 12m, custom.
+          <strong>Top N</strong>: 7 / 10 / 15 + "Resto del universo".
+          <strong>Tabla Pareto expandible</strong>: click en cada fila para ver facturas del cliente
+          (o clientes que compraron del grupo/producto).
+          <strong>"Excluir items":</strong> botón por fila — el 100% se recalcula sin ellos
+          (útil para ignorar intercompañías o clientes atípicos).
+          Respeta los filtros de territorio del sidebar.
         </div>
       </div>
     </li>
@@ -1287,7 +1335,12 @@
     <div class="kpi-card">
       <div class="kpi-card-label">4 · vs Mismo Mes Año Ant.</div>
       <div class="kpi-card-value" style="color: #fca5a5;">-23.7%</div>
-      <div class="kpi-card-detail">Cómo vas contra el mismo mes del año anterior.</div>
+      <div class="kpi-card-detail">
+        <strong>🆕 Comparativo "al-día":</strong> compara contra el <em>mismo día hábil</em>
+        del año anterior (no contra el cierre completo). Antes este KPI mentía con "-63%" en
+        día 10 al comparar 10 días vs 30 días. Ahora es apples-to-apples.
+        El valor del cierre completo se conserva en gris debajo como referencia secundaria.
+      </div>
     </div>
     <div class="kpi-card">
       <div class="kpi-card-label">5 · Vel. Original</div>
@@ -1317,7 +1370,23 @@
       <strong>Toggle Pesos / Kilos.</strong> Click el botón
       <span class="toggle-showcase"><span class="toggle-option">Pesos</span><span class="toggle-option active">Kilos</span></span>
       arriba a la derecha. La vista cambia completa: las 8 stats, el chart, la progress bar y la tabla
-      pasan a comparar contra el cierre 2025 en kilos. Útil para directores que piensan en volumen.
+      pasan a comparar contra el cierre 2025 en kilos. Útil para directores que piensan en volumen.<br>
+      <strong>🆕 Ahora también disponible en Ventas, Grupo Producto, Productos, Clientes y Vendedores.</strong>
+    </div>
+  </div>
+
+  <div class="annotation" style="background: rgba(168, 85, 247, 0.10); border-color: rgba(168, 85, 247, 0.35);">
+    <span class="annotation-icon">⏰</span>
+    <div class="annotation-text">
+      <strong style="color: #d8b4fe;">🆕 Toggle Cierre / Hoy</strong> (en el header global, junto al
+      selector de mes). <strong>Aparece solo cuando hay desfase</strong> entre el día calendario
+      y el último día con venta. Resuelve un bug clásico: si refrescabas el dashboard temprano sin
+      venta del día, el sistema mostraba <em>"REZAGADO -3pp"</em> engañoso. Ahora puedes alternar:
+      <ul style="margin: 8px 0 0 20px; padding: 0;">
+        <li><strong>Cierre [13-may]</strong> — usa el último día con venta real como referencia.</li>
+        <li><strong>Hoy [14-may]</strong> — usa el calendario (vista clásica).</li>
+      </ul>
+      Todo el dashboard se recalcula automáticamente al alternar (KPIs, %, vel. necesaria, semáforos).
     </div>
   </div>
 
@@ -1379,9 +1448,21 @@
     </div>
     <div class="kpi-card">
       <div class="kpi-card-label">⚖️ Pesos / Kilos</div>
-      <div class="kpi-card-value" style="font-size: 18px;">Solo en Tracking Diario</div>
+      <div class="kpi-card-value" style="font-size: 18px;">🆕 En 6 tabs</div>
       <div class="kpi-card-detail">
-        Toggle arriba de las 8 stats. Cambia toda la vista a kilos comparado contra cierre 2025.
+        Toggle Pesos/Kilos disponible ahora en <strong>Tracking Diario, Ventas, Grupo Producto,
+        Productos, Clientes y Vendedores</strong>. Las líneas de margen % se mantienen fijas en el
+        eje Y derecho al alternar — insight clave: <em>"¿cuándo vendí más kg, mi margen % subió o bajó?"</em>.
+        Cada tab guarda su preferencia independiente.
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">⏰ Toggle Cierre / Hoy</div>
+      <div class="kpi-card-value" style="font-size: 18px;">🆕 Header global</div>
+      <div class="kpi-card-detail">
+        Aparece <strong>solo si hay desfase</strong> entre el día calendario y el último día con
+        venta. Alterna entre <strong>"Cierre [día con venta]"</strong> y <strong>"Hoy [calendario]"</strong>.
+        Todo el dashboard se recalcula al alternar.
       </div>
     </div>
     <div class="kpi-card">
@@ -1394,11 +1475,20 @@
       </div>
     </div>
     <div class="kpi-card">
+      <div class="kpi-card-label">⚙️ "Todos" configurable</div>
+      <div class="kpi-card-value" style="font-size: 18px;">Multi-territorio custom</div>
+      <div class="kpi-card-detail">
+        Click el ⚙️ al lado de "Todos" en el sidebar → abre un dropdown con checkboxes para
+        configurar QUÉ territorios incluye ese "Todos". Útil para análisis de subsets
+        (ej. "costa norte" = Mérida + Cancún + CDMX).
+      </div>
+    </div>
+    <div class="kpi-card">
       <div class="kpi-card-label">💾 Tu preferencia se queda</div>
       <div class="kpi-card-value" style="font-size: 18px;">Memoria automática</div>
       <div class="kpi-card-detail">
-        El dashboard recuerda tus elecciones (tema, sidebar abierto/cerrado, vista pesos/kilos)
-        entre sesiones. No necesitas volver a configurar.
+        El dashboard recuerda tus elecciones (tema, sidebar abierto/cerrado, vista pesos/kilos
+        por tab, selección custom de "Todos") entre sesiones. No necesitas volver a configurar.
       </div>
     </div>
   </div>
@@ -1425,11 +1515,169 @@
 </section>
 
 <!-- ====================================================
-     8. PREGUNTAS FRECUENTES
+     8. FUNCIONES AVANZADAS (NUEVAS EN V3.5 - V3.8)
      ==================================================== -->
 <section>
   <div class="section-header">
     <div class="section-number">8</div>
+    <div>
+      <div class="section-title">🆕 Funciones avanzadas</div>
+      <div class="section-subtitle">PDF descargable, Tab Insights y seguridad de sesión</div>
+    </div>
+  </div>
+
+  <!-- A · PDF Avance Comercial -->
+  <div class="glass-card featured">
+    <h3>📄 PDF "Avance Comercial" — reporte ejecutivo de 3 páginas</h3>
+    <p>
+      Botón <span class="pill">📄 Generar PDF</span> arriba a la derecha en cualquiera de los
+      7 tabs operativos. Genera un PDF descargable de 3 páginas con todo lo necesario para
+      llevar a una junta o compartir por correo. La primera vez que lo abres tarda ~3 segundos
+      en cargar (lazy import); las siguientes son instantáneas.
+    </p>
+    <ul style="margin: 12px 0 0 20px; padding: 0;">
+      <li><strong>Página 1 — Tracking Diario completo:</strong> 8 stats Pesos + 8 stats Kilos,
+        progress bar con marca pace 2025, chart compuesto (acumulado + ptto lineal + año anterior).</li>
+      <li><strong>Página 2 — Tablas comerciales (estilo AvComSS extendido):</strong>
+        Por División (Foodservice / Distribuidores / Retail), Por Empresa (Sus / Suve),
+        Pesos por Territorio (11 territorios + TOTAL, comparativo al-día 2025),
+        Kilos por Territorio (cierre como referencia), Margen por Territorio.</li>
+      <li><strong>Página 3 — Detalle:</strong> Top 10 Clientes con comparativo al-día año anterior +
+        Var %, Tracking Diario detallado por día con semáforo de velocidad necesaria.</li>
+    </ul>
+    <p style="margin-top: 12px; margin-bottom: 0;">
+      <strong>3 modos según selección del sidebar:</strong> Single (1 territorio) → reporte focalizado.
+      Multi (subset custom desde el ⚙️) → con tablas. All (todos) → réplica AvComSS clásico.
+    </p>
+  </div>
+
+  <!-- B · Tab Insights · Concentración -->
+  <div class="glass-card featured">
+    <h3>💡 Tab Insights · Análisis de Concentración (Pareto)</h3>
+    <p>
+      <strong>El 8vo tab.</strong> Espacio dedicado a análisis avanzados, no operativos —
+      la pregunta clave es <em>"¿qué tan dependientes somos del top X clientes / grupos /
+      productos?"</em>. Útil para juntas estratégicas, revisiones trimestrales, decisiones de
+      diversificación.
+    </p>
+    <h4>Cómo usarlo (paso a paso)</h4>
+    <ol class="steps" style="margin-top: 12px;">
+      <li class="step">
+        <div class="step-content">
+          <div class="step-title">Elige el periodo</div>
+          <div class="step-description">
+            <strong>Date Range Picker</strong> con 7 atajos rápidos: Este mes, Mes anterior,
+            30d, 90d, YTD, 12m, custom.
+          </div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-content">
+          <div class="step-title">Elige la dimensión y la métrica</div>
+          <div class="step-description">
+            <strong>Dimensión:</strong> Grupos / Clientes / Productos.
+            <strong>Métrica:</strong> Pesos / Kilos / Margen $ / Margen %.
+          </div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-content">
+          <div class="step-title">Visualiza</div>
+          <div class="step-description">
+            <strong>Treemap squarify</strong> (bloques cuadrados con área proporcional al valor)
+            o <strong>Radar adaptativo</strong>. Top N (7 / 10 / 15) + "Resto del universo"
+            (octágono perfecto cuando es Top 7).
+          </div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-content">
+          <div class="step-title">Profundiza con la Tabla Pareto</div>
+          <div class="step-description">
+            Cada fila se expande con click para mostrar las <strong>facturas del cliente</strong>
+            (o clientes que compraron del grupo/producto). Columnas: Venta, Kilos, Margen $,
+            Margen %, % Universo, Acumulado, Δ pp.
+          </div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-content">
+          <div class="step-title">Excluye items atípicos</div>
+          <div class="step-description">
+            Botón <span class="pill">Excluir</span> por fila — el 100% se recalcula sin ellos.
+            Útil para ignorar intercompañías o clientes one-off que sesgan el análisis.
+          </div>
+        </div>
+      </li>
+    </ol>
+    <div class="annotation" style="margin-top: 16px;">
+      <span class="annotation-icon">🔐</span>
+      <div class="annotation-text">
+        <strong>Respeta tu rol.</strong> Si eres vendedor con un solo territorio asignado,
+        Insights solo procesa data de ese territorio. Si eres director, Insights respeta
+        el selector multi-territorio del sidebar (incluyendo el ⚙️ "Todos" configurable).
+      </div>
+    </div>
+  </div>
+
+  <!-- C · Seguridad de sesión -->
+  <div class="glass-card featured">
+    <h3>🔐 Seguridad de sesión (nuevo en V3.7)</h3>
+    <p>
+      Sistema de protección de sesión con 3 mecanismos coordinados — para que el dashboard
+      sea seguro incluso en PCs compartidas o si dejas la sesión abierta.
+    </p>
+
+    <h4>A · Timeout por inactividad</h4>
+    <p>
+      Si el admin lo activa, tu sesión se cierra automáticamente después de
+      <span class="pill">35 / 45 / 60 / 90 / 120 min</span> de inactividad (default:
+      <span class="pill green">Sin límite</span>). Cualquier movimiento de mouse, tecla, scroll
+      o touch resetea el contador.
+    </p>
+    <p style="margin-bottom: 0;">
+      A los <strong>60 segundos antes de expirar</strong> aparece un modal grande que dice
+      <strong>"¿Sigues ahí?"</strong> con un countdown. Si mueves el mouse o haces click en
+      "Sigo aquí", la sesión continúa. Si no haces nada → se cierra y redirige a login con
+      banner amarillo "Sesión expirada por inactividad".
+    </p>
+
+    <h4>B · Logout remoto desde admin</h4>
+    <p style="margin-bottom: 0;">
+      El admin (Mauricio) puede cerrar tu sesión desde su panel — por ejemplo si perdiste tu
+      laptop, o si necesita hacer mantenimiento. Si te pasa, redirige a login con banner rojo
+      <strong>"Sesión cerrada por administrador"</strong>. Simplemente vuelve a entrar con tu
+      usuario y contraseña.
+    </p>
+
+    <h4>C · Detección inteligente</h4>
+    <p style="margin-bottom: 0;">
+      El dashboard verifica tu sesión <strong>cada vez que interactúas</strong>,
+      <strong>cuando regresas a la tab</strong>, y como respaldo <strong>cada 30 minutos</strong>.
+      Detecta logout remoto en menos de 30 minutos en el peor caso, prácticamente al instante
+      si tienes la tab activa.
+    </p>
+  </div>
+
+  <!-- D · Export Excel (recordatorio) -->
+  <div class="glass-card">
+    <h3>📊 Export Excel — en los 7 tabs operativos</h3>
+    <p style="margin-bottom: 0;">
+      Botón <span class="pill">Excel</span> arriba a la derecha en cada tab. Descarga un
+      archivo <code>.xlsx</code> con bloque de resumen, columnas claras, filas con zebra,
+      freeze panes, fila TOTAL en negrita y formato numérico nativo (proporciones reales
+      0.0% para pivot tables, no strings con "%"). Respeta tu selección actual (filtros,
+      multi-select, modo de territorio).
+    </p>
+  </div>
+</section>
+
+<!-- ====================================================
+     9. PREGUNTAS FRECUENTES
+     ==================================================== -->
+<section>
+  <div class="section-header">
+    <div class="section-number">9</div>
     <div>
       <div class="section-title">Preguntas frecuentes</div>
       <div class="section-subtitle">Lo que casi todos preguntan</div>
@@ -1473,8 +1721,58 @@
   <div class="glass-card">
     <h4>Mi sesión expiró o estoy bloqueado</h4>
     <p style="margin-bottom: 0;">
-      Las sesiones duran varias horas. Si cierras la pestaña, te pedirá login al volver.
-      Después de 5 intentos fallidos hay un bloqueo automático de 15 minutos por seguridad.
+      Las sesiones de Supabase duran varias horas. Después de 5 intentos fallidos de login
+      hay un bloqueo automático de 15 minutos por seguridad.
+      <strong>🆕 Si el admin activó el timeout de inactividad</strong>, la sesión también puede
+      cerrarse después de 35/45/60/90/120 min sin actividad. Verás un banner amarillo en
+      el login: <em>"Sesión expirada por inactividad"</em>.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>🆕 Me apareció "Sesión cerrada por administrador" en rojo</h4>
+    <p style="margin-bottom: 0;">
+      Significa que un admin (típicamente Mauricio) cerró tu sesión remotamente — puede ser
+      mantenimiento, rotación de credenciales, o por seguridad si reportaste algún problema.
+      Vuelve a entrar normalmente con tu correo y contraseña.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>🆕 Salió el modal "¿Sigues ahí?" con un countdown</h4>
+    <p style="margin-bottom: 0;">
+      Tu sesión está a 60 segundos de expirar por inactividad. Mueve el mouse, haz click en
+      <strong>"Sigo aquí"</strong> o presiona cualquier tecla y se resetea el contador.
+      Si no haces nada, la sesión se cierra automáticamente.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>🆕 ¿Qué hace el Tab Insights?</h4>
+    <p style="margin-bottom: 0;">
+      Responde la pregunta <em>"¿qué tan dependientes somos del top X clientes/grupos/productos?"</em>.
+      Visualiza la concentración tipo Pareto con Treemap y Radar, por dimensión (Grupos / Clientes /
+      Productos) y métrica (Pesos / Kilos / Margen $ / Margen %). Útil para juntas estratégicas,
+      revisiones trimestrales y decisiones de diversificación. Ver Sección 8 para detalle.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>🆕 ¿Por qué a veces aparece el toggle "Cierre / Hoy" y a veces no?</h4>
+    <p style="margin-bottom: 0;">
+      Solo aparece cuando hay desfase entre el día calendario y el último día con venta —
+      por ejemplo, si entras al dashboard en la mañana antes de que se carguen las ventas del
+      día. Si ya hay venta del día actual, no hay desfase, y el toggle no se muestra
+      (no aportaría nada).
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>🆕 El PDF "Avance Comercial" tarda en abrir la primera vez</h4>
+    <p style="margin-bottom: 0;">
+      Es normal. La librería de PDF (~600KB) se carga solo cuando haces click la primera vez
+      (lazy import) — para no inflar el dashboard inicial. La segunda vez es instantáneo.
+      Si tarda mucho, verifica tu conexión a Internet.
     </p>
   </div>
 
@@ -1492,9 +1790,10 @@
      ==================================================== -->
 <div class="footer">
   <p style="margin: 0;">
-    Dashboard Comercial Susazón · Versión 1.2.0 · Abril 2026<br>
+    Dashboard Comercial Susazón · InCom · Versión 3.8.0 · Mayo 2026<br>
     Plataforma de uso restringido — solo para personal autorizado de Grupo Susazón.<br>
-    Toda actividad queda registrada en el audit log.
+    Toda actividad queda registrada en el audit log.<br>
+    <span style="opacity: 0.5; font-size: 11px;">Última actualización del instructivo: 17 mayo 2026 · Cubre Fases 1-8 (incluye Tab Insights, Toggle Cierre/Hoy, PDF Avance Comercial y Seguridad de sesión)</span>
   </p>
 </div>
 

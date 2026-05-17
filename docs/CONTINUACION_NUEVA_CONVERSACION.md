@@ -13,7 +13,9 @@
 
 **Stack:** Next.js 16 + Supabase Postgres + Vercel. Frontend React 19, Tailwind 4 CSS-first, Recharts 3.x.
 
-**Estado:** EN PRODUCCIÓN versión 1.3.0 (deploy 2026-04-28, fase 3 cerrada 2026-05-01).
+**Estado:** EN PRODUCCIÓN versión **3.8.0** (deploy 2026-04-28; Fases 1-8 cerradas. Última: Fase 8 = Tab Insights, 2026-05-17).
+
+> 🆕 **Si vienes de antes de Fase 6 (≤ 2026-05-10):** Lee primero `LO_NUEVO.md` — resume Fases 6, 7 y 8 en una página.
 
 **URL canonical:** `https://www.dashboardcomercialsusazon.com`
 
@@ -25,12 +27,13 @@
 
 | Paso | Archivo | Para qué |
 |------|---------|----------|
-| 1 | `AGENTS.md` (raíz del repo) | Auto-cargado al `cd`. Stack, gotchas críticos, reglas absolutas. **21 gotchas** ya documentados. |
-| 2 | Este archivo (`CONTINUACION_NUEVA_CONVERSACION.md`) | Estás aquí. Contexto compacto. |
-| 3 | `docs/SESSION_LOG.md` | **Todas** las decisiones (D001-D018) + bugs resueltos (1-21) con fix y commit. Lee si vas a tocar algo relacionado. |
-| 4 | `docs/INSTRUCTIVO_AGENTE.xml` | Inventario estructurado de archivos, contratos APIs, configuración. Lee si vas a hacer cambios estructurales. |
-| 5 | `docs/01_Arquitectura_Tecnica.docx` | Diseño del sistema y por qué decisiones arquitectónicas. |
-| 6 | `~/Downloads/SECRETS_DASHBOARD_V3.txt` | Tokens, API keys, credenciales (privado, no en repo). |
+| 1 | `AGENTS.md` (raíz del repo) | Auto-cargado al `cd`. Stack, gotchas críticos, reglas absolutas. |
+| 2 | **🆕 `docs/LO_NUEVO.md`** | **Si la última sesión fue antes de 2026-05-11.** Resumen ejecutivo de Fases 6, 7, 8. |
+| 3 | Este archivo (`CONTINUACION_NUEVA_CONVERSACION.md`) | Estás aquí. Contexto compacto. |
+| 4 | `docs/SESSION_LOG.md` | **Todas** las decisiones (D001-D025) + bugs resueltos (1-35). Lee si vas a tocar algo relacionado. |
+| 5 | `docs/INSTRUCTIVO_AGENTE.xml` | Inventario estructurado (v3.0, fecha 2026-05-17). Lee si vas a hacer cambios estructurales. |
+| 6 | `docs/01_Arquitectura_Tecnica.docx` | Diseño del sistema y por qué decisiones arquitectónicas. ⚠️ Refleja estado al 2026-05-10 (v3.3); para Fases 6-8 leer `LO_NUEVO.md`. |
+| 7 | `~/Downloads/SECRETS_DASHBOARD_V3.txt` | Tokens, API keys, credenciales (privado, no en repo). |
 
 **Memoria persistente del usuario** (auto-cargada): `~/.claude/projects/-Users-mauusabiaga-Desktop-Claude-Code-PROJECTS-/memory/MEMORY.md` y archivos relacionados.
 
@@ -78,28 +81,37 @@
 ```
 DASHBOARD SEMANAL VENTAS V3.0 [Claude Code]/
 ├── AGENTS.md              ← Lee primero (auto-cargado)
-├── proxy.ts               ← Middleware Next.js 16 (rename de middleware.ts)
+├── proxy.ts               ← Middleware Next.js 16 (rename de middleware.ts). Valida sesión (Fase 7)
 ├── app/
-│   ├── layout.tsx
+│   ├── layout.tsx         ← Monta SessionMonitor global (Fase 7)
 │   ├── globals.css        ← 6 themes + Tailwind 4 @theme
-│   ├── login/             ← Auth
+│   ├── login/             ← Auth (banners ?reason=idle/admin de Fase 7)
 │   ├── set-password/      ← Flow invite + reset password
-│   ├── dashboard/         ← 7 tabs principal
+│   ├── dashboard/         ← 8 tabs principal (+ Insights de Fase 8). ?asOf= de Fase 6
 │   ├── cargar-datos/      ← Loader + editor PTTO (admin/director)
-│   ├── admin/             ← Panel admin (territorios, usuarios, audit)
-│   └── api/               ← Route handlers (auth callback, data refresh, admin)
+│   ├── admin/             ← Panel admin (territorios, usuarios, audit, configuración Fase 7)
+│   └── api/
+│       ├── auth/, data/, admin/, dashboard/
+│       ├── insights/      ← (Fase 8) concentracion + item-detail
+│       └── admin/session/ ← (Fase 7) force-signout + config
 ├── components/
-│   ├── dashboard/         ← Componentes de los 7 tabs
+│   ├── dashboard/         ← Componentes de los 8 tabs
+│   │   ├── insights/      ← (Fase 8) ConcentracionAnalysis + ConcentracionGrid + TreemapHoverTooltip + DateRangePicker
+│   │   └── report-pdf/    ← (Fase 6) AvanceComercialPDF + ReportPdfButton + Page1/2/3
+│   ├── session/           ← (Fase 7) IdleTimeoutModal + SessionMonitor
 │   ├── theme/             ← ThemeProvider + 6 themes
-│   └── layout/            ← Header, etc.
+│   └── layout/            ← Header + ToggleCierreHoy (Fase 6)
+├── hooks/                 ← (Fase 7) useIdleTimeout + useSessionPolling
 ├── lib/
 │   ├── supabase/          ← Clients (browser, server, admin)
 │   ├── susazon-api.ts     ← Wrapper API Susazón/Suve (server-only)
-│   ├── business-days.ts   ← Días hábiles + getMexicoCityDateParts() ⚠️ TZ helper
+│   ├── business-days.ts   ← Días hábiles + getMexicoCityDateParts() + computePrevYearAlDia (Fase 6) + findCalendarDayForBizDays
+│   ├── aggregate.ts       ← (Mejora 7) Agregación dinámica multi-territorio
+│   ├── export-excel.ts    ← (Mejora 6) Lazy exceljs
 │   └── format.ts          ← formatMoney, formatKilos
-├── supabase/migrations/   ← 10 migraciones SQL
-├── scripts/gen_docs.py    ← Regenera los 6 .docx
-└── docs/                  ← Esta carpeta + .docx
+├── supabase/migrations/   ← 20 migraciones SQL (+4 nuevas: 017_session_security, 018_force_signout, 019_insights, 020_insights_territorios)
+├── scripts/gen_docs.py    ← Regenera los 6 .docx (no incluye Fases 6-8 todavía)
+└── docs/                  ← Esta carpeta + LO_NUEVO.md
 ```
 
 ---
@@ -138,17 +150,25 @@ DASHBOARD SEMANAL VENTAS V3.0 [Claude Code]/
 10. **Safari + backdrop-filter:** requiere `isolation: isolate` + `transform: translateZ(0)`. Ya aplicado en theme `liquid-glass`.
 11. **Run-Rate = HÁBILES siempre** (desde D017, 2026-05-01). Todos los Run-Rates del dashboard usan días hábiles L-S menos LFT, NO calendario. Si ves cálculos divergentes, verificar que estés usando `elapsedBizDays`/`totalBizDays`.
 12. **Selector de mes/año** (desde D018, 2026-05-01). El dashboard puede mostrar meses pasados via `?year=Y&month=M`. Server-side validation en `app/dashboard/page.tsx`. Cuando es histórico, `daysCurrent = daysTotal` (mes cerrado). PTTOs solo cargados para 2026 → meses anteriores no tienen "Alcance Ptto".
+13. **Toggle Cierre/Hoy** (desde D019, Fase 6 · 2026-05-13). Si refrescas el dashboard temprano sin venta del día, aparece toggle en header para alternar entre **Cierre [día con venta]** y **Hoy [calendario]**. Server detecta `lastDayWithSale = max(d) WHERE venta>0`. Si coincide con hoy → toggle no se renderiza. Param `?asOf=YYYY-MM-DD`.
+14. **Comparativos al-día** (desde D021, Fase 6). Los KPIs YoY ahora comparan contra el "mismo día hábil" del año anterior usando `computePrevYearAlDia()`. El cierre completo se conserva como referencia secundaria en gris. ANTES: el dashboard mentía con "-63%" en día 10 al comparar contra cierre completo del mes anterior.
+15. **Seguridad de sesión** (desde D023, Fase 7 · 2026-05-15). 3 mecanismos coordinados: timeout de inactividad configurable + logout remoto admin + smart polling 3 capas. Si tocas `proxy.ts`, `useIdleTimeout`, `useSessionPolling` o `force_signout_user`, lee D023 completo en SESSION_LOG.
+16. **Tab Insights con RLS** (desde D024, Fase 8 · 2026-05-17). 8vo tab. Función SQL `insights_concentracion(p_from, p_to, p_dim, p_territorios)` con SECURITY INVOKER. Filtra por territorios del sidebar. Margen % NO es aditivo — usa flag `isAdditive` por métrica para evitar bugs como "355.9%".
+17. **Treemap squarify manual** (desde D025, Fase 8). Si tocas `ConcentracionGrid.tsx`, recuerda que es algoritmo manual Bruls et al. 2000 (NO Recharts). NUNCA produce rectángulos amorfos delgados. ResizeObserver API para tiers adaptativos.
 
-**Lista completa: `AGENTS.md` sección "Gotchas críticos" (23 gotchas).**
+**Lista completa: `AGENTS.md` sección "Gotchas críticos".**
 
 ---
 
-## 📊 Estado del backlog (al 2026-05-01)
+## 📊 Estado del backlog (al 2026-05-17)
+
+### 🚀 Siguiente tarea acordada con Mauricio
+
+- **Tab "Reporteo Semanal"** — al cierre de Fase 8 (2026-05-17) Mauricio acordó que la próxima sesión arranca con este tab. Detalles del scope se confirman con él al inicio de la sesión.
 
 ### Pendientes inmediatos (Mauricio, no Claude)
 
 - [ ] Revocar GitHub PAT viejo (`github_pat_11CCZMIL...`) en github.com/settings/tokens
-- [ ] Invitar los 14 usuarios prod restantes desde `/admin/usuarios`
 - [ ] Mover `~/Downloads/SECRETS_DASHBOARD_V3.txt` a Apple Notes
 
 ### Mejoras opcionales (sin prisa)
@@ -249,14 +269,20 @@ python3 scripts/gen_docs.py
 
 | Componente | Ubicación | Qué hace |
 |---|---|---|
-| `DashboardClient` | `app/dashboard/DashboardClient.tsx` | Orquesta sidebar + tabs + state global |
-| `Sidebar` | `components/dashboard/Sidebar.tsx` | Lista de territorios + collapsible |
+| `DashboardClient` | `app/dashboard/DashboardClient.tsx` | Orquesta sidebar + tabs + state global. Pasa `insightsTerritorios` + `contextLabel` a InsightsTab |
+| `Sidebar` | `components/dashboard/Sidebar.tsx` | Lista de territorios + collapsible + ⚙️ configurable "Todos" |
 | `KpiCardsRow` | `components/dashboard/KpiCardsRow.tsx` | Las 3 KPI cards top + 3 acumulado |
-| `TrackingDiarioTab` | `components/dashboard/TrackingDiarioTab.tsx` | Tab principal con toggle Pesos/KG |
-| `VentasTab` | `components/dashboard/VentasTab.tsx` | Chart anual + tabla |
-| `DimensionTab` | `components/dashboard/DimensionTab.tsx` | Tab genérico (Grupo Producto, Productos, Clientes) |
-| `VendedoresTab` | `components/dashboard/VendedoresTab.tsx` | Tab vendedores con toggle Sus/Suve |
+| `TrackingDiarioTab` | `components/dashboard/TrackingDiarioTab.tsx` | Tab principal con toggle Pesos/KG. Stats al-día + cierre |
+| `VentasTab` | `components/dashboard/VentasTab.tsx` | Chart anual + tabla. Toggle Pesos/Kilos (Fase 6) |
+| `DimensionTab` | `components/dashboard/DimensionTab.tsx` | Tab genérico (Grupo Producto, Productos, Clientes). Toggle Pesos/Kilos |
+| `VendedoresTab` | `components/dashboard/VendedoresTab.tsx` | Tab vendedores con toggle Sus/Suve + Pesos/Kilos |
 | `PerdidosTab` | `components/dashboard/PerdidosTab.tsx` | Clientes perdidos / declive / nuevos |
+| **`InsightsTab`** | `components/dashboard/InsightsTab.tsx` | (Fase 8) Contenedor del 8vo tab con sub-toggles. v1 solo Concentración |
+| **`ConcentracionAnalysis`** | `components/dashboard/insights/ConcentracionAnalysis.tsx` | (Fase 8) Análisis Pareto completo: date picker, toggles, treemap, radar, tabla expandible, excluir items |
+| **`ConcentracionGrid`** | `components/dashboard/insights/ConcentracionGrid.tsx` | (Fase 8) Treemap squarify manual. Algoritmo Bruls et al. 2000 |
+| **`ToggleCierreHoy`** | `components/layout/ToggleCierreHoy.tsx` | (Fase 6) Toggle en header global. Aparece solo si hay desfase |
+| **`ReportPdfButton`** | `components/dashboard/report-pdf/ReportPdfButton.tsx` | (Fase 6) Botón Generar PDF en los 7 tabs operativos |
+| **`SessionMonitor`** | `components/session/SessionMonitor.tsx` | (Fase 7) Hookea useIdleTimeout + useSessionPolling. Montado global |
 
 ---
 
@@ -307,4 +333,4 @@ python3 scripts/gen_docs.py
 
 ---
 
-**Última actualización de este doc:** 2026-05-01 (cierre de fase 3 — Run-Rate hábiles + selector de mes)
+**Última actualización de este doc:** 2026-05-17 (cierre de Fase 8 — Tab Insights · Análisis de Concentración). Versión doc: 2.0.

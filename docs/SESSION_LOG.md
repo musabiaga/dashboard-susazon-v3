@@ -10,11 +10,14 @@
 - **Cierre fase 3:** 2026-05-01 (Run-Rate hábiles + selector de mes histórico)
 - **Cierre fase 4:** 2026-05-09 (Mejoras 1-5: lazy clientes, día-vs-día, multi-select Productos/Clientes, KG en tablas)
 - **Cierre fase 5:** 2026-05-10 (Mejora 6: export Excel + Mejora 7: multi-select global + Branding InCom + Login rediseño)
-- **Versión actual:** 3.3.0 (en producción)
+- **Cierre fase 6:** 2026-05-13 (UX comercial avanzada: Toggle Cierre/Hoy + Pesos/Kilos en 6 tabs + Comparativos al-día + PDF Avance Comercial)
+- **Cierre fase 7:** 2026-05-15 (Seguridad de sesión: timeout configurable + logout remoto admin + smart polling)
+- **Cierre fase 8:** 2026-05-17 (Tab Insights · Análisis de Concentración: Treemap squarify + Radar + Pareto expandible + Excluir del universo)
+- **Versión actual:** 3.8.0 (en producción)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
 - **URL prod canonical:** `https://www.dashboardcomercialsusazon.com`
 - **URL prod fallback:** `https://dashboard-susazon-v3.vercel.app`
-- **Última actualización:** 2026-05-10
+- **Última actualización:** 2026-05-17
 
 ---
 
@@ -25,21 +28,27 @@
 | Carpeta / Archivo | Propósito |
 |---|---|
 | `app/` | App Router Next.js 16 (rutas, layouts, server components) |
-| `app/dashboard/` | Dashboard principal con 7 tabs |
-| `app/admin/` | Panel admin (territorios, usuarios, audit) |
+| `app/dashboard/` | Dashboard principal con **8 tabs** (Tracking, Ventas, Grupo Producto, Productos, Clientes, Vendedores, Perdidos, **Insights**) |
+| `app/admin/` | Panel admin (territorios, usuarios, audit, **configuración de sesión**) |
 | `app/cargar-datos/` | Refresh APIs + editor PTTO |
-| `app/api/` | API routes server-side (proxy seguro a Susazón/Suve) |
-| `components/dashboard/` | Componentes de los 7 tabs y charts |
+| `app/api/` | API routes server-side (18 endpoints; +7 nuevos para insights/concentracion, insights/item-detail, force-signout, etc.) |
+| `app/api/insights/` | Endpoints del tab Insights (`concentracion`, `item-detail`) |
+| `components/dashboard/` | Componentes de los 8 tabs y charts |
+| `components/dashboard/insights/` | Componentes del tab Insights (ConcentracionAnalysis, ConcentracionGrid, TreemapHoverTooltip, DateRangePicker) |
+| `components/dashboard/report-pdf/` | Generador PDF "Avance Comercial" con `@react-pdf/renderer` (3 páginas) |
+| `components/session/` | Modal "¿Sigues ahí?" + hooks de seguridad de sesión |
 | `components/theme/` | 6 themes + selector modal |
-| `components/layout/` | Header, layout shells |
+| `components/layout/` | Header, layout shells, MonthSelector, ToggleCierreHoy |
+| `hooks/useIdleTimeout.ts` | Hook client-only para detectar inactividad y firing del modal |
+| `hooks/useSessionPolling.ts` | Smart polling de 3 capas (middleware + visibilitychange + fallback) |
 | `lib/supabase/` | Clientes Supabase (browser, server, admin) |
 | `lib/susazon-api.ts` | Wrapper server-side de APIs Susazón/Suve |
 | `lib/format.ts` | Formatters (money, kilos, dates) — portado del V2.2 |
-| `lib/business-days.ts` | Cálculo de días hábiles L-S menos LFT — portado V2.2 |
+| `lib/business-days.ts` | Cálculo de días hábiles L-S menos LFT + helpers `findCalendarDayForBizDays`, `computePrevYearAlDia` |
 | `lib/admin-guards.ts` | Guards de rol admin para API routes |
-| `supabase/migrations/` | 10 migraciones SQL aplicadas |
-| `docs/` | Esta documentación |
-| `proxy.ts` | Middleware de Next.js 16 (renombrado de middleware.ts) |
+| `supabase/migrations/` | **20 migraciones SQL aplicadas** (+4 nuevas: 017_session_security, 018_force_signout_function, 019_insights_concentracion, 020_insights_concentracion_territorios) |
+| `docs/` | Esta documentación (+ `LO_NUEVO.md` con resumen ejecutivo) |
+| `proxy.ts` | Middleware de Next.js 16 (renombrado de middleware.ts) — ahora valida sesión en cada request |
 | `.env.local` | Secrets (NO commit) |
 | `AGENTS.md` | Auto-cargado al hacer cd al proyecto — instrucciones para Claude |
 
@@ -236,6 +245,142 @@ Implementación:
 
 **Estado:** Vigente. Commits `977ddc3` (thumbnails), `b457a53` (login redesign), `0f5572e` (logo limpio), `789bcc8` (logo Susazón), `48c0c4a` (logo 6× + fix themes oscuros).
 
+> **Nota de numeración:** En la migración de fase 4 a fase 5 se reutilizaron por error los IDs D013-D017 (existen entradas duplicadas arriba). A partir de D019 la numeración es secuencial y limpia. Las decisiones D018 (2026-05-01, MonthSelector) y D018 (2026-05-13, Toggle Cierre/Hoy) ambas existen — la primera es histórica y la segunda es la formalmente registrada como D019 para evitar colisiones.
+
+### D019 — 2026-05-13 | Fase 6 · Toggle "Cierre / Hoy" para desfase data-vs-calendario
+
+**Contexto:** Si Mauricio refrescaba el dashboard temprano (sin venta del día), el sistema mostraba "REZAGADO -3pp" engañoso porque comparaba venta acumulada (hasta ayer) contra meta lineal de hoy. El día N de calendario no siempre coincide con el día N de datos.
+
+**Decisión:** Toggle en el header global (junto al MonthSelector) que aparece **SOLO cuando hay desfase**. Permite alternar entre:
+- **Cierre [13-may]** (último día con venta real)
+- **Hoy [14-may]** (calendario)
+
+Implementación:
+- Detección automática server-side: `lastDayWithSale = max(d) WHERE venta>0`.
+- Si `lastDayWithSale === actualTodayDay` → toggle NO aparece (no hay desfase).
+- Click navega a `/dashboard?asOf=YYYY-MM-DD` — el server recalcula `daysCurrent` con ese día como referencia.
+- TODO el dashboard se recalcula automáticamente (KPIs, %, vel necesaria, semáforos, run-rate).
+
+**Razón:** Solución elegante a un bug operativo (mensajes alarmistas falsos por refresh temprano). Toggle visible solo cuando aporta valor.
+**Estado:** Vigente.
+
+### D020 — 2026-05-13 | Fase 6 · Toggle Pesos/Kilos extendido a 6 tabs
+
+**Contexto:** El toggle Pesos/Kilos solo existía en Tracking Diario (D014). Mauricio quería ver vista KG en los demás tabs operativos.
+
+**Decisión:** Replicar el toggle en 6 tabs: Ventas (12 meses), Productos, Grupo Producto, Clientes, Vendedores (+ Tracking ya existente). Comportamiento idéntico en todos:
+- Las **líneas de margen %** se mantienen FIJAS en el eje Y derecho cuando alternas Pesos/KG.
+- El insight es: *"¿cuándo vendí más kg, mi margen % subió o bajó?"*
+- **Persistencia independiente** por tab (localStorage keys distintas).
+
+**Razón:** UX consistente. El director piensa en pesos Y kilos según el contexto operativo; el toggle libera fricción.
+**Estado:** Vigente.
+
+### D021 — 2026-05-13 | Fase 6 · Comparativos "al-día año anterior" (no cierre completo)
+
+**Contexto:** Los KPIs "vs mismo mes año anterior" comparaban contra el **CIERRE COMPLETO** del mes anterior. Resultado: en el día 10 de Mayo 2026 ($22M) vs. Mayo 2025 completo ($60M) daba **-63% engañoso**. El comparativo no era apples-to-apples.
+
+**Decisión:** Helper `computePrevYearAlDia()` en `lib/business-days.ts` que calcula el valor del **mismo día hábil** del año anterior usando `findCalendarDayForBizDays()`. Aplicado en:
+- KPIs del Tracking Diario (Pesos y Kilos)
+- Tablas Por Territorio del PDF (Kilos y Margen)
+- Stat panel del Tracking Diario muestra ambos: "al-día" como principal y "cierre" en gris como referencia secundaria.
+
+**Razón:** Precisión 100% en comparativos. El "al-día" refleja desempeño real al mismo día N hábil; el "cierre" se conserva como referencia secundaria para no perder contexto.
+**Estado:** Vigente.
+
+### D022 — 2026-05-13 | Fase 6 · PDF "Avance Comercial" con @react-pdf/renderer
+
+**Contexto:** Mauricio necesitaba un reporte descargable para juntas operativas, sin tener que screenshotear el dashboard. Replica del PDF "AvComSS" semanal que se hace a mano en Excel.
+
+**Decisión:** Reporte completo de 3 páginas generado con `@react-pdf/renderer` (lazy import ~600KB):
+- **Página 1 — Tracking Diario completo:** 8 stats Pesos + 8 stats Kilos, progress bar vs PTTO con marca pace 2025, chart compuesto barras+líneas (acumulado, ptto lineal, año anterior) con eje Y numerado.
+- **Página 2 — Tablas comerciales:** Por División (Foodservice / Distribuidores / Retail), Por Empresa (Susazón / Suve), Pesos por Territorio (11 territorios + TOTAL, con comparativo al-día 2025), Kilos por Territorio (con cierre como referencia), Margen por Territorio.
+- **Página 3 — Detalle:** Top 10 Clientes con comparativo al-día año anterior + Var %, Tracking Diario detallado por día con semáforo de velocidad necesaria.
+
+3 modos según selección del sidebar: **single** (1 territorio) → reporte focalizado / **multi** (subset custom) → con tablas / **all** (todos) → réplica AvComSS clásico.
+
+Botón "Generar PDF" disponible en los 7 tabs operativos (mismo permiso que Excel). Lazy import del bundle pesado de `@react-pdf/renderer` para no inflar initial bundle.
+
+**Razón:** Reporte ejecutivo replicable + bundle delta mínimo gracias a lazy import.
+**Estado:** Vigente. Migraciones de SQL no requeridas (todo cliente-side).
+
+### D023 — 2026-05-15 | Fase 7 · Seguridad de sesión completa (3 mecanismos coordinados)
+
+**Contexto:** Supabase Auth default no expira sesiones por inactividad y no permite logout remoto. Para uso real con 15 personas externas a TI, esto es insuficiente — si alguien deja la sesión abierta en una PC compartida, queda accesible indefinidamente. Y un admin necesita poder forzar logout de un usuario comprometido.
+
+**Decisión:** 3 mecanismos coordinados que se complementan:
+
+#### a) Timeout de inactividad configurable
+- Admin elige en `/admin/configuracion`: Sin límite (default) / 35 / 45 / 60 / 90 / 120 minutos.
+- Listeners de mouse/keyboard/scroll/touch resetean el timer (100% cliente, 0 polling).
+- A los 60s antes de expirar → modal **"¿Sigues ahí?"** con countdown grande.
+- Admin marca exenciones por persona (`session_timeout_exempt` en `users_permissions`).
+- Al expirar redirige a `/login?reason=idle` con banner amarillo.
+
+#### b) Logout remoto desde admin
+- Panel `/admin/usuarios`: botón **"Excluir sesión"** por fila + botón **"Cerrar todas las sesiones"**.
+- "Cerrar todas" excluye al admin actual + usuarios marcados como exentos.
+- Implementación SQL: función `force_signout_user(uuid)` que borra de `auth.sessions` + `auth.refresh_tokens`. (El método `auth.admin.signOut()` del SDK Supabase requería JWT del usuario — no funcionaba con user_id.)
+- Usuario afectado redirige a `/login?reason=admin` con banner rojo.
+
+#### c) Smart Polling para detectar logout remoto (3 capas combinadas)
+1. **Middleware** valida en CADA request existente — 0 requests extra.
+2. **`visibilitychange` + `focus`** al regresar a la tab — ~10 req/día/usuario.
+3. **Polling fallback cada 30 min** — safety net para "usuario observando sin tocar".
+
+Total: **~5,600 req/mes para 15 usuarios** (vs. 21,000 con polling cada 60s = **−74%**).
+
+**Razón:** Seguridad de nivel enterprise sin pagar el costo de polling agresivo. 3 capas redundantes garantizan detección en <30 min en el peor caso y casi-instantánea al cambiar tab.
+**Estado:** Vigente. Migraciones `017_session_security` (config tables + columna `session_timeout_exempt`) y `018_force_signout_function`.
+
+### D024 — 2026-05-17 | Fase 8 · Tab Insights · Análisis de Concentración (Pareto)
+
+**Contexto:** Los 7 tabs operativos responden preguntas del día a día. Faltaba un espacio para análisis avanzados no operativos: *"¿qué tan dependientes somos del top X clientes / grupos / productos?"* — la pregunta clásica de concentración tipo Pareto.
+
+**Decisión:** Tab nuevo (8vo, icono 💡) dedicado a análisis avanzados. Primer sub-análisis: **Concentración**.
+
+Características:
+- **Date Range Picker** con atajos: Este mes, Mes anterior, 30d, 90d, YTD, 12m, custom.
+- **3 dimensiones**: Grupos / Clientes / Productos (toggle independiente).
+- **4 métricas**: Pesos, Kilos, Margen $, Margen % (toggle).
+- **2 visualizaciones**:
+  - **Treemap squarify** (algoritmo manual `ConcentracionGrid`, área proporcional al valor, bloques cuadrados ratio ≈ 1:1).
+  - **Radar** (gradient fill + dots adaptativos + truncado dinámico para 10-15 ejes).
+- **Top N selector**: 7 / 10 / 15 items + "Resto del universo".
+- **Multi-select** sin límite para análisis ad-hoc.
+- **Estado inicial bonito**: Top 7 + Resto = octágono perfecto.
+- **Tabla Pareto expandible**: cada fila se expande con click para mostrar facturas del cliente (o clientes que compraron del grupo/producto). Columnas: Venta, Kilos, Margen $, Margen %, % Universo, Acumulado, Δ pp.
+- **Excluir items del universo**: botón "Excluir" por fila — el 100% se recalcula sin ellos (útil para ignorar intercompañías, clientes atípicos).
+- **Tooltip flotante moderno** con accent bar + jerarquía visual.
+- **Filtra por territorios del sidebar**: respeta single / aggregated-custom / aggregated-all.
+- **RLS por territorio** activa (un vendedor con `allowed=['Cancún']` solo ve Cancún).
+
+Stack técnico:
+- `app/api/insights/concentracion` + `app/api/insights/item-detail`.
+- Función SQL `insights_concentracion(p_from, p_to, p_dim, p_territorios)` con SECURITY INVOKER (hereda RLS del caller).
+- Componentes: `InsightsTab`, `ConcentracionAnalysis`, `ConcentracionGrid` (squarify), `TreemapHoverTooltip`, `DateRangePicker`.
+
+**Architecture-ready para crecer:** el tab Insights es un contenedor con sub-toggles. Cuando se agreguen más sub-análisis (Estacionalidad, Cohortes, Crecimiento YoY, etc.) el sub-toggle pasa automáticamente de info-pill a segmented control.
+
+**Razón:** El dashboard operativo no es el lugar para análisis Pareto; ese tipo de pregunta es semanal/mensual y se beneficia de una visualización dedicada. Tab nuevo separa cleanly los dos casos de uso.
+**Estado:** Vigente. Migraciones `019_insights_concentracion` (función v1) y `020_insights_concentracion_territorios` (parámetro `p_territorios`).
+
+### D025 — 2026-05-17 | Fase 8 · Treemap manual con algoritmo Squarify (no Recharts)
+
+**Contexto:** Primer intento del Treemap usaba `<Treemap>` de Recharts. Resultado: bloques con ratios amorfos (rectángulos largos arriba, cuadrados abajo), no proporcionales al valor de forma consistente, outlines fantasma en text/badges por herencia del `stroke` del parent.
+
+**Decisión:** Reemplazar con implementación manual del algoritmo **Squarify** (Bruls, Huijsen, van Wijk, 2000) — el mismo que usa D3.
+
+Características:
+- Componente `ConcentracionGrid` (~500 líneas) con layout CSS Grid posicionado vía squarify.
+- Garantiza bloques con áreas proporcionales al valor PERO con aspect ratio cercano a 1:1 (cuadrados). NUNCA produce rectángulos amorfos delgados.
+- `TreemapHoverTooltip` flotante con accent bar + jerarquía visual + auto-flip (anti-clip en bordes del viewport).
+- Sin outlines fantasma (no hay herencia de `stroke` del parent Recharts).
+- ResizeObserver API para tiers adaptativos: tamaño de bloque ajusta padding/font-size automáticamente.
+
+**Razón:** Recharts Treemap no produce el resultado profesional que el caso de uso requiere. Implementar squarify manual es ~500 líneas pero resuelve definitivamente la proporcionalidad visual.
+**Estado:** Vigente. Documentación del algoritmo + papers de referencia en el comment header del componente.
+
 ---
 
 ## Bugs Resueltos
@@ -270,6 +415,14 @@ Implementación:
 | 26 | 2026-05-10 | `<>...</>` fragment sin key causaba warning en TrackingDiarioTab | React requiere key en cada item de map; el fragment no la tomaba. | Cambiar a `<Fragment key={row.d}>...</Fragment>` explícito. | `744af0c` |
 | 27 | 2026-05-10 | Tab Tracking Diario perdía 1 columna por row TOTAL al agregar expand button | Nueva columna del botón ChevronRight no fue agregada al row TOTAL. | Agregar `<Td>{" "}</Td>` empty como primera celda del TOTAL para alinear. | `744af0c` |
 | 21 | 2026-05-01 | No había forma de ver datos de meses pasados desde el dashboard | El dashboard estaba hardcodeado al mes actual CDMX en `app/dashboard/page.tsx`. Sin selector de mes/año en UI. | Componente `MonthSelector` con dropdown 24 meses + searchParams `year`/`month` en `/dashboard` + banner amarillo cuando `isHistorical`. | `a3a825f` |
+| 28 | 2026-05-13 | "REZAGADO -3pp" engañoso al refrescar dashboard en la mañana sin venta del día | Comparaba venta acumulada (hasta ayer) contra meta lineal de hoy. Día N calendario ≠ día N datos. | Toggle Cierre/Hoy en header global — aparece SOLO si `lastDayWithSale ≠ actualTodayDay`. Server recalcula `daysCurrent` con `?asOf=YYYY-MM-DD`. | (Fase 6) |
+| 29 | 2026-05-13 | KPIs YoY mostraban "-63%" en día 10 del mes (comparaba contra cierre completo del año anterior) | Helper `computePrevYear` agregaba TODO el mes anterior, no el "al-día equivalente". | Helper `computePrevYearAlDia()` con `findCalendarDayForBizDays()`. Stat muestra "al-día" + "cierre" (gris) como referencia. | (Fase 6) |
+| 30 | 2026-05-15 | `auth.admin.signOut(jwt, scope)` fallaba con "invalid JWT" al pasar user_id | El SDK Supabase requiere JWT del usuario afectado, no su user_id. Imposible obtener JWT del usuario desde admin panel. | Función SQL `force_signout_user(uuid)` con SECURITY DEFINER que DELETE desde `auth.sessions` + `auth.refresh_tokens`. | (migración 018) |
+| 31 | 2026-05-17 | Treemap de Insights: outlines fantasma en text/badges | `stroke="var(--bg-page)"` pasado a `<Treemap>` parent se aplicaba recursivamente a TODOS los `<text>` y `<rect>` children. | Eliminado stroke del parent + `stroke="none"` explícito en cada `<text>`. (Después reemplazado por implementación manual squarify.) | (Fase 8) |
+| 32 | 2026-05-17 | Top N "se congela" después de remover item con X | El botón X activaba `isCustom=true` y freezeaba el Top N. Confusión con el botón Ban (Excluir). | Eliminado botón X (siempre con confusión UX). Único botón es "Excluir" que recalcula universo manteniendo Top N funcional. | (Fase 8) |
+| 33 | 2026-05-17 | Recharts Treemap producía rectángulos amorfos no proporcionales al valor | Algoritmo interno de Recharts no era squarify puro; bloques con ratios incoherentes (largos arriba, cuadrados abajo). | Reemplazo completo: componente manual `ConcentracionGrid` con algoritmo Squarify (Bruls et al. 2000). Aspect ratio ≈ 1:1 garantizado. | (Fase 8, D025) |
+| 34 | 2026-05-17 | Bug crítico en métrica Margen %: stat mostraba "355.9%" | `pct = (item.margen_pct / universe.margen_pct) * 100` no aplica a métricas no aditivas (margen % no se "suma"). | Flag `isAdditive` por métrica. Para margen_pct: muestra valor raw del item, no "% del universo". % universo y acumulado solo aplican a métricas aditivas. | (Fase 8) |
+| 35 | 2026-05-17 | Vendedor con `allowed=['Cancún']` veía data de todos los territorios en Insights | Función SQL `insights_concentracion` v1 no respetaba RLS de `sales_rows` porque tenía SECURITY DEFINER. | Migración 020: SECURITY INVOKER + parámetro `p_territorios text[]` opcional. Hereda RLS del caller. Endpoint backend pasa territorios efectivos del sidebar. | (migración 020) |
 
 ---
 
@@ -320,6 +473,45 @@ Implementación:
 - [x] **Fix Liquid Glass**: `.frost-popover` con background opaco + blur 40px para dropdowns en theme oscuro.
 - [x] **`SusazonLogo` extendido** con prop `surface="header"|"page"` para auto-detectar variante correcta según contexto.
 - [x] **Apple Notes** template completo de credenciales generado (Supabase + Susazón API + Vercel + GitHub + 14 usuarios + recovery codes).
+
+### Completados en fase 6 (2026-05-11 a 2026-05-13) · UX comercial avanzada
+
+- [x] **Toggle Cierre/Hoy** en header global (D019) — aparece solo si hay desfase data vs calendario.
+- [x] **Toggle Pesos/Kilos** extendido a 6 tabs (D020): Ventas, Productos, Grupo Producto, Clientes, Vendedores. Líneas de margen % se mantienen fijas en eje Y derecho al alternar.
+- [x] **Comparativos al-día año anterior** (D021): helper `computePrevYearAlDia()` aplicado en KPIs Tracking + tablas PDF. Comparativo principal apples-to-apples; cierre como referencia secundaria.
+- [x] **PDF "Avance Comercial"** (D022): 3 páginas, lazy import @react-pdf/renderer ~600KB. 3 modos (single/multi/all) según sidebar.
+- [x] **Botón "Generar PDF"** en los 7 tabs operativos.
+
+### Completados en fase 7 (2026-05-14 a 2026-05-15) · Seguridad de sesión
+
+- [x] **Timeout de inactividad configurable** (D023a): Sin límite / 35 / 45 / 60 / 90 / 120 min. Listeners de eventos resetean timer. Modal "¿Sigues ahí?" con countdown.
+- [x] **Sistema de exenciones** por usuario (`session_timeout_exempt` en `users_permissions`).
+- [x] **Logout remoto desde admin** (D023b): botones "Excluir sesión" + "Cerrar todas las sesiones". Función SQL `force_signout_user(uuid)` con DELETE desde `auth.sessions` + `auth.refresh_tokens`.
+- [x] **Smart polling de 3 capas** (D023c): middleware + visibilitychange/focus + fallback 30 min. −74% requests vs polling 60s naive.
+- [x] **Banners de razón en `/login`**: `?reason=idle` (amarillo) / `?reason=admin` (rojo).
+- [x] **Migraciones 017_session_security + 018_force_signout_function**.
+
+### Completados en fase 8 (2026-05-16 a 2026-05-17) · Tab Insights
+
+- [x] **Tab Insights · Concentración** (D024): 8vo tab, icono 💡, contenedor con sub-toggles para futuros análisis.
+- [x] **3 dimensiones × 4 métricas** (Grupos/Clientes/Productos × Pesos/Kilos/Margen$/Margen%).
+- [x] **Date Range Picker** con 7 atajos rápidos.
+- [x] **Treemap squarify manual** (D025): algoritmo Bruls et al. 2000, aspect ratio ≈ 1:1 garantizado, sin rectángulos amorfos.
+- [x] **Radar adaptativo**: gradient fill, dots r=2.5/activeDot=4, truncado dinámico de etiquetas.
+- [x] **Top N selector** (7/10/15) + "Resto del universo" octágono.
+- [x] **Multi-select sin límite** + estado inicial bonito (Top 7 + Resto).
+- [x] **Tabla Pareto expandible**: cada fila se expande con click; columnas Venta/Kilos/Margen $/Margen %/% Universo/Acumulado/Δ pp.
+- [x] **Excluir items del universo**: botón "Excluir" por fila recalcula 100% sin ellos.
+- [x] **Tooltip flotante moderno** `TreemapHoverTooltip` con accent bar + auto-flip.
+- [x] **Filtra por territorios del sidebar**: respeta single / aggregated-custom / aggregated-all.
+- [x] **RLS por territorio** activa (SECURITY INVOKER + parámetro `p_territorios`).
+- [x] **Migraciones 019_insights_concentracion + 020_insights_concentracion_territorios**.
+- [x] **Bug crítico Margen % "355.9%"** fixeado con flag `isAdditive` por métrica.
+- [x] **`LO_NUEVO.md`** generado con resumen ejecutivo de Fases 6-8.
+
+### Próximo a venir (acordado con Mauricio · post Fase 8)
+
+- [ ] **Tab "Reporteo Semanal"** — siguiente tab a construir tras esta documentación. (Quedó acordado al cierre de Fase 8 que la próxima sesión arranca con este tab.)
 
 ### Mejoras opcionales (sin prisa)
 
