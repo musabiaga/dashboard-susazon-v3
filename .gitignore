@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude session JSONL backups (large + may contain sensitive context)
+# Mantienen la carpeta /sessions/ con .gitkeep, pero excluyen los .jsonl
+/sessions/*.jsonl
