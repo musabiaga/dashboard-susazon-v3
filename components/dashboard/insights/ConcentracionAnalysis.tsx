@@ -46,6 +46,8 @@ import {
   Radar as RadarIcon,
   X,
   ChevronRight,
+  Ban,
+  RotateCcw,
 } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 import {
@@ -78,6 +80,10 @@ const STORAGE_KEY_DIMENSION = "insights-concentracion-dimension";
 const STORAGE_KEY_METRIC = "insights-concentracion-metric";
 const STORAGE_KEY_CHART = "insights-concentracion-chart";
 const STORAGE_KEY_TOPN = "insights-concentracion-topn";
+const STORAGE_KEY_EXCLUDED = "insights-concentracion-excluded";
+
+type ExcludedMap = Record<Dimension, string[]>;
+const EMPTY_EXCLUDED: ExcludedMap = { clientes: [], grupos: [], productos: [] };
 
 interface ApiItem {
   name: string;
@@ -147,6 +153,10 @@ export function ConcentracionAnalysis({ today }: Props) {
   const [topN, setTopN] = useState<TopN>(DEFAULT_TOP_N);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isCustom, setIsCustom] = useState(false);
+  // Items EXCLUIDOS del cálculo del universo (no cuentan como 100%).
+  // Por dimensión, para que cuando cambies de Clientes → Grupos, las
+  // exclusiones de cada dimensión sean independientes.
+  const [excluded, setExcluded] = useState<ExcludedMap>(EMPTY_EXCLUDED);
 
   // Cargar preferencias persistidas
   useEffect(() => {
@@ -169,10 +179,34 @@ export function ConcentracionAnalysis({ today }: Props) {
       const tn = window.localStorage.getItem(STORAGE_KEY_TOPN);
       const parsed = tn ? Number(tn) : NaN;
       if (parsed === 7 || parsed === 10 || parsed === 15) setTopN(parsed);
+      // Excluded items por dimensión
+      const exc = window.localStorage.getItem(STORAGE_KEY_EXCLUDED);
+      if (exc) {
+        const parsedExc = JSON.parse(exc) as Partial<ExcludedMap>;
+        setExcluded({
+          clientes: Array.isArray(parsedExc.clientes) ? parsedExc.clientes : [],
+          grupos: Array.isArray(parsedExc.grupos) ? parsedExc.grupos : [],
+          productos: Array.isArray(parsedExc.productos)
+            ? parsedExc.productos
+            : [],
+        });
+      }
     } catch {
       // ignore
     }
   }, []);
+
+  // Persistir excluded a localStorage cada vez que cambia
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY_EXCLUDED,
+        JSON.stringify(excluded)
+      );
+    } catch {
+      // ignore
+    }
+  }, [excluded]);
 
   const persistDimension = (d: Dimension) => {
     setDimension(d);
@@ -244,6 +278,76 @@ export function ConcentracionAnalysis({ today }: Props) {
     };
   }, [range.from, range.to, dimension]);
 
+  // ============== Items EXCLUIDOS del universo ==============
+  // Set de los excluidos para la dimensión actual. Estos items NO se
+  // cuentan en el universo (el 100% se recalcula sin ellos).
+  const excludedSet = useMemo(
+    () => new Set(excluded[dimension] ?? []),
+    [excluded, dimension]
+  );
+
+  // Lista de items efectivos (data.items SIN los excluidos)
+  const effectiveItems = useMemo(() => {
+    if (!data) return [];
+    if (excludedSet.size === 0) return data.items;
+    return data.items.filter((i) => !excludedSet.has(i.name));
+  }, [data, excludedSet]);
+
+  // Universo efectivo (recalculado quitando los excluidos)
+  const effectiveUniverse = useMemo(() => {
+    if (!data)
+      return { venta: 0, kg: 0, margen: 0, margen_pct: 0 };
+    if (excludedSet.size === 0) return data.universe;
+    let v = 0,
+      k = 0,
+      m = 0;
+    for (const i of effectiveItems) {
+      v += i.venta;
+      k += i.kg;
+      m += i.margen;
+    }
+    return {
+      venta: v,
+      kg: k,
+      margen: m,
+      margen_pct: v > 0 ? (m / v) * 100 : 0,
+    };
+  }, [data, effectiveItems, excludedSet]);
+
+  const effectiveTotalItems = data
+    ? data.total_items - excludedSet.size
+    : 0;
+
+  // Lookup de items excluidos con su data original (para mostrar en la
+  // sección "excluidos" con sus valores)
+  const excludedItemsData = useMemo(() => {
+    if (!data || excludedSet.size === 0) return [];
+    return data.items.filter((i) => excludedSet.has(i.name));
+  }, [data, excludedSet]);
+
+  // Handlers de exclusión
+  const excludeFromUniverse = (name: string) => {
+    setExcluded((prev) => {
+      const dimList = prev[dimension] ?? [];
+      if (dimList.includes(name)) return prev;
+      return { ...prev, [dimension]: [...dimList, name] };
+    });
+    // Si estaba en la selección custom, quitarlo
+    if (selectedItems.includes(name)) {
+      setSelectedItems((prev) => prev.filter((n) => n !== name));
+      if (selectedItems.length === 1) setIsCustom(false);
+    }
+  };
+  const reincludeToUniverse = (name: string) => {
+    setExcluded((prev) => ({
+      ...prev,
+      [dimension]: (prev[dimension] ?? []).filter((n) => n !== name),
+    }));
+  };
+  const clearAllExclusions = () => {
+    setExcluded((prev) => ({ ...prev, [dimension]: [] }));
+  };
+
   // ============== valueOf: extrae el valor de la métrica activa ==============
   const valueOf = (item: ApiItem): number => {
     switch (metric) {
@@ -258,14 +362,15 @@ export function ConcentracionAnalysis({ today }: Props) {
     }
   };
 
-  // El "universo total" según métrica seleccionada
+  // El "universo total" según métrica seleccionada (usa el efectivo,
+  // que ya quita los items excluidos del cálculo).
   const universeValue = useMemo(() => {
     if (!data) return 0;
-    if (metric === "venta") return data.universe.venta;
-    if (metric === "kg") return data.universe.kg;
-    if (metric === "margen") return data.universe.margen;
-    return data.universe.margen_pct;
-  }, [data, metric]);
+    if (metric === "venta") return effectiveUniverse.venta;
+    if (metric === "kg") return effectiveUniverse.kg;
+    if (metric === "margen") return effectiveUniverse.margen;
+    return effectiveUniverse.margen_pct;
+  }, [data, metric, effectiveUniverse]);
 
   // ============== shareOf: % del universo SOLO si la métrica es aditiva ==============
   // Para margen_pct NO aplica (sumarías porcentajes).
@@ -275,11 +380,10 @@ export function ConcentracionAnalysis({ today }: Props) {
     return universeValue > 0 ? (valueOf(item) / universeValue) * 100 : 0;
   };
 
-  // Items ordenados por la métrica activa (descendente)
+  // Items ordenados por la métrica activa (descendente). Ya sin excluidos.
   const sortedItems = useMemo(() => {
-    if (!data) return [];
-    return [...data.items].sort((a, b) => valueOf(b) - valueOf(a));
-  }, [data, metric]); // eslint-disable-line react-hooks/exhaustive-deps
+    return [...effectiveItems].sort((a, b) => valueOf(b) - valueOf(a));
+  }, [effectiveItems, metric]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const availableItems = useMemo(() => sortedItems.map((i) => i.name), [sortedItems]);
 
@@ -419,7 +523,9 @@ export function ConcentracionAnalysis({ today }: Props) {
       return {
         universeLabel: "Universo total",
         universeValue: formatMetricValue(universeValue),
-        universeSub: `${data.total_items} ${DIMENSION_LABEL[dimension].pl.toLowerCase()}`,
+        universeSub: `${effectiveTotalItems} ${DIMENSION_LABEL[dimension].pl.toLowerCase()}${
+          excludedSet.size > 0 ? ` · ${excludedSet.size} excluido${excludedSet.size === 1 ? "" : "s"}` : ""
+        }`,
         itemsLabel: "Items en análisis",
         itemsValue: String(visibleItems.length),
         itemsSub: METRIC_LABEL[metric],
@@ -445,8 +551,10 @@ export function ConcentracionAnalysis({ today }: Props) {
         : null;
     return {
       universeLabel: "Margen % universo",
-      universeValue: `${data.universe.margen_pct.toFixed(1)}%`,
-      universeSub: `${data.total_items} ${DIMENSION_LABEL[dimension].pl.toLowerCase()} · prom. ponderado`,
+      universeValue: `${effectiveUniverse.margen_pct.toFixed(1)}%`,
+      universeSub: `${effectiveTotalItems} ${DIMENSION_LABEL[dimension].pl.toLowerCase()} · prom. ponderado${
+        excludedSet.size > 0 ? ` · ${excludedSet.size} excl.` : ""
+      }`,
       itemsLabel: "Items en análisis",
       itemsValue: String(visibleItems.length),
       itemsSub: METRIC_LABEL[metric],
@@ -457,7 +565,7 @@ export function ConcentracionAnalysis({ today }: Props) {
       topValue: mejor ? `${mejor.margen_pct.toFixed(1)}%` : "—",
       topSub: mejor?.name ?? "—",
     };
-  }, [data, visibleItems, metric, isAdditive, universeValue, visibleSum, dimension]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, visibleItems, metric, isAdditive, universeValue, visibleSum, dimension, effectiveUniverse, effectiveTotalItems, excludedSet]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============== Tabla Pareto data ==============
   const tableRows = useMemo(() => {
@@ -466,7 +574,7 @@ export function ConcentracionAnalysis({ today }: Props) {
       const valActiva = valueOf(i);
       const pct = shareOf(i);
       if (isAdditive) acum += pct;
-      const deltaPp = i.margen_pct - (data?.universe.margen_pct ?? 0);
+      const deltaPp = i.margen_pct - effectiveUniverse.margen_pct;
       return {
         rank: idx + 1,
         name: i.name,
@@ -480,7 +588,7 @@ export function ConcentracionAnalysis({ today }: Props) {
         deltaPp,
       };
     });
-  }, [visibleItems, metric, isAdditive, data]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visibleItems, metric, isAdditive, data, effectiveUniverse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============== Estado de filas expandidas ==============
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -641,6 +749,41 @@ export function ConcentracionAnalysis({ today }: Props) {
         <StatCell label={stats.topLabel} value={stats.topValue} sub={stats.topSub} subTruncate />
       </div>
 
+      {/* ============ Banner de exclusión activa ============ */}
+      {excludedSet.size > 0 && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] border px-3 py-2 text-xs"
+          style={{
+            background: "var(--warning-soft)",
+            borderColor: "var(--warning)",
+            color: "var(--text-primary)",
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <Ban size={14} style={{ color: "var(--warning)" }} />
+            <span>
+              <strong>{excludedSet.size}</strong>{" "}
+              {DIMENSION_LABEL[dimension].pl.toLowerCase()} excluido
+              {excludedSet.size === 1 ? "" : "s"} del universo · El 100% se
+              recalculó sin ellos
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={clearAllExclusions}
+            className="flex items-center gap-1 rounded-[var(--radius-sm)] border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-[var(--bg-surface)]"
+            style={{
+              borderColor: "var(--warning)",
+              color: "var(--warning)",
+              background: "transparent",
+            }}
+          >
+            <RotateCcw size={11} />
+            Re-incluir todos
+          </button>
+        </div>
+      )}
+
       {/* ============ Errores / Loading ============ */}
       {error && (
         <div
@@ -695,8 +838,10 @@ export function ConcentracionAnalysis({ today }: Props) {
               data={treemapData}
               dataKey="size"
               aspectRatio={4 / 3}
-              stroke="var(--bg-page)"
-              fill="var(--accent)"
+              // IMPORTANTE: NO pasamos stroke/fill aquí — Recharts los aplica
+              // recursivamente a todos los <text> y <rect> hijos del custom
+              // content, creando outlines fantasma feos. Manejamos el stroke
+              // únicamente en cada <rect> del TreemapBlock.
               isAnimationActive={false}
               content={
                 <TreemapBlock
@@ -782,14 +927,14 @@ export function ConcentracionAnalysis({ today }: Props) {
                     fillOpacity={1}
                     strokeWidth={2.5}
                     dot={{
-                      r: 4,
-                      strokeWidth: 2,
+                      r: 2.5,
+                      strokeWidth: 1.5,
                       stroke: "var(--accent)",
                       fill: "var(--bg-surface)",
                     }}
                     activeDot={{
-                      r: 6,
-                      strokeWidth: 2,
+                      r: 4,
+                      strokeWidth: 1.5,
                       stroke: "var(--accent)",
                       fill: "var(--accent)",
                     }}
@@ -872,7 +1017,7 @@ export function ConcentracionAnalysis({ today }: Props) {
                   ) : (
                     <Th align="right">Δ pp vs universo</Th>
                   )}
-                  <Th align="center"></Th>
+                  <Th align="center">Acciones</Th>
                 </tr>
               </thead>
               <tbody>
@@ -941,18 +1086,32 @@ export function ConcentracionAnalysis({ today }: Props) {
                           </Td>
                         )}
                         <Td align="center">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeItem(r.name);
-                            }}
-                            title="Quitar del análisis"
-                            className="rounded-full p-1 transition-colors hover:bg-[var(--bg-surface-muted)]"
-                            style={{ color: "var(--text-muted)" }}
-                          >
-                            <X size={11} />
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeItem(r.name);
+                              }}
+                              title="Quitar del análisis (sigue en el universo)"
+                              className="rounded-full p-1 transition-colors hover:bg-[var(--bg-surface-muted)]"
+                              style={{ color: "var(--text-muted)" }}
+                            >
+                              <X size={11} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                excludeFromUniverse(r.name);
+                              }}
+                              title="Excluir del universo (no contar como 100%)"
+                              className="rounded-full p-1 transition-colors hover:bg-[var(--danger-soft)]"
+                              style={{ color: "var(--text-muted)" }}
+                            >
+                              <Ban size={11} />
+                            </button>
+                          </div>
                         </Td>
                       </tr>
                       {/* Sub-tabla de detalle (facturas o clientes según dimensión) */}
@@ -1007,7 +1166,7 @@ export function ConcentracionAnalysis({ today }: Props) {
                         }}
                       >
                         Resto del universo (
-                        {(data?.total_items ?? 0) - visibleItems.length}{" "}
+                        {effectiveTotalItems - visibleItems.length}{" "}
                         {DIMENSION_LABEL[dimension].pl.toLowerCase()})
                       </span>
                     </Td>
@@ -1015,7 +1174,7 @@ export function ConcentracionAnalysis({ today }: Props) {
                       {metric === "venta"
                         ? formatMoney(restoValue)
                         : formatMoney(
-                            (data?.universe.venta ?? 0) -
+                            effectiveUniverse.venta -
                               visibleItems.reduce((s, i) => s + i.venta, 0)
                           )}
                     </Td>
@@ -1023,7 +1182,7 @@ export function ConcentracionAnalysis({ today }: Props) {
                       {metric === "kg"
                         ? formatKilos(restoValue)
                         : formatKilos(
-                            (data?.universe.kg ?? 0) -
+                            effectiveUniverse.kg -
                               visibleItems.reduce((s, i) => s + i.kg, 0)
                           )}
                     </Td>
@@ -1031,7 +1190,7 @@ export function ConcentracionAnalysis({ today }: Props) {
                       {metric === "margen"
                         ? formatMoney(restoValue)
                         : formatMoney(
-                            (data?.universe.margen ?? 0) -
+                            effectiveUniverse.margen -
                               visibleItems.reduce((s, i) => s + i.margen, 0)
                           )}
                     </Td>
@@ -1056,18 +1215,29 @@ export function ConcentracionAnalysis({ today }: Props) {
                 >
                   <Td></Td>
                   <Td></Td>
-                  <Td bold>TOTAL universo</Td>
-                  <Td align="right" bold>
-                    {formatMoney(data?.universe.venta ?? 0)}
+                  <Td bold>
+                    TOTAL universo
+                    {excludedSet.size > 0 && (
+                      <span
+                        className="ml-2 text-[10px] font-normal"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        (sin {excludedSet.size} excluido
+                        {excludedSet.size === 1 ? "" : "s"})
+                      </span>
+                    )}
                   </Td>
                   <Td align="right" bold>
-                    {formatKilos(data?.universe.kg ?? 0)}
+                    {formatMoney(effectiveUniverse.venta)}
                   </Td>
                   <Td align="right" bold>
-                    {formatMoney(data?.universe.margen ?? 0)}
+                    {formatKilos(effectiveUniverse.kg)}
                   </Td>
                   <Td align="right" bold>
-                    {(data?.universe.margen_pct ?? 0).toFixed(1)}%
+                    {formatMoney(effectiveUniverse.margen)}
+                  </Td>
+                  <Td align="right" bold>
+                    {effectiveUniverse.margen_pct.toFixed(1)}%
                   </Td>
                   {isAdditive ? (
                     <>
@@ -1083,6 +1253,115 @@ export function ConcentracionAnalysis({ today }: Props) {
                   )}
                   <Td></Td>
                 </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ============ Sección de items EXCLUIDOS del universo ============ */}
+      {excludedItemsData.length > 0 && (
+        <div
+          className="rounded-[var(--radius-lg)] border"
+          style={{
+            background: "var(--bg-surface)",
+            borderColor: "var(--warning)",
+          }}
+        >
+          <div
+            className="flex items-center justify-between gap-2 border-b px-3 py-2"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--warning-soft)",
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <Ban size={14} style={{ color: "var(--warning)" }} />
+              <span
+                className="text-[11px] font-semibold uppercase tracking-wider"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Excluidos del universo · {excludedItemsData.length}{" "}
+                {DIMENSION_LABEL[dimension].pl.toLowerCase()}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={clearAllExclusions}
+              className="flex items-center gap-1 rounded-[var(--radius-sm)] border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-[var(--bg-surface)]"
+              style={{
+                borderColor: "var(--warning)",
+                color: "var(--warning)",
+                background: "transparent",
+              }}
+            >
+              <RotateCcw size={11} />
+              Re-incluir todos
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm tabular-nums">
+              <thead>
+                <tr style={{ background: "var(--bg-surface-muted)" }}>
+                  <Th>{DIMENSION_LABEL[dimension].sg}</Th>
+                  <Th align="right">Venta</Th>
+                  <Th align="right">Kilos</Th>
+                  <Th align="right">Margen $</Th>
+                  <Th align="right">Margen %</Th>
+                  <Th align="center">Acción</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {excludedItemsData.map((i, idx) => (
+                  <tr
+                    key={i.name}
+                    style={{
+                      background:
+                        idx % 2 === 0
+                          ? "var(--bg-surface)"
+                          : "var(--bg-surface-muted)",
+                      opacity: 0.7,
+                    }}
+                  >
+                    <Td>
+                      <span
+                        style={{
+                          textDecoration: "line-through",
+                          textDecorationColor: "var(--text-muted)",
+                        }}
+                      >
+                        {i.name}
+                      </span>
+                    </Td>
+                    <Td align="right" subtle>
+                      {formatMoney(i.venta)}
+                    </Td>
+                    <Td align="right" subtle>
+                      {formatKilos(i.kg)}
+                    </Td>
+                    <Td align="right" subtle>
+                      {formatMoney(i.margen)}
+                    </Td>
+                    <Td align="right" subtle>
+                      {i.margen_pct.toFixed(1)}%
+                    </Td>
+                    <Td align="center">
+                      <button
+                        type="button"
+                        onClick={() => reincludeToUniverse(i.name)}
+                        title="Re-incluir en el universo"
+                        className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border px-2 py-0.5 text-[10px] font-medium transition-colors hover:bg-[var(--bg-surface-muted)]"
+                        style={{
+                          borderColor: "var(--border)",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        <RotateCcw size={10} />
+                        Re-incluir
+                      </button>
+                    </Td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -1489,6 +1768,7 @@ function TreemapBlock(props: TreemapPayload) {
           x={innerLeft}
           y={innerTop + titleFontSize}
           textAnchor="start"
+          stroke="none"
           style={{
             fontSize: titleFontSize,
             fontWeight: 700,
@@ -1507,6 +1787,7 @@ function TreemapBlock(props: TreemapPayload) {
           x={innerLeft}
           y={innerTop + titleFontSize + valueFontSize + 8}
           textAnchor="start"
+          stroke="none"
           style={{
             fontSize: valueFontSize,
             fontWeight: 500,
@@ -1530,7 +1811,7 @@ function TreemapBlock(props: TreemapPayload) {
             ry={badgeH / 2}
             style={{
               fill: badgeBg,
-              stroke: badgeBorder,
+              stroke: isResto ? badgeBorder : "none",
               strokeWidth: isResto ? 1 : 0,
               pointerEvents: "none",
             }}
@@ -1540,6 +1821,7 @@ function TreemapBlock(props: TreemapPayload) {
             y={badgeY + badgeH / 2}
             textAnchor="middle"
             dominantBaseline="central"
+            stroke="none"
             style={{
               fontSize: badgeFontSize,
               fontWeight: 700,
