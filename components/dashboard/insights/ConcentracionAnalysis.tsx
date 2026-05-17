@@ -1711,6 +1711,21 @@ interface ConcentracionGridProps {
   valueOf: (item: ApiItem) => number;
 }
 
+// Estado del tooltip flotante del treemap
+interface HoverState {
+  rank: number | null;
+  name: string;
+  value: number;
+  pct: number;
+  isResto: boolean;
+  // Posición del cursor RELATIVA al container del treemap (en px)
+  cursorX: number;
+  cursorY: number;
+  // Tamaño del container para clamp dentro de límites
+  containerW: number;
+  containerH: number;
+}
+
 function ConcentracionGrid({
   items,
   restoValue,
@@ -1723,6 +1738,33 @@ function ConcentracionGrid({
   valueOf,
 }: ConcentracionGridProps) {
   const isAdditive = metric !== "margen_pct";
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [hover, setHover] = useState<HoverState | null>(null);
+
+  // Move handler común: actualiza cursor + dimensiones del container
+  const handleTileMove = (
+    e: React.MouseEvent<HTMLDivElement>,
+    tile: {
+      rank: number | null;
+      name: string;
+      value: number;
+      pct: number;
+      isResto: boolean;
+    }
+  ) => {
+    const cont = containerRef.current;
+    if (!cont) return;
+    const rect = cont.getBoundingClientRect();
+    setHover({
+      ...tile,
+      cursorX: e.clientX - rect.left,
+      cursorY: e.clientY - rect.top,
+      containerW: rect.width,
+      containerH: rect.height,
+    });
+  };
+
+  const handleTileLeave = () => setHover(null);
 
   // Build tiles: items + Resto del universo como un tile más (si aplica)
   const tiles: TileInput[] = useMemo(() => {
@@ -1763,11 +1805,13 @@ function ConcentracionGrid({
 
   return (
     <div
+      ref={containerRef}
       className="relative w-full overflow-hidden rounded-[var(--radius-lg)]"
       style={{
         aspectRatio: `${ASPECT_W} / ${ASPECT_H}`,
         background: "var(--bg-page)",
       }}
+      onMouseLeave={handleTileLeave}
     >
       {layout.map((tile, idx) => {
         const isResto = "isResto" in tile.data;
@@ -1795,23 +1839,174 @@ function ConcentracionGrid({
             pct={pct}
             intensity={intensity}
             formatValue={formatValue}
-            isAdditive={isAdditive}
             style={{
               left: `${leftPct}%`,
               top: `${topPct}%`,
               width: `${widthPct}%`,
               height: `${heightPct}%`,
             }}
+            onMove={(e) =>
+              handleTileMove(e, { rank, name, value, pct, isResto })
+            }
           />
         );
       })}
+
+      {/* Tooltip flotante — se renderiza en hover, posicionado cerca
+          del cursor (con auto-flip al lado opuesto si está cerca del
+          borde para no recortarse). */}
+      {hover && (
+        <TreemapHoverTooltip
+          hover={hover}
+          metricLabel={METRIC_LABEL[metric]}
+          isAdditive={isAdditive}
+          formatValue={formatValue}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Tooltip flotante del treemap. Se posiciona absolute dentro del container
+ *  del grid, con auto-flip si está cerca de los bordes para no recortarse. */
+function TreemapHoverTooltip({
+  hover,
+  metricLabel,
+  isAdditive,
+  formatValue,
+}: {
+  hover: HoverState;
+  metricLabel: string;
+  isAdditive: boolean;
+  formatValue: (n: number) => string;
+}) {
+  const tipRef = useRef<HTMLDivElement | null>(null);
+  // Tamaño estimado del tooltip (se ajusta si ya midió)
+  const [size, setSize] = useState({ w: 260, h: 130 });
+
+  useEffect(() => {
+    const el = tipRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) {
+      setSize({ w: r.width, h: r.height });
+    }
+  }, [hover.name]);
+
+  const OFFSET = 14;
+  // Posición inicial: a la derecha-abajo del cursor
+  let left = hover.cursorX + OFFSET;
+  let top = hover.cursorY + OFFSET;
+  // Flip horizontal si se sale por la derecha
+  if (left + size.w > hover.containerW - 4) {
+    left = hover.cursorX - size.w - OFFSET;
+  }
+  // Flip vertical si se sale por abajo
+  if (top + size.h > hover.containerH - 4) {
+    top = hover.cursorY - size.h - OFFSET;
+  }
+  // Clamp dentro del container (defensivo)
+  left = Math.max(4, Math.min(hover.containerW - size.w - 4, left));
+  top = Math.max(4, Math.min(hover.containerH - size.h - 4, top));
+
+  return (
+    <div
+      ref={tipRef}
+      className="pointer-events-none absolute z-20 overflow-hidden rounded-[var(--radius-lg)] border text-xs tabular-nums"
+      style={{
+        left: `${left}px`,
+        top: `${top}px`,
+        background: "var(--bg-surface)",
+        borderColor: "var(--border-strong)",
+        boxShadow:
+          "0 14px 50px rgba(0,0,0,0.28), 0 4px 12px rgba(0,0,0,0.12)",
+        minWidth: 220,
+        maxWidth: 320,
+      }}
+    >
+      <div className="flex">
+        {/* Accent bar */}
+        <div
+          style={{
+            width: 3,
+            background: hover.isResto ? "var(--text-muted)" : "var(--accent)",
+          }}
+        />
+        <div className="flex-1 p-3">
+          {/* Header: rank + nombre */}
+          <div className="mb-2 flex items-baseline gap-1.5">
+            {hover.rank !== null && (
+              <span
+                className="text-[9px] font-bold tabular-nums"
+                style={{ color: "var(--text-muted)" }}
+              >
+                #{hover.rank}
+              </span>
+            )}
+            <span
+              className="truncate text-[11px] font-bold uppercase tracking-wider"
+              style={{
+                color: "var(--text-primary)",
+                wordBreak: "break-word",
+              }}
+              title={hover.name}
+            >
+              {hover.name}
+            </span>
+          </div>
+
+          {/* Valor grande */}
+          <div className="mb-2">
+            <div
+              className="text-[9px] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {hover.isResto ? "Restante del universo" : metricLabel}
+            </div>
+            <div
+              className="text-lg font-bold leading-tight"
+              style={{
+                color: hover.isResto
+                  ? "var(--text-secondary)"
+                  : "var(--accent)",
+              }}
+            >
+              {formatValue(hover.value)}
+            </div>
+          </div>
+
+          {/* Pill con %  */}
+          <div className="flex items-center gap-2">
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+              style={{
+                background: hover.isResto
+                  ? "var(--bg-surface-muted)"
+                  : "var(--accent-soft)",
+                color: hover.isResto
+                  ? "var(--text-secondary)"
+                  : "var(--accent)",
+              }}
+            >
+              {hover.pct.toFixed(1)}%
+            </span>
+            <span
+              className="text-[10px]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {isAdditive ? "del universo total" : "margen real"}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
 /** Cada tile del treemap. Posicionado absolutamente con porcentajes.
  *  Tipografía adaptativa según el tamaño REAL renderizado del tile.
- *  Usa container queries vía useRef + measurements para decidir el tier. */
+ *  Usa container queries vía useRef + measurements para decidir el tier.
+ *  Reporta hover al padre via onMove para que renderice el tooltip custom. */
 function TreemapTile({
   isResto,
   rank,
@@ -1820,8 +2015,8 @@ function TreemapTile({
   pct,
   intensity,
   formatValue,
-  isAdditive,
   style,
+  onMove,
 }: {
   isResto: boolean;
   rank: number | null;
@@ -1830,8 +2025,8 @@ function TreemapTile({
   pct: number;
   intensity: number;
   formatValue: (n: number) => string;
-  isAdditive: boolean;
   style: React.CSSProperties;
+  onMove?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }) {
   const tileRef = useRef<HTMLDivElement | null>(null);
   const [tier, setTier] = useState<"full" | "compact" | "mini" | "micro">("full");
@@ -1881,11 +2076,7 @@ function TreemapTile({
         ...style,
         padding: 2, // gap entre tiles via padding del wrapper
       }}
-      title={`${
-        rank ? `#${rank} · ` : ""
-      }${name} · ${formatValue(value)} · ${pct.toFixed(1)}%${
-        isAdditive ? " del universo" : ""
-      }`}
+      onMouseMove={onMove}
     >
       <div
         className="relative flex h-full w-full flex-col justify-between overflow-hidden rounded-md p-2"
