@@ -44,7 +44,6 @@ import {
   Loader2,
   LayoutGrid,
   Radar as RadarIcon,
-  X,
   ChevronRight,
   Ban,
   RotateCcw,
@@ -415,16 +414,6 @@ export function ConcentracionAnalysis({ today }: Props) {
   const onMultiSelectChange = (next: string[]) => {
     setSelectedItems(next);
     setIsCustom(next.length > 0);
-  };
-
-  const removeItem = (name: string) => {
-    if (!isCustom) {
-      const current = visibleItems.map((i) => i.name).filter((n) => n !== name);
-      setSelectedItems(current);
-      setIsCustom(true);
-    } else {
-      setSelectedItems((prev) => prev.filter((n) => n !== name));
-    }
   };
 
   const resetToTopN = () => {
@@ -1086,32 +1075,38 @@ export function ConcentracionAnalysis({ today }: Props) {
                           </Td>
                         )}
                         <Td align="center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeItem(r.name);
-                              }}
-                              title="Quitar del análisis (sigue en el universo)"
-                              className="rounded-full p-1 transition-colors hover:bg-[var(--bg-surface-muted)]"
-                              style={{ color: "var(--text-muted)" }}
-                            >
-                              <X size={11} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                excludeFromUniverse(r.name);
-                              }}
-                              title="Excluir del universo (no contar como 100%)"
-                              className="rounded-full p-1 transition-colors hover:bg-[var(--danger-soft)]"
-                              style={{ color: "var(--text-muted)" }}
-                            >
-                              <Ban size={11} />
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              excludeFromUniverse(r.name);
+                            }}
+                            title="Excluir del universo (recalcula el 100% sin este item, el Top N sigue funcionando con el siguiente)"
+                            className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border px-2 py-0.5 text-[10px] font-medium transition-colors"
+                            style={{
+                              borderColor: "var(--border)",
+                              color: "var(--text-secondary)",
+                              background: "var(--bg-surface)",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background =
+                                "var(--danger-soft)";
+                              e.currentTarget.style.borderColor =
+                                "var(--danger)";
+                              e.currentTarget.style.color = "var(--danger)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background =
+                                "var(--bg-surface)";
+                              e.currentTarget.style.borderColor =
+                                "var(--border)";
+                              e.currentTarget.style.color =
+                                "var(--text-secondary)";
+                            }}
+                          >
+                            <Ban size={10} />
+                            Excluir
+                          </button>
                         </Td>
                       </tr>
                       {/* Sub-tabla de detalle (facturas o clientes según dimensión) */}
