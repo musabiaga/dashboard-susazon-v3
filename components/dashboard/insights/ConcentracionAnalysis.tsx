@@ -28,7 +28,7 @@
  * por día del cliente, o clientes que compraron del grupo/producto).
  */
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   ResponsiveContainer,
   RadarChart,
@@ -1561,25 +1561,143 @@ function StatCell({
 }
 
 // ============================================================
-// ConcentracionGrid — grid cuadriculado manual (reemplaza al Treemap
-// algorítmico de Recharts que creaba rectángulos amorfos).
+// ConcentracionGrid — treemap real con algoritmo "squarify".
 //
-// Filosofía:
-//   - Cada item tiene una celda UNIFORME (todas iguales en tamaño)
-//   - El "valor" del item se comunica via:
-//       · Intensidad del color de fondo (más grande = más vibrante)
-//       · Valor monetario en texto
-//       · Badge con % del universo
-//   - "Resto del universo" ocupa una fila completa al final (visualmente
-//     distinto, neutral, sin intensidad)
+// Cada bloque tiene ÁREA PROPORCIONAL a su valor (correcto matemáticamente).
+// El algoritmo squarify (Van Wijk 2000, mismo que usa D3) minimiza el
+// aspect ratio de cada bloque para que tiendan a ser cuadrados, evitando
+// los rectángulos amorfos super delgados que Recharts producía.
 //
-// Layout responsive por cantidad de items:
-//   1–4 items   → 4 columnas, 1 fila
-//   5–8 items   → 4 columnas, 2 filas
-//   9–12 items  → 4 columnas, 3 filas
-//   13–16 items → 5 columnas, 3 filas
-// + 1 fila completa al final para "Resto del universo"
+// Características:
+//  - Bloque grande del top = MUCHO espacio + tipografía grande
+//  - Bloques chicos = pequeños PERO cuadrados (no franjas delgadas)
+//  - Tipografía adaptativa por tier (FULL / COMPACT / MINI / MICRO)
+//  - "Resto del universo" es un bloque más del treemap, con look neutral
 // ============================================================
+
+interface TileInput {
+  data: ApiItem | { isResto: true; name: string; value: number };
+  value: number;
+}
+
+interface PositionedTile {
+  data: ApiItem | { isResto: true; name: string; value: number };
+  value: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Algoritmo Squarify: distribuye items en un rectángulo (width × height)
+ * tal que el área de cada uno sea proporcional a su valor, intentando
+ * que el aspect ratio (lado largo / lado corto) sea lo más cercano a 1
+ * posible en TODOS los items.
+ *
+ * Funciona en "strips" recursivos: toma items hasta que agregar el
+ * siguiente empeore el aspect ratio del peor de los actuales. Cuando
+ * empeora, cierra la strip y empieza una nueva en el espacio restante.
+ */
+function squarifyLayout(
+  tiles: TileInput[],
+  width: number,
+  height: number
+): PositionedTile[] {
+  if (tiles.length === 0) return [];
+  const sorted = [...tiles].sort((a, b) => b.value - a.value);
+  const totalValue = sorted.reduce((s, t) => s + t.value, 0);
+  if (totalValue === 0 || width <= 0 || height <= 0) return [];
+
+  // Convertir valores a "áreas" escaladas al espacio total
+  const totalArea = width * height;
+  const queue = sorted.map((t) => ({
+    data: t.data,
+    value: t.value,
+    area: (t.value / totalValue) * totalArea,
+  }));
+
+  const result: PositionedTile[] = [];
+  let x = 0,
+    y = 0,
+    w = width,
+    h = height;
+
+  // Worst aspect ratio para una fila candidata
+  // (formula clásica de squarified treemaps, Bruls et al. 2000)
+  const worstRatio = (areas: number[], shortSide: number): number => {
+    const s = shortSide;
+    const total = areas.reduce((sum, a) => sum + a, 0);
+    if (total === 0) return Infinity;
+    const min = Math.min(...areas);
+    const max = Math.max(...areas);
+    const s2 = s * s;
+    const total2 = total * total;
+    return Math.max((s2 * max) / total2, total2 / (s2 * min));
+  };
+
+  while (queue.length > 0) {
+    const shortSide = Math.min(w, h);
+    const row: typeof queue = [];
+    let prevWorst = Infinity;
+
+    // Greedy: agregamos items mientras mejore el aspect ratio
+    while (queue.length > 0) {
+      const tentativeAreas = [...row.map((r) => r.area), queue[0].area];
+      const newWorst = worstRatio(tentativeAreas, shortSide);
+      if (row.length === 0 || newWorst <= prevWorst) {
+        row.push(queue.shift()!);
+        prevWorst = newWorst;
+      } else {
+        break;
+      }
+    }
+
+    // Layout esta strip
+    const rowArea = row.reduce((s, r) => s + r.area, 0);
+    const isHorizontalStrip = w >= h;
+
+    if (isHorizontalStrip) {
+      // Strip vertical (columna) en el lado izquierdo
+      const stripW = rowArea / h;
+      let curY = y;
+      for (const tile of row) {
+        const tileH = tile.area / stripW;
+        result.push({
+          data: tile.data,
+          value: tile.value,
+          x,
+          y: curY,
+          w: stripW,
+          h: tileH,
+        });
+        curY += tileH;
+      }
+      x += stripW;
+      w -= stripW;
+    } else {
+      // Strip horizontal (fila) arriba
+      const stripH = rowArea / w;
+      let curX = x;
+      for (const tile of row) {
+        const tileW = tile.area / stripH;
+        result.push({
+          data: tile.data,
+          value: tile.value,
+          x: curX,
+          y,
+          w: tileW,
+          h: stripH,
+        });
+        curX += tileW;
+      }
+      y += stripH;
+      h -= stripH;
+    }
+  }
+
+  return result;
+}
 
 interface ConcentracionGridProps {
   items: ApiItem[];
@@ -1605,98 +1723,97 @@ function ConcentracionGrid({
   valueOf,
 }: ConcentracionGridProps) {
   const isAdditive = metric !== "margen_pct";
-  // Columnas según cantidad de items (para tener celdas más cuadradas)
-  const n = items.length;
-  const cols = n <= 4 ? n : n <= 8 ? 4 : n <= 12 ? 4 : 5;
 
-  // Para intensidad por importancia, usamos el max value entre items
+  // Build tiles: items + Resto del universo como un tile más (si aplica)
+  const tiles: TileInput[] = useMemo(() => {
+    const ts: TileInput[] = items.map((i) => ({
+      data: i,
+      value: Math.max(0, valueOf(i)),
+    }));
+    if (isAdditive && restoValue > 0) {
+      ts.push({
+        data: {
+          isResto: true,
+          name: `Resto del universo (${restoItemsCount} ${restoLabel})`,
+          value: restoValue,
+        },
+        value: restoValue,
+      });
+    }
+    return ts;
+  }, [items, restoValue, restoItemsCount, restoLabel, isAdditive, valueOf]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const maxValue = useMemo(
     () => (items.length > 0 ? Math.max(...items.map(valueOf)) : 0),
     [items, valueOf] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  return (
-    <div className="space-y-3">
-      {/* Grid de items */}
-      <div
-        className="grid gap-2"
-        style={{
-          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-        }}
-      >
-        {items.map((item, idx) => {
-          const value = valueOf(item);
-          const pct =
-            isAdditive && universeValue > 0
-              ? (value / universeValue) * 100
-              : item.margen_pct;
-          const intensity = maxValue > 0 ? Math.min(1, value / maxValue) : 0;
-          return (
-            <GridCell
-              key={item.name}
-              rank={idx + 1}
-              name={item.name}
-              value={value}
-              pct={pct}
-              intensity={intensity}
-              formatValue={formatValue}
-              isAdditive={isAdditive}
-            />
-          );
-        })}
-      </div>
+  // Aspect ratio del contenedor: 2:1 funciona bien para treemaps con muchos items
+  // (más ancho que alto, más como dashboards profesionales)
+  const ASPECT_W = 2;
+  const ASPECT_H = 1;
+  // Coordenadas virtuales — el render usa porcentajes para responsive
+  const virtualW = 1000;
+  const virtualH = (virtualW * ASPECT_H) / ASPECT_W;
 
-      {/* Resto del universo — solo en métricas aditivas, ocupa todo el ancho */}
-      {isAdditive && restoValue > 0 && (
-        <div
-          className="flex items-center justify-between gap-4 rounded-[var(--radius-lg)] border p-4 transition-all"
-          style={{
-            background: "var(--bg-surface-muted)",
-            borderColor: "var(--border)",
-          }}
-          title={`Resto del universo: ${formatValue(restoValue)} · ${restoPct.toFixed(1)}% · ${restoItemsCount} ${restoLabel}`}
-        >
-          <div className="flex flex-col gap-0.5">
-            <span
-              className="text-xs font-bold uppercase tracking-wider"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Resto del universo
-            </span>
-            <span
-              className="text-[11px]"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {restoItemsCount} {restoLabel} no analizados
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span
-              className="text-lg font-bold tabular-nums"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {formatValue(restoValue)}
-            </span>
-            <span
-              className="rounded-full px-2.5 py-1 text-xs font-bold tabular-nums"
-              style={{
-                background: "var(--bg-page)",
-                color: "var(--text-primary)",
-                border: "1px solid var(--border-strong)",
-              }}
-            >
-              {restoPct.toFixed(1)}%
-            </span>
-          </div>
-        </div>
-      )}
+  const layout = useMemo(
+    () => squarifyLayout(tiles, virtualW, virtualH),
+    [tiles, virtualW, virtualH]
+  );
+
+  return (
+    <div
+      className="relative w-full overflow-hidden rounded-[var(--radius-lg)]"
+      style={{
+        aspectRatio: `${ASPECT_W} / ${ASPECT_H}`,
+        background: "var(--bg-page)",
+      }}
+    >
+      {layout.map((tile, idx) => {
+        const isResto = "isResto" in tile.data;
+        const name = tile.data.name;
+        const value = tile.value;
+        const pct = isAdditive && universeValue > 0
+          ? (value / universeValue) * 100
+          : (tile.data as ApiItem).margen_pct ?? 0;
+        const rank = isResto ? null : idx + 1;
+        const intensity = !isResto && maxValue > 0 ? Math.min(1, value / maxValue) : 0;
+
+        // Posición y tamaño en %
+        const leftPct = (tile.x / virtualW) * 100;
+        const topPct = (tile.y / virtualH) * 100;
+        const widthPct = (tile.w / virtualW) * 100;
+        const heightPct = (tile.h / virtualH) * 100;
+
+        return (
+          <TreemapTile
+            key={isResto ? "__resto__" : (tile.data as ApiItem).name}
+            isResto={isResto}
+            rank={rank}
+            name={name}
+            value={value}
+            pct={pct}
+            intensity={intensity}
+            formatValue={formatValue}
+            isAdditive={isAdditive}
+            style={{
+              left: `${leftPct}%`,
+              top: `${topPct}%`,
+              width: `${widthPct}%`,
+              height: `${heightPct}%`,
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
 
-/** Celda individual del grid. Tamaño uniforme — la "importancia" se
- *  comunica via la intensidad del color de fondo + el badge del %. */
-function GridCell({
+/** Cada tile del treemap. Posicionado absolutamente con porcentajes.
+ *  Tipografía adaptativa según el tamaño REAL renderizado del tile.
+ *  Usa container queries vía useRef + measurements para decidir el tier. */
+function TreemapTile({
+  isResto,
   rank,
   name,
   value,
@@ -1704,64 +1821,190 @@ function GridCell({
   intensity,
   formatValue,
   isAdditive,
+  style,
 }: {
-  rank: number;
+  isResto: boolean;
+  rank: number | null;
   name: string;
   value: number;
   pct: number;
   intensity: number;
   formatValue: (n: number) => string;
   isAdditive: boolean;
+  style: React.CSSProperties;
 }) {
-  // Background: gradient naranja por importancia (0.6 → 1.0)
-  const fill = `rgba(237, 104, 8, ${0.6 + intensity * 0.4})`;
+  const tileRef = useRef<HTMLDivElement | null>(null);
+  const [tier, setTier] = useState<"full" | "compact" | "mini" | "micro">("full");
+
+  // Medir el tile renderizado para decidir el tier
+  useEffect(() => {
+    const el = tileRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        const h = entry.contentRect.height;
+        const next: typeof tier =
+          w > 140 && h > 90
+            ? "full"
+            : w > 90 && h > 50
+              ? "compact"
+              : w > 50 && h > 28
+                ? "mini"
+                : "micro";
+        setTier(next);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Color: items con gradient naranja por importancia, Resto neutro
+  const fill = isResto
+    ? "var(--bg-surface-muted)"
+    : `rgba(237, 104, 8, ${0.62 + intensity * 0.38})`;
+  const titleColor = isResto ? "var(--text-primary)" : "#ffffff";
+  const valueColor = isResto
+    ? "var(--text-secondary)"
+    : "rgba(255,255,255,0.92)";
+  const badgeBg = isResto
+    ? "var(--bg-page)"
+    : "rgba(255, 255, 255, 0.96)";
+  const badgeText = isResto ? "var(--text-primary)" : "#9a3412";
+  const badgeBorder = isResto ? "1px solid var(--border-strong)" : "none";
 
   return (
     <div
-      className="group relative flex aspect-square min-h-[110px] flex-col justify-between overflow-hidden rounded-[var(--radius-lg)] border p-3 transition-all hover:scale-[1.02] hover:shadow-lg"
+      ref={tileRef}
+      className="absolute overflow-hidden rounded-md transition-transform hover:z-10 hover:scale-[1.02]"
       style={{
-        background: fill,
-        borderColor: "rgba(255,255,255,0.15)",
-        boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.08)",
+        ...style,
+        padding: 2, // gap entre tiles via padding del wrapper
       }}
-      title={`#${rank} · ${name} · ${formatValue(value)} · ${pct.toFixed(1)}%${
+      title={`${
+        rank ? `#${rank} · ` : ""
+      }${name} · ${formatValue(value)} · ${pct.toFixed(1)}%${
         isAdditive ? " del universo" : ""
       }`}
     >
-      {/* Top: rank + nombre */}
-      <div className="flex flex-col gap-0.5 leading-tight">
-        <div className="flex items-baseline gap-1.5">
-          <span
-            className="text-[10px] font-bold tabular-nums"
-            style={{ color: "rgba(255,255,255,0.65)" }}
-          >
-            #{rank}
-          </span>
-          <span
-            className="line-clamp-2 text-[11px] font-bold uppercase tracking-wide text-white"
-            style={{ overflowWrap: "anywhere" }}
-            title={name}
-          >
-            {name}
-          </span>
-        </div>
-      </div>
+      <div
+        className="relative flex h-full w-full flex-col justify-between overflow-hidden rounded-md p-2"
+        style={{
+          background: fill,
+          border: isResto
+            ? "1px solid var(--border)"
+            : "1px solid rgba(255,255,255,0.12)",
+          boxShadow: isResto
+            ? "none"
+            : "inset 0 1px 0 rgba(255,255,255,0.14)",
+        }}
+      >
+        {/* === Tier FULL: todo === */}
+        {tier === "full" && (
+          <>
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-baseline gap-1.5">
+                {rank && (
+                  <span
+                    className="shrink-0 text-[10px] font-bold tabular-nums"
+                    style={{ color: "rgba(255,255,255,0.65)" }}
+                  >
+                    #{rank}
+                  </span>
+                )}
+                <span
+                  className="line-clamp-2 text-[12px] font-bold uppercase leading-tight tracking-wide"
+                  style={{
+                    color: titleColor,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {name}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-end justify-between gap-1">
+              <span
+                className="text-sm font-semibold leading-tight tabular-nums"
+                style={{ color: valueColor }}
+              >
+                {formatValue(value)}
+              </span>
+              <span
+                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+                style={{
+                  background: badgeBg,
+                  color: badgeText,
+                  border: badgeBorder,
+                }}
+              >
+                {pct.toFixed(1)}%
+              </span>
+            </div>
+          </>
+        )}
 
-      {/* Bottom: valor + badge % */}
-      <div className="flex items-end justify-between gap-2">
-        <span
-          className="text-sm font-semibold leading-tight tabular-nums"
-          style={{ color: "rgba(255,255,255,0.92)" }}
-        >
-          {formatValue(value)}
-        </span>
-        <span
-          className="shrink-0 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold tabular-nums"
-          style={{ color: "#9a3412" }}
-        >
-          {pct.toFixed(1)}%
-        </span>
+        {/* === Tier COMPACT: nombre + badge === */}
+        {tier === "compact" && (
+          <>
+            <div className="flex items-baseline gap-1">
+              {rank && (
+                <span
+                  className="shrink-0 text-[9px] font-bold tabular-nums"
+                  style={{ color: "rgba(255,255,255,0.6)" }}
+                >
+                  #{rank}
+                </span>
+              )}
+              <span
+                className="line-clamp-2 text-[10px] font-bold uppercase leading-tight"
+                style={{
+                  color: titleColor,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {name}
+              </span>
+            </div>
+            <div className="flex items-end justify-between gap-1">
+              <span
+                className="text-[10px] font-medium tabular-nums"
+                style={{ color: valueColor }}
+              >
+                {formatValue(value)}
+              </span>
+              <span
+                className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums"
+                style={{
+                  background: badgeBg,
+                  color: badgeText,
+                  border: badgeBorder,
+                }}
+              >
+                {pct.toFixed(1)}%
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* === Tier MINI: solo badge % centrado === */}
+        {tier === "mini" && (
+          <div className="flex h-full items-center justify-center">
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+              style={{
+                background: badgeBg,
+                color: badgeText,
+                border: badgeBorder,
+              }}
+            >
+              {pct.toFixed(1)}%
+            </span>
+          </div>
+        )}
+
+        {/* === Tier MICRO: solo color, border más visible === */}
+        {/* (No agregamos nada — el wrapper ya tiene background y border) */}
       </div>
     </div>
   );
