@@ -43,9 +43,12 @@ export async function POST() {
     return true;
   });
 
-  // 3. Invalidar sesiones en paralelo (Supabase Admin API es atómica por user)
+  // 3. Invalidar sesiones en paralelo vía función SQL personalizada
+  //    (auth.admin.signOut del SDK no funciona con user_id solo).
   const results = await Promise.allSettled(
-    toSignOut.map((u) => admin.auth.admin.signOut(u.user_id, "global"))
+    toSignOut.map((u) =>
+      admin.rpc("force_signout_user", { target_user_id: u.user_id })
+    )
   );
 
   const success: string[] = [];

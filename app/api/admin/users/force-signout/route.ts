@@ -13,9 +13,12 @@ interface ForceSignoutBody {
  *
  * Body: { user_id: "uuid-of-user" }
  *
- * Mecanismo: Supabase Admin API `auth.admin.signOut(userId)` invalida
- * todos los refresh tokens del usuario. Su access token expira en máximo
- * 1 hora (config default) o cuando intente refrescar (~1 min después).
+ * Mecanismo: llama a la función SQL public.force_signout_user(user_id) que
+ * borra las filas correspondientes de auth.sessions y auth.refresh_tokens.
+ * Esto invalida tanto los refresh tokens como las sessions activas.
+ *
+ * (El método SDK `auth.admin.signOut(jwt, scope)` requiere el JWT del usuario,
+ * no el user_id — por eso usamos la función SQL personalizada).
  *
  * El cliente detecta el cierre vía:
  *   - Middleware en cada request (validación gratuita) → próximo click
@@ -60,9 +63,11 @@ export async function POST(request: NextRequest) {
     .eq("user_id", body.user_id)
     .single();
 
-  // Invalidar todas las sesiones del usuario (scope "global" cierra
-  // sesiones en TODOS los dispositivos del usuario).
-  const { error } = await admin.auth.admin.signOut(body.user_id, "global");
+  // Invalidar todas las sesiones del usuario vía función SQL personalizada
+  // (auth.admin.signOut del SDK requiere el JWT, no funciona con user_id).
+  const { error } = await admin.rpc("force_signout_user", {
+    target_user_id: body.user_id,
+  });
 
   if (error) {
     return NextResponse.json(
