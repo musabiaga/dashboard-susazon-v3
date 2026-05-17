@@ -31,7 +31,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
-  Treemap,
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
@@ -822,28 +821,17 @@ export function ConcentracionAnalysis({ today }: Props) {
             otra métrica para ver bloques proporcionales.
           </div>
         ) : chartKind === "treemap" ? (
-          <ResponsiveContainer width="100%" height={520}>
-            <Treemap
-              data={treemapData}
-              dataKey="size"
-              aspectRatio={4 / 3}
-              // IMPORTANTE: NO pasamos stroke/fill aquí — Recharts los aplica
-              // recursivamente a todos los <text> y <rect> hijos del custom
-              // content, creando outlines fantasma feos. Manejamos el stroke
-              // únicamente en cada <rect> del TreemapBlock.
-              isAnimationActive={false}
-              content={
-                <TreemapBlock
-                  formatValue={formatMetricValue}
-                  maxValue={Math.max(...treemapData.map((d) => d.size))}
-                />
-              }
-            >
-              <Tooltip
-                content={<TreemapTooltip formatValue={formatMetricValue} />}
-              />
-            </Treemap>
-          </ResponsiveContainer>
+          <ConcentracionGrid
+            items={visibleItems}
+            restoValue={restoValue}
+            restoPct={restoPct}
+            restoItemsCount={effectiveTotalItems - visibleItems.length}
+            restoLabel={DIMENSION_LABEL[dimension].pl.toLowerCase()}
+            metric={metric}
+            universeValue={universeValue}
+            formatValue={formatMetricValue}
+            valueOf={valueOf}
+          />
         ) : (
           // Radar adaptativo: ajusta font/truncado según cantidad de ejes
           // + gradiente radial moderno + dots visibles en cada vértice.
@@ -1573,10 +1561,215 @@ function StatCell({
 }
 
 // ============================================================
-// Treemap custom block — diseño moderno con tipografía top-left,
-// padding interno, esquinas redondeadas y badge translúcido para %.
-// El "Resto del universo" se distingue con un patrón diagonal sutil
-// y color diferenciado para ser perfectamente visible.
+// ConcentracionGrid — grid cuadriculado manual (reemplaza al Treemap
+// algorítmico de Recharts que creaba rectángulos amorfos).
+//
+// Filosofía:
+//   - Cada item tiene una celda UNIFORME (todas iguales en tamaño)
+//   - El "valor" del item se comunica via:
+//       · Intensidad del color de fondo (más grande = más vibrante)
+//       · Valor monetario en texto
+//       · Badge con % del universo
+//   - "Resto del universo" ocupa una fila completa al final (visualmente
+//     distinto, neutral, sin intensidad)
+//
+// Layout responsive por cantidad de items:
+//   1–4 items   → 4 columnas, 1 fila
+//   5–8 items   → 4 columnas, 2 filas
+//   9–12 items  → 4 columnas, 3 filas
+//   13–16 items → 5 columnas, 3 filas
+// + 1 fila completa al final para "Resto del universo"
+// ============================================================
+
+interface ConcentracionGridProps {
+  items: ApiItem[];
+  restoValue: number;
+  restoPct: number;
+  restoItemsCount: number;
+  restoLabel: string;
+  metric: Metric;
+  universeValue: number;
+  formatValue: (n: number) => string;
+  valueOf: (item: ApiItem) => number;
+}
+
+function ConcentracionGrid({
+  items,
+  restoValue,
+  restoPct,
+  restoItemsCount,
+  restoLabel,
+  metric,
+  universeValue,
+  formatValue,
+  valueOf,
+}: ConcentracionGridProps) {
+  const isAdditive = metric !== "margen_pct";
+  // Columnas según cantidad de items (para tener celdas más cuadradas)
+  const n = items.length;
+  const cols = n <= 4 ? n : n <= 8 ? 4 : n <= 12 ? 4 : 5;
+
+  // Para intensidad por importancia, usamos el max value entre items
+  const maxValue = useMemo(
+    () => (items.length > 0 ? Math.max(...items.map(valueOf)) : 0),
+    [items, valueOf] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  return (
+    <div className="space-y-3">
+      {/* Grid de items */}
+      <div
+        className="grid gap-2"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+        }}
+      >
+        {items.map((item, idx) => {
+          const value = valueOf(item);
+          const pct =
+            isAdditive && universeValue > 0
+              ? (value / universeValue) * 100
+              : item.margen_pct;
+          const intensity = maxValue > 0 ? Math.min(1, value / maxValue) : 0;
+          return (
+            <GridCell
+              key={item.name}
+              rank={idx + 1}
+              name={item.name}
+              value={value}
+              pct={pct}
+              intensity={intensity}
+              formatValue={formatValue}
+              isAdditive={isAdditive}
+            />
+          );
+        })}
+      </div>
+
+      {/* Resto del universo — solo en métricas aditivas, ocupa todo el ancho */}
+      {isAdditive && restoValue > 0 && (
+        <div
+          className="flex items-center justify-between gap-4 rounded-[var(--radius-lg)] border p-4 transition-all"
+          style={{
+            background: "var(--bg-surface-muted)",
+            borderColor: "var(--border)",
+          }}
+          title={`Resto del universo: ${formatValue(restoValue)} · ${restoPct.toFixed(1)}% · ${restoItemsCount} ${restoLabel}`}
+        >
+          <div className="flex flex-col gap-0.5">
+            <span
+              className="text-xs font-bold uppercase tracking-wider"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Resto del universo
+            </span>
+            <span
+              className="text-[11px]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {restoItemsCount} {restoLabel} no analizados
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span
+              className="text-lg font-bold tabular-nums"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {formatValue(restoValue)}
+            </span>
+            <span
+              className="rounded-full px-2.5 py-1 text-xs font-bold tabular-nums"
+              style={{
+                background: "var(--bg-page)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-strong)",
+              }}
+            >
+              {restoPct.toFixed(1)}%
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Celda individual del grid. Tamaño uniforme — la "importancia" se
+ *  comunica via la intensidad del color de fondo + el badge del %. */
+function GridCell({
+  rank,
+  name,
+  value,
+  pct,
+  intensity,
+  formatValue,
+  isAdditive,
+}: {
+  rank: number;
+  name: string;
+  value: number;
+  pct: number;
+  intensity: number;
+  formatValue: (n: number) => string;
+  isAdditive: boolean;
+}) {
+  // Background: gradient naranja por importancia (0.6 → 1.0)
+  const fill = `rgba(237, 104, 8, ${0.6 + intensity * 0.4})`;
+
+  return (
+    <div
+      className="group relative flex aspect-square min-h-[110px] flex-col justify-between overflow-hidden rounded-[var(--radius-lg)] border p-3 transition-all hover:scale-[1.02] hover:shadow-lg"
+      style={{
+        background: fill,
+        borderColor: "rgba(255,255,255,0.15)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.08)",
+      }}
+      title={`#${rank} · ${name} · ${formatValue(value)} · ${pct.toFixed(1)}%${
+        isAdditive ? " del universo" : ""
+      }`}
+    >
+      {/* Top: rank + nombre */}
+      <div className="flex flex-col gap-0.5 leading-tight">
+        <div className="flex items-baseline gap-1.5">
+          <span
+            className="text-[10px] font-bold tabular-nums"
+            style={{ color: "rgba(255,255,255,0.65)" }}
+          >
+            #{rank}
+          </span>
+          <span
+            className="line-clamp-2 text-[11px] font-bold uppercase tracking-wide text-white"
+            style={{ overflowWrap: "anywhere" }}
+            title={name}
+          >
+            {name}
+          </span>
+        </div>
+      </div>
+
+      {/* Bottom: valor + badge % */}
+      <div className="flex items-end justify-between gap-2">
+        <span
+          className="text-sm font-semibold leading-tight tabular-nums"
+          style={{ color: "rgba(255,255,255,0.92)" }}
+        >
+          {formatValue(value)}
+        </span>
+        <span
+          className="shrink-0 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold tabular-nums"
+          style={{ color: "#9a3412" }}
+        >
+          {pct.toFixed(1)}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// (Legacy) TreemapPayload — mantenido por si en el futuro se reactiva
+// el modo Treemap algorítmico. No se usa en el render actual.
 // ============================================================
 interface TreemapPayload {
   x?: number;
