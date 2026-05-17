@@ -8,15 +8,27 @@
  * Margen $, Margen %) en un rango de fechas libre.
  *
  * Visualización dual:
- *   - Treemap: bloques proporcionales al valor de cada item
- *   - Radar: cada eje = un item, valor = % del universo total
+ *   - Treemap: bloques proporcionales al valor de cada item (área = valor)
+ *   - Radar: cada eje = un item, valor = % del universo (ó margen % crudo
+ *     cuando la métrica es Margen %)
+ *
+ * Importante sobre Margen %:
+ *   El Margen % NO es aditivo. No tiene sentido hablar de "% del universo"
+ *   ni "acumulado" para esta métrica (un cliente con 30% de margen NO es
+ *   "30% del universo del margen"). Para Margen %:
+ *     - Radar: eje muestra el margen % crudo (0–max+padding)
+ *     - Treemap: no aplica (se muestra mensaje de cambiar a Radar)
+ *     - Tabla: se reemplaza "% Universo" y "Acumulado" por "Δ pp vs universo"
+ *     - Stats: "Cubren" → "Margen ponderado de los items"
+ *             "Top dependencia" → "Mejor margen"
  *
  * El usuario empieza con Top 7 + "Resto del universo" (= octágono) y puede
  * borrar items o agregar otros sin límite. La tabla Pareto debajo da los
- * números exactos.
+ * números exactos. Las filas son expandibles para ver el detalle (facturas
+ * por día del cliente, o clientes que compraron del grupo/producto).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   Treemap,
@@ -33,6 +45,7 @@ import {
   LayoutGrid,
   Radar as RadarIcon,
   X,
+  ChevronRight,
 } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 import {
@@ -80,9 +93,37 @@ interface ApiResponse {
   items: ApiItem[];
 }
 
+// === Detail (filas expandidas) ===
+interface DetailFacturaPorFecha {
+  fecha: string;
+  territorio: string;
+  venta: number;
+  margen: number;
+  kg: number;
+  margen_pct: number;
+  sku_count: number;
+  vendedor: string;
+}
+interface DetailClientePorDim {
+  cliente: string;
+  venta: number;
+  margen: number;
+  kg: number;
+  margen_pct: number;
+}
+type DetailResponse =
+  | {
+      kind: "facturas_por_fecha";
+      total_records: number;
+      items: DetailFacturaPorFecha[];
+    }
+  | {
+      kind: "clientes_por_dim";
+      total_records: number;
+      items: DetailClientePorDim[];
+    };
+
 interface Props {
-  /** Día/mes/año "hoy" CDMX, viene del server. Pasado para no llamar al server
-   *  desde el cliente solo por la fecha. */
   today: { year: number; month: number; day: number };
 }
 
@@ -100,10 +141,7 @@ export function ConcentracionAnalysis({ today }: Props) {
   const [dimension, setDimension] = useState<Dimension>("clientes");
   const [metric, setMetric] = useState<Metric>("venta");
   const [chartKind, setChartKind] = useState<ChartKind>("treemap");
-  // Items seleccionados manualmente (override del Top N default si .length > 0)
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  // Si el usuario nunca tocó la selección manual, usamos Top N. Al primer
-  // click manual, isCustom = true y respetamos su elección.
   const [isCustom, setIsCustom] = useState(false);
 
   // Cargar preferencias persistidas
@@ -131,9 +169,9 @@ export function ConcentracionAnalysis({ today }: Props) {
 
   const persistDimension = (d: Dimension) => {
     setDimension(d);
-    // Cambiar dimensión limpia la selección manual (los nombres ya no aplican)
     setSelectedItems([]);
     setIsCustom(false);
+    setExpandedItems(new Set());
     try {
       window.localStorage.setItem(STORAGE_KEY_DIMENSION, d);
     } catch {}
@@ -178,6 +216,8 @@ export function ConcentracionAnalysis({ today }: Props) {
       .then((j) => {
         if (cancelled) return;
         setData(j);
+        setExpandedItems(new Set()); // limpiar expansiones al cambiar data
+        setDetailCache(new Map());
       })
       .catch((e) => {
         if (cancelled) return;
@@ -191,15 +231,7 @@ export function ConcentracionAnalysis({ today }: Props) {
     };
   }, [range.from, range.to, dimension]);
 
-  // ============== Cálculos derivados ==============
-  // Universo total según métrica seleccionada
-  const universeValue = useMemo(() => {
-    if (!data) return 0;
-    if (metric === "margen_pct") return data.universe.margen_pct;
-    return data.universe[metric === "venta" ? "venta" : metric === "kg" ? "kg" : "margen"];
-  }, [data, metric]);
-
-  // Helper para sacar el valor del item según métrica activa
+  // ============== valueOf: extrae el valor de la métrica activa ==============
   const valueOf = (item: ApiItem): number => {
     switch (metric) {
       case "venta":
@@ -213,18 +245,31 @@ export function ConcentracionAnalysis({ today }: Props) {
     }
   };
 
-  // Items ordenados por la métrica activa (descendente). Re-ordena si cambia metric.
+  // El "universo total" según métrica seleccionada
+  const universeValue = useMemo(() => {
+    if (!data) return 0;
+    if (metric === "venta") return data.universe.venta;
+    if (metric === "kg") return data.universe.kg;
+    if (metric === "margen") return data.universe.margen;
+    return data.universe.margen_pct;
+  }, [data, metric]);
+
+  // ============== shareOf: % del universo SOLO si la métrica es aditiva ==============
+  // Para margen_pct NO aplica (sumarías porcentajes).
+  const isAdditive = metric !== "margen_pct";
+  const shareOf = (item: ApiItem): number => {
+    if (!isAdditive) return item.margen_pct; // devuelve el % crudo
+    return universeValue > 0 ? (valueOf(item) / universeValue) * 100 : 0;
+  };
+
+  // Items ordenados por la métrica activa (descendente)
   const sortedItems = useMemo(() => {
     if (!data) return [];
     return [...data.items].sort((a, b) => valueOf(b) - valueOf(a));
   }, [data, metric]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Items disponibles para el multi-select
   const availableItems = useMemo(() => sortedItems.map((i) => i.name), [sortedItems]);
 
-  // Items que se muestran en la visualización:
-  //  - Si isCustom = true → respetamos selectedItems (en el orden del usuario)
-  //  - Si isCustom = false → Top N default según la métrica
   const visibleItems: ApiItem[] = useMemo(() => {
     if (!data) return [];
     if (isCustom) {
@@ -236,19 +281,18 @@ export function ConcentracionAnalysis({ today }: Props) {
     return sortedItems.slice(0, DEFAULT_TOP_N);
   }, [data, isCustom, selectedItems, sortedItems]);
 
-  // "Resto del universo" = lo que NO está en visibleItems
+  // Para métricas aditivas: "Resto del universo" = lo que NO está en visibleItems
+  // Para margen_pct: NO aplica el concepto de resto
   const visibleSum = useMemo(
     () => visibleItems.reduce((s, i) => s + valueOf(i), 0),
     [visibleItems, metric] // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const restoValue = Math.max(0, universeValue - visibleSum);
-  // Para margen %, el "resto" se calcula distinto (es un margen, no se resta lineal)
-  const restoPct =
-    metric === "margen_pct"
-      ? null // no aplica linealmente
-      : universeValue > 0
-        ? (restoValue / universeValue) * 100
-        : 0;
+  const restoValue = isAdditive ? Math.max(0, universeValue - visibleSum) : 0;
+  const restoPct = isAdditive
+    ? universeValue > 0
+      ? (restoValue / universeValue) * 100
+      : 0
+    : 0;
 
   // ============== Update selection del multi-select ==============
   const onMultiSelectChange = (next: string[]) => {
@@ -257,7 +301,6 @@ export function ConcentracionAnalysis({ today }: Props) {
   };
 
   const removeItem = (name: string) => {
-    // Si está en Top N default → entra en custom mode con los otros 6
     if (!isCustom) {
       const current = visibleItems.map((i) => i.name).filter((n) => n !== name);
       setSelectedItems(current);
@@ -272,94 +315,230 @@ export function ConcentracionAnalysis({ today }: Props) {
     setIsCustom(false);
   };
 
-  // ============== Formato del valor según métrica ==============
-  const formatValue = (n: number): string => {
+  // ============== Formatos ==============
+  const formatMetricValue = (n: number): string => {
     if (metric === "venta" || metric === "margen") return formatMoney(n);
     if (metric === "kg") return formatKilos(n);
     return `${n.toFixed(1)}%`;
   };
 
-  // ============== Data para Treemap ==============
-  // Recharts Treemap requiere data con `name` y `size` (size define el área).
-  // Para margen % no tiene sentido un treemap (negativo o muy pequeño se vería raro).
+  // ============== Treemap data ==============
+  // Solo para métricas aditivas. Para margen_pct se muestra mensaje.
   const treemapData = useMemo(() => {
+    if (!isAdditive) return [];
     const items = visibleItems.map((i) => ({
       name: i.name,
       size: Math.max(0, valueOf(i)),
       value: valueOf(i),
-      pct: universeValue > 0 ? (valueOf(i) / universeValue) * 100 : 0,
+      pct: shareOf(i),
     }));
-    if (metric !== "margen_pct" && restoValue > 0) {
+    if (restoValue > 0) {
       items.push({
         name: "Resto del universo",
         size: restoValue,
         value: restoValue,
-        pct: restoPct ?? 0,
+        pct: restoPct,
       });
     }
     return items;
-  }, [visibleItems, metric, restoValue, restoPct, universeValue]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visibleItems, metric, restoValue, restoPct, isAdditive]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ============== Data para Radar ==============
-  // Cada item = un eje. Valor = % del universo (0-100).
+  // ============== Radar data ==============
+  // Aditivas: eje = % del universo (0–100+). Incluye "Resto".
+  // Margen %: eje = margen % crudo de cada item (0–max).
   const radarData = useMemo(() => {
-    const items = visibleItems.map((i) => ({
-      name: i.name,
-      pct: universeValue > 0 ? (valueOf(i) / universeValue) * 100 : 0,
-      raw: valueOf(i),
-    }));
-    if (metric !== "margen_pct") {
+    if (isAdditive) {
+      const items = visibleItems.map((i) => ({
+        name: i.name,
+        value: shareOf(i), // 0–100
+        raw: valueOf(i),
+      }));
       items.push({
         name: "Resto",
-        pct: restoPct ?? 0,
+        value: restoPct,
         raw: restoValue,
       });
+      return items;
     }
-    return items;
-  }, [visibleItems, metric, universeValue, restoValue, restoPct]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Margen %: eje = margen % crudo
+    return visibleItems.map((i) => ({
+      name: i.name,
+      value: i.margen_pct,
+      raw: i.margen_pct,
+    }));
+  }, [visibleItems, metric, restoValue, restoPct, isAdditive]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const maxRadarValue = useMemo(
-    () => Math.max(10, ...radarData.map((d) => d.pct)),
-    [radarData]
-  );
+  const radarMax = useMemo(() => {
+    const vals = radarData.map((d) => d.value);
+    const max = vals.length > 0 ? Math.max(...vals) : 0;
+    // Redondear arriba al siguiente múltiplo de 10
+    return Math.max(10, Math.ceil(max / 10) * 10);
+  }, [radarData]);
 
-  // ============== Stats panel ==============
-  const cubrenPct = universeValue > 0 ? (visibleSum / universeValue) * 100 : 0;
-  const topItem = visibleItems[0];
-  const topItemPct =
-    topItem && universeValue > 0
-      ? (valueOf(topItem) / universeValue) * 100
-      : 0;
+  // ============== Stats panel (adaptativo según métrica) ==============
+  // Para aditivas: % del universo, top dependencia, etc.
+  // Para margen_pct: promedio ponderado de items, mejor margen, etc.
+  const stats = useMemo(() => {
+    if (!data) {
+      return {
+        universeLabel: "Universo total",
+        universeValue: "—",
+        universeSub: "",
+        itemsLabel: "Items en análisis",
+        itemsValue: "0",
+        itemsSub: METRIC_LABEL[metric],
+        coverLabel: "Cubren del universo",
+        coverValue: "—",
+        coverSub: "",
+        topLabel: "Top dependencia",
+        topValue: "—",
+        topSub: "—",
+      };
+    }
+    if (isAdditive) {
+      const cubrenPct =
+        universeValue > 0 ? (visibleSum / universeValue) * 100 : 0;
+      const topItem = visibleItems[0];
+      const topItemPct =
+        topItem && universeValue > 0
+          ? (valueOf(topItem) / universeValue) * 100
+          : 0;
+      return {
+        universeLabel: "Universo total",
+        universeValue: formatMetricValue(universeValue),
+        universeSub: `${data.total_items} ${DIMENSION_LABEL[dimension].pl.toLowerCase()}`,
+        itemsLabel: "Items en análisis",
+        itemsValue: String(visibleItems.length),
+        itemsSub: METRIC_LABEL[metric],
+        coverLabel: "Cubren del universo",
+        coverValue: `${cubrenPct.toFixed(1)}%`,
+        coverSub: `Resto: ${(100 - cubrenPct).toFixed(1)}%`,
+        topLabel: "Top dependencia",
+        topValue: topItem ? `${topItemPct.toFixed(1)}%` : "—",
+        topSub: topItem?.name ?? "—",
+      };
+    }
+    // Margen %: stats distintos
+    // Margen ponderado de los items = sum(margen items) / sum(venta items)
+    const sumMargen = visibleItems.reduce((s, i) => s + i.margen, 0);
+    const sumVenta = visibleItems.reduce((s, i) => s + i.venta, 0);
+    const marginPonderado = sumVenta > 0 ? (sumMargen / sumVenta) * 100 : 0;
+    // Mejor margen = item con mayor margen_pct entre visibles
+    const mejor =
+      visibleItems.length > 0
+        ? visibleItems.reduce((best, i) =>
+            i.margen_pct > best.margen_pct ? i : best
+          )
+        : null;
+    return {
+      universeLabel: "Margen % universo",
+      universeValue: `${data.universe.margen_pct.toFixed(1)}%`,
+      universeSub: `${data.total_items} ${DIMENSION_LABEL[dimension].pl.toLowerCase()} · prom. ponderado`,
+      itemsLabel: "Items en análisis",
+      itemsValue: String(visibleItems.length),
+      itemsSub: METRIC_LABEL[metric],
+      coverLabel: "Margen items (ponderado)",
+      coverValue: `${marginPonderado.toFixed(1)}%`,
+      coverSub: `Δ ${(marginPonderado - data.universe.margen_pct).toFixed(1)} pp vs universo`,
+      topLabel: "Mejor margen",
+      topValue: mejor ? `${mejor.margen_pct.toFixed(1)}%` : "—",
+      topSub: mejor?.name ?? "—",
+    };
+  }, [data, visibleItems, metric, isAdditive, universeValue, visibleSum, dimension]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ============== Tabla Pareto ==============
-  // Calculamos acumulado para tabla
+  // ============== Tabla Pareto data ==============
   const tableRows = useMemo(() => {
     let acum = 0;
     return visibleItems.map((i, idx) => {
-      const v = valueOf(i);
-      const pct = universeValue > 0 ? (v / universeValue) * 100 : 0;
-      acum += pct;
+      const valActiva = valueOf(i);
+      const pct = shareOf(i);
+      if (isAdditive) acum += pct;
+      const deltaPp = i.margen_pct - (data?.universe.margen_pct ?? 0);
       return {
         rank: idx + 1,
         name: i.name,
-        value: v,
+        valActiva,
+        venta: i.venta,
+        kg: i.kg,
+        margen: i.margen,
+        margen_pct: i.margen_pct,
         pct,
         acumPct: acum,
-        margenPct: i.margen_pct,
+        deltaPp,
       };
     });
-  }, [visibleItems, metric, universeValue]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visibleItems, metric, isAdditive, data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ============== Estado de filas expandidas ==============
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [detailCache, setDetailCache] = useState<Map<string, DetailResponse>>(
+    new Map()
+  );
+  const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set());
+  const [errorDetails, setErrorDetails] = useState<Map<string, string>>(
+    new Map()
+  );
+
+  async function toggleExpand(itemName: string) {
+    if (expandedItems.has(itemName)) {
+      setExpandedItems((prev) => {
+        const next = new Set(prev);
+        next.delete(itemName);
+        return next;
+      });
+      return;
+    }
+    setExpandedItems((prev) => new Set(prev).add(itemName));
+    if (detailCache.has(itemName)) return;
+    if (loadingDetails.has(itemName)) return;
+    setLoadingDetails((prev) => new Set(prev).add(itemName));
+    setErrorDetails((prev) => {
+      const next = new Map(prev);
+      next.delete(itemName);
+      return next;
+    });
+    try {
+      const params = new URLSearchParams({
+        from: range.from,
+        to: range.to,
+        dimension,
+        name: itemName,
+      });
+      const r = await fetch(
+        `/api/insights/item-detail?${params.toString()}`,
+        { credentials: "include" }
+      );
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.error ?? `HTTP ${r.status}`);
+      }
+      const j = (await r.json()) as DetailResponse;
+      setDetailCache((prev) => new Map(prev).set(itemName, j));
+    } catch (e) {
+      setErrorDetails((prev) =>
+        new Map(prev).set(
+          itemName,
+          e instanceof Error ? e.message : "Error desconocido"
+        )
+      );
+    } finally {
+      setLoadingDetails((prev) => {
+        const next = new Set(prev);
+        next.delete(itemName);
+        return next;
+      });
+    }
+  }
 
   // ============== Render ==============
   return (
     <div className="space-y-4">
-      {/* ============ Toolbar superior con controles ============ */}
+      {/* ============ Toolbar superior ============ */}
       <div className="flex flex-wrap items-center justify-end gap-2">
         <DateRangePicker value={range} onChange={setRange} today={today} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {/* Toggle Dimensión */}
         <ChipToggle
           label="Dimensión"
           options={[
@@ -370,7 +549,6 @@ export function ConcentracionAnalysis({ today }: Props) {
           value={dimension}
           onChange={(v) => persistDimension(v as Dimension)}
         />
-        {/* Toggle Métrica */}
         <ChipToggle
           label="Métrica"
           options={[
@@ -382,7 +560,6 @@ export function ConcentracionAnalysis({ today }: Props) {
           value={metric}
           onChange={(v) => persistMetric(v as Metric)}
         />
-        {/* Toggle Visualización */}
         <ChipToggle
           label="Vista"
           options={[
@@ -408,7 +585,7 @@ export function ConcentracionAnalysis({ today }: Props) {
           options={availableItems}
           selected={isCustom ? selectedItems : visibleItems.map((i) => i.name)}
           onChange={onMultiSelectChange}
-          maxItems={9999} // sin límite efectivo
+          maxItems={9999}
           placeholder={`Agregar ${DIMENSION_LABEL[dimension].sg.toLowerCase()}…`}
           emptyLabel="Top default"
         />
@@ -436,31 +613,10 @@ export function ConcentracionAnalysis({ today }: Props) {
           borderColor: "var(--border)",
         }}
       >
-        <StatCell
-          label="Universo total"
-          value={formatValue(universeValue)}
-          sub={`${data?.total_items ?? 0} ${DIMENSION_LABEL[dimension].pl.toLowerCase()}`}
-        />
-        <StatCell
-          label="Items en análisis"
-          value={String(visibleItems.length)}
-          sub={`${METRIC_LABEL[metric]}`}
-        />
-        <StatCell
-          label="Cubren del universo"
-          value={`${cubrenPct.toFixed(1)}%`}
-          sub={
-            metric !== "margen_pct"
-              ? `Resto: ${(100 - cubrenPct).toFixed(1)}%`
-              : "—"
-          }
-        />
-        <StatCell
-          label="Top dependencia"
-          value={topItem ? `${topItemPct.toFixed(1)}%` : "—"}
-          sub={topItem?.name ?? "—"}
-          subTruncate
-        />
+        <StatCell label={stats.universeLabel} value={stats.universeValue} sub={stats.universeSub} />
+        <StatCell label={stats.itemsLabel} value={stats.itemsValue} sub={stats.itemsSub} />
+        <StatCell label={stats.coverLabel} value={stats.coverValue} sub={stats.coverSub} />
+        <StatCell label={stats.topLabel} value={stats.topValue} sub={stats.topSub} subTruncate />
       </div>
 
       {/* ============ Errores / Loading ============ */}
@@ -502,15 +658,14 @@ export function ConcentracionAnalysis({ today }: Props) {
           >
             Sin items para el rango y dimensión seleccionados.
           </div>
-        ) : metric === "margen_pct" && chartKind === "treemap" ? (
-          // Treemap con margen % no funciona bien (los valores son
-          // comparables pero no representan "área del universo")
+        ) : !isAdditive && chartKind === "treemap" ? (
           <div
             className="py-12 text-center text-sm"
             style={{ color: "var(--text-secondary)" }}
           >
-            El treemap no aplica para Margen %. Usa la vista <strong>Radar</strong> o
-            cambia a otra métrica para ver los bloques proporcionales.
+            El treemap no aplica para <strong>Margen %</strong> (no es una métrica aditiva).
+            Usa la vista <strong>Radar</strong> para ver el margen % de cada item, o cambia a
+            otra métrica para ver bloques proporcionales.
           </div>
         ) : chartKind === "treemap" ? (
           <ResponsiveContainer width="100%" height={520}>
@@ -521,17 +676,22 @@ export function ConcentracionAnalysis({ today }: Props) {
               fill="var(--accent)"
               content={
                 <TreemapBlock
-                  formatValue={formatValue}
+                  formatValue={formatMetricValue}
                   maxValue={Math.max(...treemapData.map((d) => d.size))}
                 />
               }
             >
-              <Tooltip content={<TreemapTooltip formatValue={formatValue} />} />
+              <Tooltip
+                content={<TreemapTooltip formatValue={formatMetricValue} />}
+              />
             </Treemap>
           </ResponsiveContainer>
         ) : (
           <ResponsiveContainer width="100%" height={520}>
-            <RadarChart data={radarData} margin={{ top: 30, right: 60, bottom: 30, left: 60 }}>
+            <RadarChart
+              data={radarData}
+              margin={{ top: 30, right: 60, bottom: 30, left: 60 }}
+            >
               <PolarGrid stroke="var(--border)" />
               <PolarAngleAxis
                 dataKey="name"
@@ -539,13 +699,17 @@ export function ConcentracionAnalysis({ today }: Props) {
               />
               <PolarRadiusAxis
                 angle={90}
-                domain={[0, Math.ceil(maxRadarValue / 10) * 10]}
+                domain={[0, radarMax]}
                 tick={{ fontSize: 9, fill: "var(--text-muted)" }}
                 tickFormatter={(v) => `${v}%`}
               />
               <Radar
-                name={METRIC_LABEL[metric]}
-                dataKey="pct"
+                name={
+                  isAdditive
+                    ? `${METRIC_LABEL[metric]} (% del universo)`
+                    : "Margen %"
+                }
+                dataKey="value"
                 stroke="var(--accent)"
                 fill="var(--accent)"
                 fillOpacity={0.35}
@@ -554,8 +718,9 @@ export function ConcentracionAnalysis({ today }: Props) {
               <Tooltip
                 content={
                   <RadarTooltip
-                    formatValue={formatValue}
+                    formatValue={formatMetricValue}
                     metricLabel={METRIC_LABEL[metric]}
+                    isAdditive={isAdditive}
                   />
                 }
               />
@@ -564,7 +729,7 @@ export function ConcentracionAnalysis({ today }: Props) {
         )}
       </div>
 
-      {/* ============ Tabla Pareto ============ */}
+      {/* ============ Tabla Pareto expandida ============ */}
       {tableRows.length > 0 && (
         <div
           className="rounded-[var(--radius-lg)] border"
@@ -573,82 +738,225 @@ export function ConcentracionAnalysis({ today }: Props) {
             borderColor: "var(--border)",
           }}
         >
+          {/* Hint sobre filas expandibles */}
+          {dimension === "clientes" && (
+            <div
+              className="border-b px-3 py-1.5 text-[10px] uppercase tracking-wider"
+              style={{
+                borderColor: "var(--border)",
+                background: "var(--bg-surface-muted)",
+                color: "var(--text-muted)",
+              }}
+            >
+              <span style={{ color: "var(--text-secondary)" }}>
+                ⓘ Click en la flecha para expandir y ver las facturas del cliente en el rango
+              </span>
+            </div>
+          )}
+          {(dimension === "grupos" || dimension === "productos") && (
+            <div
+              className="border-b px-3 py-1.5 text-[10px] uppercase tracking-wider"
+              style={{
+                borderColor: "var(--border)",
+                background: "var(--bg-surface-muted)",
+                color: "var(--text-muted)",
+              }}
+            >
+              <span style={{ color: "var(--text-secondary)" }}>
+                ⓘ Click en la flecha para expandir y ver qué clientes compraron en el rango
+              </span>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm tabular-nums">
               <thead>
                 <tr style={{ background: "var(--bg-surface-muted)" }}>
+                  <Th></Th>
                   <Th align="center">#</Th>
                   <Th>{DIMENSION_LABEL[dimension].sg}</Th>
-                  <Th align="right">{METRIC_LABEL[metric]}</Th>
-                  <Th align="right">% Universo</Th>
-                  <Th align="right">Acumulado</Th>
-                  {metric !== "margen_pct" && <Th align="right">Margen %</Th>}
+                  <Th align="right">Venta</Th>
+                  <Th align="right">Kilos</Th>
+                  <Th align="right">Margen $</Th>
+                  <Th align="right">Margen %</Th>
+                  {isAdditive ? (
+                    <>
+                      <Th align="right">% Universo</Th>
+                      <Th align="right">Acumulado</Th>
+                    </>
+                  ) : (
+                    <Th align="right">Δ pp vs universo</Th>
+                  )}
                   <Th align="center"></Th>
                 </tr>
               </thead>
               <tbody>
-                {tableRows.map((r, i) => (
-                  <tr
-                    key={r.name}
-                    style={{
-                      background:
-                        i % 2 === 0
-                          ? "var(--bg-surface)"
-                          : "var(--bg-surface-muted)",
-                    }}
-                  >
-                    <Td align="center" subtle>
-                      {r.rank}
-                    </Td>
-                    <Td>{r.name}</Td>
-                    <Td align="right" bold>
-                      {formatValue(r.value)}
-                    </Td>
-                    <Td align="right">{r.pct.toFixed(1)}%</Td>
-                    <Td align="right" subtle>
-                      {r.acumPct.toFixed(1)}%
-                    </Td>
-                    {metric !== "margen_pct" && (
-                      <Td align="right" subtle>
-                        {r.margenPct.toFixed(1)}%
-                      </Td>
-                    )}
-                    <Td align="center">
-                      <button
-                        type="button"
-                        onClick={() => removeItem(r.name)}
-                        title="Quitar del análisis"
-                        className="rounded-full p-1 transition-colors hover:bg-[var(--bg-surface-muted)]"
-                        style={{ color: "var(--text-muted)" }}
+                {tableRows.map((r, i) => {
+                  const isExpanded = expandedItems.has(r.name);
+                  const detail = detailCache.get(r.name);
+                  const isLoadingDetail = loadingDetails.has(r.name);
+                  const detailError = errorDetails.get(r.name);
+                  return (
+                    <Fragment key={r.name}>
+                      <tr
+                        style={{
+                          background:
+                            i % 2 === 0
+                              ? "var(--bg-surface)"
+                              : "var(--bg-surface-muted)",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => toggleExpand(r.name)}
                       >
-                        <X size={11} />
-                      </button>
-                    </Td>
-                  </tr>
-                ))}
-                {/* Fila Resto del universo (solo si métrica no es margen %) */}
-                {metric !== "margen_pct" && restoValue > 0 && (
+                        <Td align="center">
+                          <ChevronRight
+                            size={12}
+                            style={{
+                              color: "var(--text-secondary)",
+                              transform: isExpanded ? "rotate(90deg)" : "none",
+                              transition: "transform 0.15s ease",
+                            }}
+                          />
+                        </Td>
+                        <Td align="center" subtle>
+                          {r.rank}
+                        </Td>
+                        <Td>{r.name}</Td>
+                        <Td align="right" bold={metric === "venta"}>
+                          {formatMoney(r.venta)}
+                        </Td>
+                        <Td align="right" bold={metric === "kg"}>
+                          {formatKilos(r.kg)}
+                        </Td>
+                        <Td align="right" bold={metric === "margen"}>
+                          {formatMoney(r.margen)}
+                        </Td>
+                        <Td align="right" bold={metric === "margen_pct"}>
+                          {r.margen_pct.toFixed(1)}%
+                        </Td>
+                        {isAdditive ? (
+                          <>
+                            <Td align="right" subtle>
+                              {r.pct.toFixed(1)}%
+                            </Td>
+                            <Td align="right" subtle>
+                              {r.acumPct.toFixed(1)}%
+                            </Td>
+                          </>
+                        ) : (
+                          <Td
+                            align="right"
+                            bold
+                            color={
+                              r.deltaPp >= 0 ? "var(--success)" : "var(--danger)"
+                            }
+                          >
+                            {r.deltaPp >= 0 ? "+" : ""}
+                            {r.deltaPp.toFixed(1)} pp
+                          </Td>
+                        )}
+                        <Td align="center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeItem(r.name);
+                            }}
+                            title="Quitar del análisis"
+                            className="rounded-full p-1 transition-colors hover:bg-[var(--bg-surface-muted)]"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            <X size={11} />
+                          </button>
+                        </Td>
+                      </tr>
+                      {/* Sub-tabla de detalle (facturas o clientes según dimensión) */}
+                      {isExpanded && (
+                        <tr>
+                          <td
+                            colSpan={isAdditive ? 10 : 9}
+                            style={{
+                              background: "var(--bg-surface-muted)",
+                              borderTop: "1px solid var(--border)",
+                              borderBottom: "1px solid var(--border)",
+                            }}
+                          >
+                            <div className="px-6 py-3">
+                              {isLoadingDetail && (
+                                <div
+                                  className="flex items-center gap-2 text-xs"
+                                  style={{ color: "var(--text-muted)" }}
+                                >
+                                  <Loader2 size={12} className="animate-spin" />
+                                  Cargando detalle…
+                                </div>
+                              )}
+                              {detailError && (
+                                <div
+                                  className="text-xs"
+                                  style={{ color: "var(--danger)" }}
+                                >
+                                  Error: {detailError}
+                                </div>
+                              )}
+                              {detail && <DetailTable detail={detail} />}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+                {/* Fila Resto del universo (solo aditivas) */}
+                {isAdditive && restoValue > 0 && (
                   <tr style={{ background: "var(--bg-surface-muted)" }}>
+                    <Td></Td>
                     <Td align="center" subtle>
                       —
                     </Td>
                     <Td>
-                      <span style={{ color: "var(--text-secondary)", fontStyle: "italic" }}>
-                        Resto del universo ({(data?.total_items ?? 0) - visibleItems.length}{" "}
+                      <span
+                        style={{
+                          color: "var(--text-secondary)",
+                          fontStyle: "italic",
+                        }}
+                      >
+                        Resto del universo (
+                        {(data?.total_items ?? 0) - visibleItems.length}{" "}
                         {DIMENSION_LABEL[dimension].pl.toLowerCase()})
                       </span>
                     </Td>
                     <Td align="right" subtle>
-                      {formatValue(restoValue)}
+                      {metric === "venta"
+                        ? formatMoney(restoValue)
+                        : formatMoney(
+                            (data?.universe.venta ?? 0) -
+                              visibleItems.reduce((s, i) => s + i.venta, 0)
+                          )}
                     </Td>
                     <Td align="right" subtle>
-                      {(restoPct ?? 0).toFixed(1)}%
+                      {metric === "kg"
+                        ? formatKilos(restoValue)
+                        : formatKilos(
+                            (data?.universe.kg ?? 0) -
+                              visibleItems.reduce((s, i) => s + i.kg, 0)
+                          )}
                     </Td>
                     <Td align="right" subtle>
-                      100.0%
+                      {metric === "margen"
+                        ? formatMoney(restoValue)
+                        : formatMoney(
+                            (data?.universe.margen ?? 0) -
+                              visibleItems.reduce((s, i) => s + i.margen, 0)
+                          )}
                     </Td>
                     <Td align="right" subtle>
                       —
+                    </Td>
+                    <Td align="right" subtle>
+                      {restoPct.toFixed(1)}%
+                    </Td>
+                    <Td align="right" subtle>
+                      100.0%
                     </Td>
                     <Td></Td>
                   </tr>
@@ -660,18 +968,31 @@ export function ConcentracionAnalysis({ today }: Props) {
                     borderTop: "2px solid var(--border-strong)",
                   }}
                 >
-                  <Td align="center"></Td>
-                  <Td bold>TOTAL ({METRIC_LABEL[metric]})</Td>
+                  <Td></Td>
+                  <Td></Td>
+                  <Td bold>TOTAL universo</Td>
                   <Td align="right" bold>
-                    {formatValue(universeValue)}
+                    {formatMoney(data?.universe.venta ?? 0)}
                   </Td>
                   <Td align="right" bold>
-                    100.0%
+                    {formatKilos(data?.universe.kg ?? 0)}
                   </Td>
-                  <Td align="right"></Td>
-                  {metric !== "margen_pct" && (
-                    <Td align="right" bold>
-                      {(data?.universe.margen_pct ?? 0).toFixed(1)}%
+                  <Td align="right" bold>
+                    {formatMoney(data?.universe.margen ?? 0)}
+                  </Td>
+                  <Td align="right" bold>
+                    {(data?.universe.margen_pct ?? 0).toFixed(1)}%
+                  </Td>
+                  {isAdditive ? (
+                    <>
+                      <Td align="right" bold>
+                        100.0%
+                      </Td>
+                      <Td></Td>
+                    </>
+                  ) : (
+                    <Td align="right" subtle>
+                      —
                     </Td>
                   )}
                   <Td></Td>
@@ -686,7 +1007,115 @@ export function ConcentracionAnalysis({ today }: Props) {
 }
 
 // ============================================================
-// Subcomponentes
+// DetailTable — sub-tabla de filas expandidas
+// ============================================================
+function DetailTable({ detail }: { detail: DetailResponse }) {
+  if (detail.kind === "facturas_por_fecha") {
+    if (detail.items.length === 0) {
+      return (
+        <div
+          className="py-2 text-xs"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Sin facturas en el rango.
+        </div>
+      );
+    }
+    return (
+      <div>
+        <div
+          className="mb-1 text-[10px] uppercase tracking-wider"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {detail.total_records} {detail.total_records === 1 ? "factura" : "facturas"} en el rango
+        </div>
+        <table className="w-full text-xs tabular-nums">
+          <thead>
+            <tr>
+              <SubTh>Fecha</SubTh>
+              <SubTh>Territorio</SubTh>
+              <SubTh>Vendedor</SubTh>
+              <SubTh align="right">SKUs</SubTh>
+              <SubTh align="right">Venta</SubTh>
+              <SubTh align="right">Kilos</SubTh>
+              <SubTh align="right">Margen $</SubTh>
+              <SubTh align="right">Margen %</SubTh>
+            </tr>
+          </thead>
+          <tbody>
+            {detail.items.map((row, idx) => (
+              <tr
+                key={`${row.fecha}|${row.territorio}|${idx}`}
+                style={{ borderTop: "1px solid var(--border)" }}
+              >
+                <SubTd>{row.fecha}</SubTd>
+                <SubTd>{row.territorio}</SubTd>
+                <SubTd subtle>{row.vendedor || "—"}</SubTd>
+                <SubTd align="right" subtle>
+                  {row.sku_count}
+                </SubTd>
+                <SubTd align="right">{formatMoney(row.venta)}</SubTd>
+                <SubTd align="right">{formatKilos(row.kg)}</SubTd>
+                <SubTd align="right">{formatMoney(row.margen)}</SubTd>
+                <SubTd align="right">{row.margen_pct.toFixed(1)}%</SubTd>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+  // clientes_por_dim (cuando dimensión es grupo o producto)
+  if (detail.items.length === 0) {
+    return (
+      <div className="py-2 text-xs" style={{ color: "var(--text-muted)" }}>
+        Sin clientes que compraron en el rango.
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div
+        className="mb-1 text-[10px] uppercase tracking-wider"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {detail.total_records} clientes que compraron en el rango
+      </div>
+      <table className="w-full text-xs tabular-nums">
+        <thead>
+          <tr>
+            <SubTh align="center">#</SubTh>
+            <SubTh>Cliente</SubTh>
+            <SubTh align="right">Venta</SubTh>
+            <SubTh align="right">Kilos</SubTh>
+            <SubTh align="right">Margen $</SubTh>
+            <SubTh align="right">Margen %</SubTh>
+          </tr>
+        </thead>
+        <tbody>
+          {detail.items.map((row, idx) => (
+            <tr
+              key={`${row.cliente}|${idx}`}
+              style={{ borderTop: "1px solid var(--border)" }}
+            >
+              <SubTd align="center" subtle>
+                {idx + 1}
+              </SubTd>
+              <SubTd>{row.cliente}</SubTd>
+              <SubTd align="right">{formatMoney(row.venta)}</SubTd>
+              <SubTd align="right">{formatKilos(row.kg)}</SubTd>
+              <SubTd align="right">{formatMoney(row.margen)}</SubTd>
+              <SubTd align="right">{row.margen_pct.toFixed(1)}%</SubTd>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ============================================================
+// Subcomponentes UI
 // ============================================================
 
 interface ChipOption {
@@ -787,8 +1216,6 @@ function StatCell({
 // Treemap custom block — gradient por importancia
 // ============================================================
 interface TreemapPayload {
-  // Estos los inyecta Recharts en tiempo de render. Opcionales para
-  // que TypeScript no se queje al pasar el componente como `content`.
   x?: number;
   y?: number;
   width?: number;
@@ -816,13 +1243,11 @@ function TreemapBlock(props: TreemapPayload) {
   const intensity =
     maxValue && maxValue > 0 ? Math.min(1, (value ?? 0) / maxValue) : 0;
   const isResto = name === "Resto del universo";
-  // Color: naranja Susazón con opacidad por importancia. Resto = gris.
   const fill = isResto
     ? "var(--bg-surface-muted)"
     : `rgba(237, 104, 8, ${0.35 + intensity * 0.55})`;
   const textColor = isResto ? "var(--text-secondary)" : "white";
 
-  // Solo mostrar label si el bloque es suficientemente grande
   const showLabel = width > 60 && height > 30;
   const showValue = width > 80 && height > 50;
 
@@ -846,7 +1271,10 @@ function TreemapBlock(props: TreemapPayload) {
           textAnchor="middle"
           dominantBaseline="middle"
           style={{
-            fontSize: Math.min(13, width / Math.max(8, (name?.length ?? 1) * 0.6)),
+            fontSize: Math.min(
+              13,
+              width / Math.max(8, (name?.length ?? 1) * 0.6)
+            ),
             fontWeight: 600,
             fill: textColor,
             pointerEvents: "none",
@@ -921,16 +1349,19 @@ function TreemapTooltip({
         boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
       }}
     >
-      <div
-        className="font-semibold"
-        style={{ color: "var(--text-primary)" }}
-      >
+      <div className="font-semibold" style={{ color: "var(--text-primary)" }}>
         {d.name}
       </div>
-      <div className="mt-1 tabular-nums" style={{ color: "var(--text-secondary)" }}>
+      <div
+        className="mt-1 tabular-nums"
+        style={{ color: "var(--text-secondary)" }}
+      >
         {formatValue(d.value ?? 0)}
       </div>
-      <div className="tabular-nums" style={{ color: "var(--accent)", fontWeight: 600 }}>
+      <div
+        className="tabular-nums"
+        style={{ color: "var(--accent)", fontWeight: 600 }}
+      >
         {(d.pct ?? 0).toFixed(1)}% del universo
       </div>
     </div>
@@ -942,11 +1373,13 @@ function RadarTooltip({
   payload,
   formatValue,
   metricLabel,
+  isAdditive,
 }: {
   active?: boolean;
   payload?: TooltipPayloadItem[];
   formatValue: (n: number) => string;
   metricLabel: string;
+  isAdditive: boolean;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const d = payload[0].payload;
@@ -960,24 +1393,38 @@ function RadarTooltip({
         boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
       }}
     >
-      <div
-        className="font-semibold"
-        style={{ color: "var(--text-primary)" }}
-      >
+      <div className="font-semibold" style={{ color: "var(--text-primary)" }}>
         {d.name}
       </div>
-      <div className="mt-1 tabular-nums" style={{ color: "var(--text-secondary)" }}>
-        {metricLabel}: {formatValue(d.raw ?? 0)}
-      </div>
-      <div className="tabular-nums" style={{ color: "var(--accent)", fontWeight: 600 }}>
-        {(d.pct ?? 0).toFixed(1)}% del universo
-      </div>
+      {isAdditive ? (
+        <>
+          <div
+            className="mt-1 tabular-nums"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            {metricLabel}: {formatValue(d.raw ?? 0)}
+          </div>
+          <div
+            className="tabular-nums"
+            style={{ color: "var(--accent)", fontWeight: 600 }}
+          >
+            {(d.value ?? 0).toFixed(1)}% del universo
+          </div>
+        </>
+      ) : (
+        <div
+          className="mt-1 tabular-nums"
+          style={{ color: "var(--accent)", fontWeight: 600 }}
+        >
+          Margen: {(d.value ?? 0).toFixed(1)}%
+        </div>
+      )}
     </div>
   );
 }
 
 // ============================================================
-// Tabla helpers (idénticos a otros tabs)
+// Tabla helpers
 // ============================================================
 function Th({
   children,
@@ -989,10 +1436,7 @@ function Th({
   return (
     <th
       className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider"
-      style={{
-        textAlign: align,
-        color: "var(--text-secondary)",
-      }}
+      style={{ textAlign: align, color: "var(--text-secondary)" }}
     >
       {children}
     </th>
@@ -1004,11 +1448,13 @@ function Td({
   align = "left",
   bold = false,
   subtle = false,
+  color,
 }: {
   children?: React.ReactNode;
   align?: "left" | "center" | "right";
   bold?: boolean;
   subtle?: boolean;
+  color?: string;
 }) {
   return (
     <td
@@ -1016,7 +1462,7 @@ function Td({
       style={{
         textAlign: align,
         fontWeight: bold ? 600 : 400,
-        color: subtle ? "var(--text-muted)" : "var(--text-primary)",
+        color: color ?? (subtle ? "var(--text-muted)" : "var(--text-primary)"),
       }}
     >
       {children}
@@ -1024,3 +1470,41 @@ function Td({
   );
 }
 
+function SubTh({
+  children,
+  align = "left",
+}: {
+  children?: React.ReactNode;
+  align?: "left" | "center" | "right";
+}) {
+  return (
+    <th
+      className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider"
+      style={{ textAlign: align, color: "var(--text-muted)" }}
+    >
+      {children}
+    </th>
+  );
+}
+
+function SubTd({
+  children,
+  align = "left",
+  subtle = false,
+}: {
+  children?: React.ReactNode;
+  align?: "left" | "center" | "right";
+  subtle?: boolean;
+}) {
+  return (
+    <td
+      className="px-2 py-1"
+      style={{
+        textAlign: align,
+        color: subtle ? "var(--text-muted)" : "var(--text-primary)",
+      }}
+    >
+      {children}
+    </td>
+  );
+}
