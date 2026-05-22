@@ -704,6 +704,14 @@ export function DashboardClient({
                       territorios: clientesTerritorios,
                     }}
                     evolutionStorageKey="clientes-chart-view"
+                    enableProductSearch
+                    productOptions={resolveDimRows(skus).map((r) => r.name)}
+                    productSearchContext={{
+                      year: currentYear,
+                      month: currentMonth,
+                      daysCurrent,
+                      territorios: clientesTerritorios,
+                    }}
                   />
                 );
               }

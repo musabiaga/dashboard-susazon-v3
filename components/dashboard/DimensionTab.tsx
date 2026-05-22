@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 import {
   GroupedBarChart,
@@ -107,6 +108,19 @@ interface Props {
   /** Key de localStorage para persistir la vista de la gráfica
    *  ("mismo-mes" | "evolucion"). */
   evolutionStorageKey?: string;
+  /** Si true, agrega un toggle "Buscar por: Clientes | Productos" al buscador.
+   *  En modo Productos, seleccionar SKUs muestra los clientes que más los
+   *  compran. Solo lo usa el tab Clientes (Mejora 3). */
+  enableProductSearch?: boolean;
+  /** Lista de SKUs disponibles para el buscador en modo Productos. */
+  productOptions?: string[];
+  /** Contexto para el fetch lazy de clientes-por-producto. */
+  productSearchContext?: {
+    year: number;
+    month: number;
+    daysCurrent: number;
+    territorios: string[] | null;
+  };
 }
 
 /**
@@ -145,7 +159,20 @@ export function DimensionTab({
   enableEvolution = false,
   evolutionContext,
   evolutionStorageKey,
+  enableProductSearch = false,
+  productOptions,
+  productSearchContext,
 }: Props) {
+  // ============ Modo de búsqueda: Clientes / Productos (Mejora 3) ============
+  // Solo se activa con enableProductSearch (tab Clientes). En modo Productos,
+  // seleccionar SKUs muestra los clientes que más los compran (fetch lazy).
+  const [searchMode, setSearchMode] = useState<"clientes" | "productos">(
+    "clientes"
+  );
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [productClientRows, setProductClientRows] = useState<DimensionRow[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const productMode = enableProductSearch && searchMode === "productos";
   // ============ Toggle vista gráfica: Mismo mes (3 años) / Evolución ============
   // Solo se activa con enableEvolution (tab Clientes). Persiste en localStorage.
   const [chartView, setChartView] = useState<"mismo-mes" | "evolucion">(
@@ -225,18 +252,81 @@ export function DimensionTab({
     }
   };
 
+  // Handler de selección de productos (modo Productos).
+  const updateSelectedProducts = (next: string[]) => {
+    setSelectedProducts(next.slice(0, multiSelectMaxItems));
+  };
+
+  // Fetch lazy de clientes-por-producto cuando hay SKUs seleccionados.
+  const productKey = selectedProducts.slice().sort().join("|");
+  const territoriosKey =
+    productSearchContext == null
+      ? ""
+      : productSearchContext.territorios === null
+        ? "__ALL__"
+        : productSearchContext.territorios.slice().sort().join("|");
+  useEffect(() => {
+    let cancelled = false;
+    if (!productMode || !productSearchContext) return;
+    if (selectedProducts.length === 0) {
+      setProductClientRows([]);
+      return;
+    }
+    setLoadingProducts(true);
+    const params = new URLSearchParams();
+    params.set("year", String(productSearchContext.year));
+    params.set("month", String(productSearchContext.month));
+    params.set("daysCurrent", String(productSearchContext.daysCurrent));
+    params.set("skus", selectedProducts.join(","));
+    params.set("topN", "200");
+    if (productSearchContext.territorios !== null) {
+      params.set("territorios", productSearchContext.territorios.join(","));
+    }
+    fetch(`/api/dashboard/clientes-por-producto?${params.toString()}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((json: { rows?: DimensionRow[] }) => {
+        if (!cancelled) setProductClientRows(json.rows ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setProductClientRows([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingProducts(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productMode, productKey, territoriosKey]);
+
+  // Source de filas según el modo: en modo Productos usamos los clientes que
+  // compran los SKUs (fetched); en modo Clientes, los rows del server.
+  const sourceRows = productMode ? productClientRows : rows;
+
   const sorted = useMemo(
-    () => [...rows].sort((a, b) => b.v26 - a.v26),
-    [rows]
+    () => [...sourceRows].sort((a, b) => b.v26 - a.v26),
+    [sourceRows]
   );
 
-  // Items disponibles para el multi-select (todos los nombres únicos)
+  // Items disponibles para el multi-select:
+  //  - modo Clientes: nombres de clientes
+  //  - modo Productos: lista de SKUs (productOptions)
   const availableItems = useMemo(
-    () => sorted.map((r) => r.name),
-    [sorted]
+    () => (productMode ? (productOptions ?? []) : sorted.map((r) => r.name)),
+    [productMode, productOptions, sorted]
   );
 
-  const isCustomMode = enableMultiSelect && selectedItems.length > 0;
+  // Selección activa según modo (clientes vs productos).
+  const activeSelected = productMode ? selectedProducts : selectedItems;
+  const activeUpdate = productMode ? updateSelectedProducts : updateSelected;
+
+  // isCustomMode: solo aplica en modo Clientes (la selección filtra rows).
+  // En modo Productos los rows YA vienen filtrados/rankeados del endpoint.
+  const isCustomMode =
+    !productMode && enableMultiSelect && selectedItems.length > 0;
 
   // Items del chart:
   //  - Custom: respeta orden de selección del usuario, mapea a rows reales
@@ -550,11 +640,15 @@ export function DimensionTab({
                   className="text-xs font-semibold uppercase tracking-wider"
                   style={{ color: "var(--text-secondary)" }}
                 >
-                  {isCustomMode
-                    ? `${top.length} ${dimensionLabelPlural} seleccionado${top.length === 1 ? "" : "s"} · ${monthLabel26}`
-                    : topNChart == null
-                      ? `${dimensionLabelPlural} · ${monthLabel26}`
-                      : `Top ${top.length} ${dimensionLabelPlural} · ${monthLabel26}`}
+                  {productMode
+                    ? selectedProducts.length === 0
+                      ? `Clientes por producto · ${monthLabel26}`
+                      : `Top ${top.length} Clientes que compran ${selectedProducts.length} producto${selectedProducts.length === 1 ? "" : "s"} · ${monthLabel26}`
+                    : isCustomMode
+                      ? `${top.length} ${dimensionLabelPlural} seleccionado${top.length === 1 ? "" : "s"} · ${monthLabel26}`
+                      : topNChart == null
+                        ? `${dimensionLabelPlural} · ${monthLabel26}`
+                        : `Top ${top.length} ${dimensionLabelPlural} · ${monthLabel26}`}
                 </h3>
                 {isCustomMode && (
                   <span
@@ -564,8 +658,17 @@ export function DimensionTab({
                     Modo personalizado · selección custom override Top default
                   </span>
                 )}
-                {/* Toggle vista: Mismo mes (3 años) / Evolución {año} (Mejora 2) */}
-                {enableEvolution && evolutionContext && (
+                {productMode && (
+                  <span
+                    className="text-[10px]"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Clientes rankeados por su compra de los productos seleccionados
+                  </span>
+                )}
+                {/* Toggle vista: Mismo mes (3 años) / Evolución {año} (Mejora 2).
+                    No aplica en modo Productos (se muestra solo mismo-mes). */}
+                {enableEvolution && evolutionContext && !productMode && (
                   <div
                     className="mt-1.5 inline-flex w-fit items-center gap-0.5 rounded-[var(--radius)] border p-0.5"
                     style={{
@@ -619,27 +722,103 @@ export function DimensionTab({
                 )}
               </div>
               {enableMultiSelect && (
-                <MultiSelectChips
-                  options={availableItems}
-                  selected={selectedItems}
-                  onChange={updateSelected}
-                  maxItems={multiSelectMaxItems}
-                  placeholder={multiSelectPlaceholder}
-                  emptyLabel="Top default"
-                />
+                <div className="flex flex-col items-end gap-1.5">
+                  {/* Toggle de modo: Clientes / Productos (Mejora 3) */}
+                  {enableProductSearch && (
+                    <div
+                      className="inline-flex w-fit items-center gap-0.5 rounded-[var(--radius)] border p-0.5"
+                      style={{
+                        background: "var(--bg-surface-muted)",
+                        borderColor: "var(--border)",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSearchMode("clientes")}
+                        className="rounded-[var(--radius-sm)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                        style={{
+                          background:
+                            searchMode === "clientes"
+                              ? "var(--bg-surface)"
+                              : "transparent",
+                          color:
+                            searchMode === "clientes"
+                              ? "var(--accent)"
+                              : "var(--text-muted)",
+                          boxShadow:
+                            searchMode === "clientes"
+                              ? "0 1px 2px rgba(0,0,0,0.05)"
+                              : "none",
+                        }}
+                      >
+                        Clientes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSearchMode("productos")}
+                        className="rounded-[var(--radius-sm)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                        style={{
+                          background:
+                            searchMode === "productos"
+                              ? "var(--bg-surface)"
+                              : "transparent",
+                          color:
+                            searchMode === "productos"
+                              ? "var(--accent)"
+                              : "var(--text-muted)",
+                          boxShadow:
+                            searchMode === "productos"
+                              ? "0 1px 2px rgba(0,0,0,0.05)"
+                              : "none",
+                        }}
+                      >
+                        Productos
+                      </button>
+                    </div>
+                  )}
+                  <MultiSelectChips
+                    options={availableItems}
+                    selected={activeSelected}
+                    onChange={activeUpdate}
+                    maxItems={multiSelectMaxItems}
+                    placeholder={
+                      productMode ? "Buscar producto (SKU)…" : multiSelectPlaceholder
+                    }
+                    emptyLabel={productMode ? "Sin selección" : "Top default"}
+                  />
+                </div>
               )}
             </div>
-            {top.length === 0 ? (
+            {productMode && loadingProducts ? (
+              <div className="flex h-[520px] items-center justify-center">
+                <Loader2
+                  className="animate-spin"
+                  size={28}
+                  style={{ color: "var(--accent)" }}
+                />
+              </div>
+            ) : productMode && selectedProducts.length === 0 ? (
               <p
                 className="py-12 text-center text-sm"
                 style={{ color: "var(--text-muted)" }}
               >
-                {isCustomMode
-                  ? "Sin data para los items seleccionados en este mes."
-                  : "Sin data del mes actual."}
+                Selecciona uno o más productos (SKU) en el buscador para ver los
+                clientes que más los compran.
+              </p>
+            ) : top.length === 0 ? (
+              <p
+                className="py-12 text-center text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {productMode
+                  ? "Ningún cliente compró los productos seleccionados en este periodo."
+                  : isCustomMode
+                    ? "Sin data para los items seleccionados en este mes."
+                    : "Sin data del mes actual."}
               </p>
             ) : enableEvolution &&
               evolutionContext &&
+              !productMode &&
               chartView === "evolucion" ? (
               <ClientesEvolutionChart
                 year={evolutionContext.year}
