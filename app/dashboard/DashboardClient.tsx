@@ -19,7 +19,6 @@ import {
   type PerdidoRow,
 } from "@/components/dashboard/PerdidosTab";
 import { MonthSelector } from "@/components/dashboard/MonthSelector";
-import { CutoffToggle } from "@/components/dashboard/CutoffToggle";
 import { DaySelector } from "@/components/dashboard/DaySelector";
 import { SessionSecurityProvider } from "@/components/dashboard/SessionSecurityProvider";
 import { InsightsTab } from "@/components/dashboard/InsightsTab";
@@ -547,19 +546,10 @@ export function DashboardClient({
               {/* Toggle "Cierre vs Hoy" — solo si la data llega antes que
                   el día calendario (típico al refrescar en la mañana).
                   No aplica en histórico ni cuando ya hay venta de hoy. */}
-              {!isHistorical &&
-                lastDayWithSale !== null &&
-                lastDayWithSale < actualTodayDay && (
-                  <CutoffToggle
-                    currentYear={currentYear}
-                    currentMonth={currentMonth}
-                    actualTodayDay={actualTodayDay}
-                    lastDayWithSale={lastDayWithSale}
-                    asOfDay={asOfDay}
-                  />
-                )}
               {/* Selector de día libre — ver el dashboard al cierre de
-                  cualquier día del mes seleccionado (Mejora 1). */}
+                  cualquier día del mes seleccionado (Mejora 1). Reemplaza al
+                  antiguo CutoffToggle: incluye "Hoy" + el último día con venta
+                  + cualquier día arbitrario, todo en un solo control. */}
               <DaySelector
                 currentYear={currentYear}
                 currentMonth={currentMonth}
@@ -567,6 +557,7 @@ export function DashboardClient({
                 maxAsOfDay={maxAsOfDay}
                 daysWithSale={daysWithSale}
                 isHistorical={isHistorical}
+                lastDayWithSale={lastDayWithSale}
               />
               <MonthSelector
                 currentYear={currentYear}

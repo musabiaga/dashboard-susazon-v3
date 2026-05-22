@@ -40,6 +40,9 @@ interface Props {
   daysWithSale: number[];
   /** ¿El mes mostrado es histórico? Cambia la etiqueta del default. */
   isHistorical: boolean;
+  /** Último día con venta del mes en curso (para marcar "Cierre" cuando hay
+   *  desfase data-vs-calendario). null = no aplica / histórico. */
+  lastDayWithSale: number | null;
 }
 
 export function DaySelector({
@@ -49,6 +52,7 @@ export function DaySelector({
   maxAsOfDay,
   daysWithSale,
   isHistorical,
+  lastDayWithSale,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -73,6 +77,11 @@ export function DaySelector({
 
   const saleSet = new Set(daysWithSale);
   const monthShort = MONTH_SHORT_ES[currentMonth - 1];
+  // Hay desfase si el último día con venta es anterior a hoy (solo mes actual).
+  const hasDesfase =
+    !isHistorical &&
+    lastDayWithSale !== null &&
+    lastDayWithSale < maxAsOfDay;
 
   // Lista de días descendente (más reciente arriba): maxAsOfDay .. 1
   const days: number[] = [];
@@ -171,6 +180,9 @@ export function DaySelector({
             const isSelected = asOfDay === d;
             const hasSale = saleSet.has(d);
             const dow = new Date(currentYear, currentMonth - 1, d).getDay();
+            // Marcas contextuales (solo mes actual):
+            const isToday = !isHistorical && d === maxAsOfDay;
+            const isCierre = hasDesfase && d === lastDayWithSale;
             return (
               <button
                 key={d}
@@ -206,6 +218,28 @@ export function DaySelector({
                   >
                     {WEEKDAY_SHORT_ES[dow]}
                   </span>
+                  {isToday && (
+                    <span
+                      className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
+                      style={{
+                        background: "var(--bg-surface-muted)",
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      Hoy
+                    </span>
+                  )}
+                  {isCierre && (
+                    <span
+                      className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
+                      style={{
+                        background: "var(--success-soft)",
+                        color: "var(--success)",
+                      }}
+                    >
+                      Cierre
+                    </span>
+                  )}
                 </span>
                 {isSelected && (
                   <Check size={14} style={{ color: "var(--accent)" }} />
