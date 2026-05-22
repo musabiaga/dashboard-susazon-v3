@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * ClientesEvolutionChart — vista "Evolución 2026" de la gráfica superior del
+ * ClientesEvolutionChart — vista "Evolución {año}" de la gráfica superior del
  * tab Clientes (Mejora 2).
  *
- * Muestra la evolución MENSUAL (Ene → mes tope) de los clientes visibles:
- *   - Una línea sólida por cliente = venta (o kilos según el toggle), eje izq.
- *   - Una línea punteada por cliente = margen %, eje derecho.
+ * Formato consistente con el resto del dashboard: BARRAS de volumen + LÍNEA de
+ * margen %. Muestra el AGREGADO de los clientes visibles, mes a mes:
+ *   - Barras (eje izq) = volumen total (venta o kilos, según el toggle).
+ *   - Línea (eje der)  = margen % del conjunto (margen total / venta total).
  *
  * Carga lazy desde /api/dashboard/clientes-evolution solo cuando esta vista
  * está activa y cambian los inputs (clientes visibles / territorios / mes).
@@ -15,6 +16,7 @@
 import { useEffect, useState, useMemo } from "react";
 import {
   ComposedChart,
+  Bar,
   Line,
   XAxis,
   YAxis,
@@ -26,12 +28,8 @@ import {
 import { Loader2 } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 
-// Paleta para distinguir hasta 15 clientes.
-const PALETTE = [
-  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#84cc16",
-  "#06b6d4", "#d946ef", "#eab308", "#22c55e", "#a855f7",
-];
+const BAR_COLOR = "#10b981"; // verde — volumen (consistente con 2026 del dashboard)
+const LINE_COLOR = "#f59e0b"; // ámbar — margen % (distinguible de las barras)
 
 interface MonthlyCell {
   mes: number;
@@ -58,7 +56,7 @@ interface Props {
   territorios: string[] | null;
   /** Nombres de clientes visibles (top N o selección custom). */
   clientes: string[];
-  /** "pesos" | "kg" — qué métrica grafica la línea sólida. */
+  /** "pesos" | "kg" — qué métrica grafican las barras. */
   mode: "pesos" | "kg";
 }
 
@@ -112,22 +110,31 @@ export function ClientesEvolutionChart({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, territoriosKey, clientesKey, mode]);
+  }, [year, month, territoriosKey, clientesKey]);
 
   const isKg = mode === "kg";
 
-  // Transformar a formato Recharts: un punto por mes, keys dinámicas por cliente.
+  // Agregar los clientes visibles por mes → un punto por mes con volumen total
+  // y margen % del conjunto (margen total ÷ venta total).
   const chartData = useMemo(() => {
     if (!data) return [];
     return data.meses.map((mObj, idx) => {
-      const point: Record<string, string | number> = { mesLabel: mObj.label };
+      let venta = 0;
+      let kg = 0;
+      let margen = 0;
       for (const c of data.clientes) {
         const cell = c.monthly[idx];
         if (!cell) continue;
-        point[c.name] = isKg ? cell.kg : cell.venta;
-        point[`${c.name}__mp`] = cell.margen_pct;
+        venta += cell.venta;
+        kg += cell.kg;
+        margen += cell.margen;
       }
-      return point;
+      return {
+        mesLabel: mObj.label,
+        volumen: isKg ? kg : venta,
+        // Margen % del conjunto: siempre sobre venta (no sobre kg).
+        margenPct: venta > 0 ? (margen / venta) * 100 : 0,
+      };
     });
   }, [data, isKg]);
 
@@ -158,6 +165,7 @@ export function ClientesEvolutionChart({
   }
 
   const valueFormatter = isKg ? formatKilos : formatMoney;
+  const volumenLabel = isKg ? "Kilos" : "Venta";
 
   return (
     <ResponsiveContainer width="100%" height={520}>
@@ -203,45 +211,29 @@ export function ClientesEvolutionChart({
           formatter={(value, name) => {
             const v = Number(value);
             const n = String(name);
-            if (n.endsWith("__mp")) {
-              return [`${v.toFixed(1)}%`, `Margen % · ${n.replace("__mp", "")}`];
-            }
-            return [valueFormatter(v), n];
+            if (n === "Margen %") return [`${v.toFixed(1)}%`, "Margen %"];
+            return [valueFormatter(v), volumenLabel];
           }}
         />
-        {/* Leyenda default — las líneas de margen % tienen legendType="none",
-            así que solo aparecen los nombres de cliente (líneas de venta). */}
         <Legend wrapperStyle={{ fontSize: 11 }} />
-        {/* Línea sólida (venta/kg) por cliente — eje izquierdo */}
-        {data.clientes.map((c, i) => (
-          <Line
-            key={c.name}
-            yAxisId="left"
-            type="monotone"
-            dataKey={c.name}
-            stroke={PALETTE[i % PALETTE.length]}
-            strokeWidth={2}
-            dot={{ r: 2.5 }}
-            activeDot={{ r: 4 }}
-            connectNulls
-          />
-        ))}
-        {/* Línea punteada (margen %) por cliente — eje derecho */}
-        {data.clientes.map((c, i) => (
-          <Line
-            key={`${c.name}__mp`}
-            yAxisId="right"
-            type="monotone"
-            dataKey={`${c.name}__mp`}
-            stroke={PALETTE[i % PALETTE.length]}
-            strokeWidth={1.5}
-            strokeDasharray="4 3"
-            dot={false}
-            activeDot={{ r: 3 }}
-            connectNulls
-            legendType="none"
-          />
-        ))}
+        <Bar
+          yAxisId="left"
+          dataKey="volumen"
+          name={volumenLabel}
+          fill={BAR_COLOR}
+          radius={[3, 3, 0, 0]}
+          maxBarSize={56}
+        />
+        <Line
+          yAxisId="right"
+          type="monotone"
+          dataKey="margenPct"
+          name="Margen %"
+          stroke={LINE_COLOR}
+          strokeWidth={2}
+          dot={{ r: 3 }}
+          activeDot={{ r: 5 }}
+        />
       </ComposedChart>
     </ResponsiveContainer>
   );
