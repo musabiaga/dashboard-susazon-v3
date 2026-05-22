@@ -173,6 +173,8 @@ export function DimensionTab({
   const [productClientRows, setProductClientRows] = useState<DimensionRow[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const productMode = enableProductSearch && searchMode === "productos";
+  // Cliente elegido para la vista Evolución en modo Productos (1 a la vez).
+  const [evolutionClient, setEvolutionClient] = useState<string | null>(null);
   // ============ Toggle vista gráfica: Mismo mes (3 años) / Evolución ============
   // Solo se activa con enableEvolution (tab Clientes). Persiste en localStorage.
   const [chartView, setChartView] = useState<"mismo-mes" | "evolucion">(
@@ -588,6 +590,13 @@ export function DimensionTab({
       }
     : null;
 
+  // Cliente efectivo para la vista Evolución en modo Productos: el elegido en
+  // el dropdown si sigue en el top; si no, el top 1 por default.
+  const effectiveEvolutionClient =
+    evolutionClient && top.some((r) => r.name === evolutionClient)
+      ? evolutionClient
+      : (top[0]?.name ?? null);
+
   return (
     <div className="space-y-4">
       {/* Toolbar superior: toggle Pesos/Kilos (si aplica) + botones de
@@ -667,8 +676,11 @@ export function DimensionTab({
                   </span>
                 )}
                 {/* Toggle vista: Mismo mes (3 años) / Evolución {año} (Mejora 2).
-                    No aplica en modo Productos (se muestra solo mismo-mes). */}
-                {enableEvolution && evolutionContext && !productMode && (
+                    En modo Productos solo aplica si hay productos seleccionados
+                    (la evolución muestra 1 cliente comprando esos SKUs). */}
+                {enableEvolution &&
+                  evolutionContext &&
+                  (!productMode || selectedProducts.length > 0) && (
                   <div
                     className="mt-1.5 inline-flex w-fit items-center gap-0.5 rounded-[var(--radius)] border p-0.5"
                     style={{
@@ -818,15 +830,62 @@ export function DimensionTab({
               </p>
             ) : enableEvolution &&
               evolutionContext &&
-              !productMode &&
               chartView === "evolucion" ? (
-              <ClientesEvolutionChart
-                year={evolutionContext.year}
-                month={evolutionContext.month}
-                territorios={evolutionContext.territorios}
-                clientes={top.map((r) => r.name)}
-                mode={mode}
-              />
+              productMode ? (
+                /* Modo Productos: evolución de 1 cliente comprando los SKUs. */
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className="text-[11px] font-semibold uppercase tracking-wider"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Cliente:
+                    </span>
+                    <select
+                      value={effectiveEvolutionClient ?? ""}
+                      onChange={(e) => setEvolutionClient(e.target.value)}
+                      className="max-w-xs rounded-[var(--radius)] border px-2 py-1 text-sm"
+                      style={{
+                        background: "var(--bg-surface)",
+                        borderColor: "var(--border)",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {top.map((r) => (
+                        <option key={r.name} value={r.name}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span
+                      className="text-[10px]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      comprando {selectedProducts.length} producto
+                      {selectedProducts.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {effectiveEvolutionClient && (
+                    <ClientesEvolutionChart
+                      year={evolutionContext.year}
+                      month={evolutionContext.month}
+                      territorios={evolutionContext.territorios}
+                      clientes={[effectiveEvolutionClient]}
+                      skus={selectedProducts}
+                      mode={mode}
+                    />
+                  )}
+                </div>
+              ) : (
+                /* Modo Clientes: agregado de los clientes visibles. */
+                <ClientesEvolutionChart
+                  year={evolutionContext.year}
+                  month={evolutionContext.month}
+                  territorios={evolutionContext.territorios}
+                  clientes={top.map((r) => r.name)}
+                  mode={mode}
+                />
+              )
             ) : (
               <GroupedBarChart
                 data={top.map((r) => {

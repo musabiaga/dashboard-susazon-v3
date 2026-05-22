@@ -58,6 +58,9 @@ interface Props {
   clientes: string[];
   /** "pesos" | "kg" — qué métrica grafican las barras. */
   mode: "pesos" | "kg";
+  /** (Opcional) SKUs para filtrar la evolución a esos productos (modo
+   *  Productos + 1 cliente). Si se omite, usa la venta total del cliente. */
+  skus?: string[];
 }
 
 export function ClientesEvolutionChart({
@@ -66,6 +69,7 @@ export function ClientesEvolutionChart({
   territorios,
   clientes,
   mode,
+  skus,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -75,6 +79,7 @@ export function ClientesEvolutionChart({
   const territoriosKey =
     territorios === null ? "__ALL__" : territorios.slice().sort().join("|");
   const clientesKey = clientes.slice().sort().join("|");
+  const skusKey = (skus ?? []).slice().sort().join("|");
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +95,7 @@ export function ClientesEvolutionChart({
     params.set("month", String(month));
     params.set("clientes", clientes.join(","));
     if (territorios !== null) params.set("territorios", territorios.join(","));
+    if (skus && skus.length > 0) params.set("skus", skus.join(","));
 
     fetch(`/api/dashboard/clientes-evolution?${params.toString()}`)
       .then((r) => {
@@ -110,7 +116,7 @@ export function ClientesEvolutionChart({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, territoriosKey, clientesKey]);
+  }, [year, month, territoriosKey, clientesKey, skusKey]);
 
   const isKg = mode === "kg";
 

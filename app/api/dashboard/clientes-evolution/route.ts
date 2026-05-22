@@ -17,9 +17,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  *   month:       1-12 (mes tope; se devuelven meses 1..month)
  *   clientes:    CSV de nombres de cliente a incluir (URL-encoded)
  *   territorios: null (todos visibles por RLS) | "" (ninguno) | CSV de territorios
+ *   skus:        (opcional) CSV de SKUs. Si viene, la evolución se calcula SOLO
+ *                con las ventas de esos productos (modo Productos + 1 cliente,
+ *                Mejora 3). Sin él, usa la venta total del cliente.
  *
- * Respeta RLS de territorio (lectura directa de kpi_cliente_summary con el
- * client del usuario, security_invoker heredado).
+ * Respeta RLS de territorio (lectura directa con el client del usuario,
+ * security_invoker heredado).
  */
 
 const MONTH_SHORT_ES = [
@@ -76,16 +79,52 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ meses: [], clientes: [] });
   }
 
-  let query = supabase
-    .from("kpi_cliente_summary")
-    .select("cliente, mes, total_venta, total_kg, total_margen")
-    .eq("anio", year)
-    .lte("mes", month)
-    .in("cliente", clientes);
-  if (territoriosFilter !== null) {
-    query = query.in("territorio", territoriosFilter);
+  // SKUs opcionales: si vienen, filtramos la evolución a esos productos
+  // (consultando sales_rows). Si no, usamos la venta total (kpi_cliente_summary).
+  const skusRaw = sp.get("skus") ?? "";
+  const skus = skusRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  // data: filas con { cliente, mes, total_venta, total_kg, total_margen }
+  let data:
+    | { cliente: string | null; mes: number; total_venta: number; total_kg: number; total_margen: number }[]
+    | null;
+  let error: { message: string } | null;
+
+  if (skus.length > 0) {
+    // Modo Productos: ventas de esos SKUs por cliente, desde sales_rows.
+    let q = supabase
+      .from("sales_rows")
+      .select("cliente, mes, venta, kg, margen")
+      .eq("anio", year)
+      .lte("mes", month)
+      .in("cliente", clientes)
+      .in("sku", skus);
+    if (territoriosFilter !== null) q = q.in("territorio", territoriosFilter);
+    const res = await q.limit(50000);
+    error = res.error;
+    data = (res.data ?? []).map((r) => ({
+      cliente: r.cliente,
+      mes: Number(r.mes),
+      total_venta: Number(r.venta) || 0,
+      total_kg: Number(r.kg) || 0,
+      total_margen: Number(r.margen) || 0,
+    }));
+  } else {
+    // Modo Clientes: venta total del cliente, desde la vista agregada.
+    let q = supabase
+      .from("kpi_cliente_summary")
+      .select("cliente, mes, total_venta, total_kg, total_margen")
+      .eq("anio", year)
+      .lte("mes", month)
+      .in("cliente", clientes);
+    if (territoriosFilter !== null) q = q.in("territorio", territoriosFilter);
+    const res = await q.limit(50000);
+    error = res.error;
+    data = res.data;
   }
-  const { data, error } = await query.limit(50000);
 
   if (error) {
     return NextResponse.json(
