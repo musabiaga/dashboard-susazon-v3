@@ -7,6 +7,7 @@ import {
   type GroupedBarSeries,
 } from "@/components/dashboard/GroupedBarChart";
 import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
+import { ClientesEvolutionChart } from "@/components/dashboard/ClientesEvolutionChart";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
 import { ReportButton } from "@/components/dashboard/ReportButton";
 import type { BuildReportInput } from "@/lib/report-pdf/data";
@@ -93,6 +94,19 @@ interface Props {
    *  "vendedores-tab-mode") para que los toggles sean independientes.
    *  Si NO se pasa, no se muestra el toggle (modo Pesos hardcoded). */
   modeStorageKey?: string;
+  /** Si true, habilita el toggle "Mismo mes (3 años) | Evolución {año}" en la
+   *  gráfica superior. Solo lo usa el tab Clientes (Mejora 2). Requiere
+   *  evolutionContext + evolutionStorageKey. */
+  enableEvolution?: boolean;
+  /** Contexto para el fetch lazy de evolución mensual. */
+  evolutionContext?: {
+    year: number;
+    month: number;
+    territorios: string[] | null;
+  };
+  /** Key de localStorage para persistir la vista de la gráfica
+   *  ("mismo-mes" | "evolucion"). */
+  evolutionStorageKey?: string;
 }
 
 /**
@@ -128,7 +142,33 @@ export function DimensionTab({
   canExportExcel = false,
   reportInput = null,
   modeStorageKey,
+  enableEvolution = false,
+  evolutionContext,
+  evolutionStorageKey,
 }: Props) {
+  // ============ Toggle vista gráfica: Mismo mes (3 años) / Evolución ============
+  // Solo se activa con enableEvolution (tab Clientes). Persiste en localStorage.
+  const [chartView, setChartView] = useState<"mismo-mes" | "evolucion">(
+    "mismo-mes"
+  );
+  useEffect(() => {
+    if (!evolutionStorageKey) return;
+    try {
+      const saved = window.localStorage.getItem(evolutionStorageKey);
+      if (saved === "evolucion" || saved === "mismo-mes") setChartView(saved);
+    } catch {
+      // ignore
+    }
+  }, [evolutionStorageKey]);
+  const switchChartView = (next: "mismo-mes" | "evolucion") => {
+    setChartView(next);
+    if (!evolutionStorageKey) return;
+    try {
+      window.localStorage.setItem(evolutionStorageKey, next);
+    } catch {
+      // ignore
+    }
+  };
   // ============ Toggle Pesos / Kilos ============
   // Solo se renderiza si se pasa modeStorageKey. Cada tab tiene su propio
   // key para que el modo sea independiente: Grupo en Pesos, Clientes en Kg
@@ -524,6 +564,59 @@ export function DimensionTab({
                     Modo personalizado · selección custom override Top default
                   </span>
                 )}
+                {/* Toggle vista: Mismo mes (3 años) / Evolución {año} (Mejora 2) */}
+                {enableEvolution && evolutionContext && (
+                  <div
+                    className="mt-1.5 inline-flex w-fit items-center gap-0.5 rounded-[var(--radius)] border p-0.5"
+                    style={{
+                      background: "var(--bg-surface-muted)",
+                      borderColor: "var(--border)",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => switchChartView("mismo-mes")}
+                      className="rounded-[var(--radius-sm)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                      style={{
+                        background:
+                          chartView === "mismo-mes"
+                            ? "var(--bg-surface)"
+                            : "transparent",
+                        color:
+                          chartView === "mismo-mes"
+                            ? "var(--accent)"
+                            : "var(--text-muted)",
+                        boxShadow:
+                          chartView === "mismo-mes"
+                            ? "0 1px 2px rgba(0,0,0,0.05)"
+                            : "none",
+                      }}
+                    >
+                      Mismo mes (3 años)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => switchChartView("evolucion")}
+                      className="rounded-[var(--radius-sm)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                      style={{
+                        background:
+                          chartView === "evolucion"
+                            ? "var(--bg-surface)"
+                            : "transparent",
+                        color:
+                          chartView === "evolucion"
+                            ? "var(--accent)"
+                            : "var(--text-muted)",
+                        boxShadow:
+                          chartView === "evolucion"
+                            ? "0 1px 2px rgba(0,0,0,0.05)"
+                            : "none",
+                      }}
+                    >
+                      Evolución {evolutionContext.year}
+                    </button>
+                  </div>
+                )}
               </div>
               {enableMultiSelect && (
                 <MultiSelectChips
@@ -545,6 +638,16 @@ export function DimensionTab({
                   ? "Sin data para los items seleccionados en este mes."
                   : "Sin data del mes actual."}
               </p>
+            ) : enableEvolution &&
+              evolutionContext &&
+              chartView === "evolucion" ? (
+              <ClientesEvolutionChart
+                year={evolutionContext.year}
+                month={evolutionContext.month}
+                territorios={evolutionContext.territorios}
+                clientes={top.map((r) => r.name)}
+                mode={mode}
+              />
             ) : (
               <GroupedBarChart
                 data={top.map((r) => {

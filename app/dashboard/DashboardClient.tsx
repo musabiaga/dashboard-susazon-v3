@@ -666,6 +666,16 @@ export function DashboardClient({
                 );
               }
               if (activeTab === "clientes") {
+                // Territorios efectivos según el sidebar (mismo cálculo que
+                // Insights) — para el fetch lazy de evolución mensual (Mejora 2).
+                const clientesTerritorios: string[] | null =
+                  selectionMode === "single"
+                    ? [effectiveSelected]
+                    : selectionMode === "aggregated-custom"
+                      ? Array.from(aggregatedTerritories)
+                      : selectionMode === "aggregated-none"
+                        ? []
+                        : null; // aggregated-all → no filtrar
                 return (
                   <DimensionTab
                     rows={resolveDimRows(clientes)}
@@ -687,6 +697,13 @@ export function DashboardClient({
                     canExportExcel={canExportExcel}
                     reportInput={reportInput}
                     modeStorageKey="clientes-tab-mode"
+                    enableEvolution
+                    evolutionContext={{
+                      year: currentYear,
+                      month: currentMonth,
+                      territorios: clientesTerritorios,
+                    }}
+                    evolutionStorageKey="clientes-chart-view"
                   />
                 );
               }
