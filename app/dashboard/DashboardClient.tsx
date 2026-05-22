@@ -20,6 +20,7 @@ import {
 } from "@/components/dashboard/PerdidosTab";
 import { MonthSelector } from "@/components/dashboard/MonthSelector";
 import { CutoffToggle } from "@/components/dashboard/CutoffToggle";
+import { DaySelector } from "@/components/dashboard/DaySelector";
 import { SessionSecurityProvider } from "@/components/dashboard/SessionSecurityProvider";
 import { InsightsTab } from "@/components/dashboard/InsightsTab";
 import { AlertCircle, Clock } from "lucide-react";
@@ -88,6 +89,11 @@ interface DashboardClientProps {
    *  venta este mes todavía. Usado para mostrar el CutoffToggle solo cuando
    *  hay desfase data-vs-calendario. */
   lastDayWithSale: number | null;
+  /** Días del mes seleccionado con venta > 0 (para el DaySelector). */
+  daysWithSale: number[];
+  /** Día máximo seleccionable en el DaySelector: hoy CDMX (mes actual) o fin
+   *  de mes (histórico). */
+  maxAsOfDay: number;
   /** Permiso para descargar Excel desde los tabs (de users_permissions.can_export_excel). */
   canExportExcel: boolean;
   /** Setting global de timeout de inactividad (de app_settings). null = sin timeout. */
@@ -135,6 +141,8 @@ export function DashboardClient({
   actualTodayDay,
   asOfDay,
   lastDayWithSale,
+  daysWithSale,
+  maxAsOfDay,
   canExportExcel,
   sessionIdleTimeoutMinutes,
   sessionTimeoutExempt,
@@ -550,6 +558,16 @@ export function DashboardClient({
                     asOfDay={asOfDay}
                   />
                 )}
+              {/* Selector de día libre — ver el dashboard al cierre de
+                  cualquier día del mes seleccionado (Mejora 1). */}
+              <DaySelector
+                currentYear={currentYear}
+                currentMonth={currentMonth}
+                asOfDay={asOfDay}
+                maxAsOfDay={maxAsOfDay}
+                daysWithSale={daysWithSale}
+                isHistorical={isHistorical}
+              />
               <MonthSelector
                 currentYear={currentYear}
                 currentMonth={currentMonth}

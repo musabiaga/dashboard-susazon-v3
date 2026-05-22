@@ -331,10 +331,13 @@ export default async function DashboardPage({
   // ese día. Todo el resto del pipeline (elapsedBizDays, *_alDia, etc.)
   // se recalcula solo a partir de daysCurrent.
   let daysCurrent: number;
-  let asOfDay: number | null = null; // null = "Hoy en curso" (default)
-  if (isHistorical) {
-    daysCurrent = daysTotal; // mes histórico = cierre completo
-  } else {
+  let asOfDay: number | null = null; // null = default (hoy en mes actual / cierre en histórico)
+  // Default según contexto: histórico = mes completo (cierre); actual = hoy CDMX.
+  const defaultDay = isHistorical ? daysTotal : today.day;
+  // Tope máximo permitido para asOf: en mes actual no permitir días futuros
+  // (más allá de hoy CDMX); en histórico, hasta el último día del mes.
+  const maxAsOfDay = isHistorical ? daysTotal : today.day;
+  {
     const asOfRaw = sp.asOf?.trim();
     if (asOfRaw && /^\d{4}-\d{2}-\d{2}$/.test(asOfRaw)) {
       const [yy, mm, dd] = asOfRaw.split("-").map((s) => parseInt(s, 10));
@@ -343,16 +346,15 @@ export default async function DashboardPage({
         mm === currentMonth &&
         dd >= 1 &&
         dd <= daysTotal &&
-        // No permitir fechas futuras (más allá de hoy CDMX)
-        dd <= today.day;
+        dd <= maxAsOfDay;
       if (valid) {
         asOfDay = dd;
         daysCurrent = dd;
       } else {
-        daysCurrent = today.day;
+        daysCurrent = defaultDay;
       }
     } else {
-      daysCurrent = today.day;
+      daysCurrent = defaultDay;
     }
   }
 
@@ -416,15 +418,23 @@ export default async function DashboardPage({
   //     13-may / Hoy 14-may" aparece en el header del dashboard.
   //   - Si lastDayWithSale === today.day → no aparece (no hay desfase).
   // Solo aplica para el mes en curso; en histórico el toggle no tiene sentido.
+  // daysWithSale: días del mes seleccionado con venta > 0 (global across
+  // territorios visibles). Usado por el DaySelector del header para resaltar
+  // qué días tienen venta. Se calcula para CUALQUIER mes (actual o histórico).
+  const daysWithSaleSet = new Set<number>();
+  for (const r of dailyCurrent ?? []) {
+    const v = Number(r.total_venta) || 0;
+    if (v <= 0) continue;
+    const d = new Date(r.fecha + "T12:00:00").getDate();
+    daysWithSaleSet.add(d);
+  }
+  const daysWithSale = Array.from(daysWithSaleSet).sort((a, b) => a - b);
+
+  // lastDayWithSale: el máximo día con venta — solo aplica al mes en curso
+  // (alimenta el CutoffToggle "Cierre/Hoy", que no tiene sentido en histórico).
   let lastDayWithSale: number | null = null;
   if (!isHistorical) {
-    let maxDay = 0;
-    for (const r of dailyCurrent ?? []) {
-      const v = Number(r.total_venta) || 0;
-      if (v <= 0) continue;
-      const d = new Date(r.fecha + "T12:00:00").getDate();
-      if (d > maxDay) maxDay = d;
-    }
+    const maxDay = daysWithSale.length ? daysWithSale[daysWithSale.length - 1] : 0;
     lastDayWithSale = maxDay > 0 ? maxDay : null;
   }
 
@@ -1232,6 +1242,8 @@ export default async function DashboardPage({
         actualTodayDay={today.day}
         asOfDay={asOfDay}
         lastDayWithSale={lastDayWithSale}
+        daysWithSale={daysWithSale}
+        maxAsOfDay={maxAsOfDay}
         canExportExcel={permissions?.can_export_excel ?? false}
         sessionIdleTimeoutMinutes={appSettings.sessionIdleTimeoutMinutes}
         sessionTimeoutExempt={permissions?.session_timeout_exempt ?? false}
