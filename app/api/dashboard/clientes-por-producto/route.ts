@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   const year = parseInt(sp.get("year") ?? "", 10);
   const month = parseInt(sp.get("month") ?? "", 10);
   const daysCurrent = parseInt(sp.get("daysCurrent") ?? "", 10);
-  const topN = Math.min(Math.max(parseInt(sp.get("topN") ?? "50", 10) || 50, 1), 200);
+  const topN = Math.min(Math.max(parseInt(sp.get("topN") ?? "50", 10) || 50, 1), 2000);
 
   if (!Number.isFinite(year) || year < 2024 || year > 2100) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });

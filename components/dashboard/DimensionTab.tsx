@@ -280,7 +280,9 @@ export function DimensionTab({
     params.set("month", String(productSearchContext.month));
     params.set("daysCurrent", String(productSearchContext.daysCurrent));
     params.set("skus", selectedProducts.join(","));
-    params.set("topN", "200");
+    // Traemos todos los clientes que compran esos SKUs (el dropdown de
+    // Evolución los lista completos; chart/tabla aplican su propio top).
+    params.set("topN", "2000");
     if (productSearchContext.territorios !== null) {
       params.set("territorios", productSearchContext.territorios.join(","));
     }
@@ -591,11 +593,13 @@ export function DimensionTab({
     : null;
 
   // Cliente efectivo para la vista Evolución en modo Productos: el elegido en
-  // el dropdown si sigue en el top; si no, el top 1 por default.
+  // el dropdown si sigue en la lista completa; si no, el #1 por default.
+  // Usa `sorted` (TODOS los clientes que compran el SKU, mayor a menor), no
+  // solo el top del chart.
   const effectiveEvolutionClient =
-    evolutionClient && top.some((r) => r.name === evolutionClient)
+    evolutionClient && sorted.some((r) => r.name === evolutionClient)
       ? evolutionClient
-      : (top[0]?.name ?? null);
+      : (sorted[0]?.name ?? null);
 
   return (
     <div className="space-y-4">
@@ -844,16 +848,18 @@ export function DimensionTab({
                     <select
                       value={effectiveEvolutionClient ?? ""}
                       onChange={(e) => setEvolutionClient(e.target.value)}
-                      className="max-w-xs rounded-[var(--radius)] border px-2 py-1 text-sm"
+                      className="max-w-md rounded-[var(--radius)] border px-2 py-1 text-sm"
                       style={{
                         background: "var(--bg-surface)",
                         borderColor: "var(--border)",
                         color: "var(--text-primary)",
                       }}
                     >
-                      {top.map((r) => (
+                      {/* TODOS los clientes que compran el SKU en el/los
+                          territorio(s), ordenados de mayor a menor compra. */}
+                      {sorted.map((r) => (
                         <option key={r.name} value={r.name}>
-                          {r.name}
+                          {r.name} · {(isKg ? formatKilos : formatMoney)(isKg ? r.k26 ?? 0 : r.v26)}
                         </option>
                       ))}
                     </select>
@@ -861,6 +867,7 @@ export function DimensionTab({
                       className="text-[10px]"
                       style={{ color: "var(--text-muted)" }}
                     >
+                      {sorted.length} cliente{sorted.length === 1 ? "" : "s"} ·
                       comprando {selectedProducts.length} producto
                       {selectedProducts.length === 1 ? "" : "s"}
                     </span>
