@@ -804,21 +804,22 @@
   <div class="cover-logo">
     <span class="cover-logo-text">S</span>
   </div>
-  <div class="cover-eyebrow">Grupo Susazón · InCom V3.8</div>
+  <div class="cover-eyebrow">Grupo Susazón · InCom V3.9</div>
   <h1>Dashboard Comercial</h1>
   <p class="cover-subtitle">
     Guía visual para entender tu dashboard.
     Pantalla principal, KPIs, navegación, los 8 tabs, toggles avanzados,
-    PDF descargable, Tab Insights y seguridad de sesión.
+    selector de día, análisis profundo de Clientes, PDF descargable,
+    Tab Insights y seguridad de sesión.
   </p>
   <div class="cover-meta">
     <div class="cover-meta-item">
       <span class="cover-meta-label">Versión</span>
-      <span class="cover-meta-value">3.8.0</span>
+      <span class="cover-meta-value">3.9.0</span>
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">Actualizado</span>
-      <span class="cover-meta-value">17 Mayo 2026</span>
+      <span class="cover-meta-value">23 Mayo 2026</span>
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">URL</span>
@@ -1222,18 +1223,26 @@
     <li class="tab-item">
       <div class="tab-icon tab-clientes">👥</div>
       <div class="tab-content">
-        <div class="tab-name">Clientes · Concentración de cartera</div>
+        <div class="tab-name">Clientes · Concentración de cartera <span class="pill green">Ampliado V3.9</span></div>
         <div class="tab-summary">
           Top 10 clientes por venta del mes (chart de barras agrupadas) + tabla scrollable con
           todos los clientes. Te muestra dónde está concentrada tu cartera y quién creció o
-          decreció vs el año pasado.
+          decreció vs el año pasado. <strong>En V3.9 este tab recibió 4 mejoras de análisis
+          profundo</strong> (ver Sección 8.5 para el detalle).
         </div>
         <div class="tab-detail">
-          <strong>🆕 Toggle Pesos / Kilos.</strong> Cambia el ranking a kilos para detectar
-          clientes de alto volumen pero margen bajo (o viceversa).<br>
-          <strong>Tip estratégico:</strong> si tus Top 5 representan +60% de la venta, tienes
-          riesgo de concentración. Diversifica. <em>Para análisis a profundidad usa el</em>
-          <strong>Tab Insights 💡</strong>.
+          <strong>🆕 Toggle de gráfica "Mismo mes (3 años) / Evolución":</strong> alterna entre
+          comparar el mismo mes en 3 años, o ver la evolución mensual del año en curso
+          (barras de volumen + línea de margen %).<br>
+          <strong>🆕 Buscar por Clientes o Productos:</strong> el buscador tiene un toggle —
+          en modo "Productos" eliges SKUs y ves los clientes que más los compran.<br>
+          <strong>🆕 Tabla con 3 vistas:</strong> "Año vs Año", "Meses 2026" (mes a mes + Total
+          YTD) y "vs Prom. 90d" (ritmo actual vs últimos 90 días, detecta quién acelera/desacelera).<br>
+          <strong>🆕 Desglose por línea de producto:</strong> click en cualquier cliente para
+          expandir su facturación por grupo → SKU.<br>
+          <strong>Toggle Pesos / Kilos</strong> y <strong>Tip estratégico:</strong> si tus Top 5
+          representan +60% de la venta, tienes riesgo de concentración. <em>Para análisis Pareto
+          usa el</em> <strong>Tab Insights 💡</strong>.
         </div>
       </div>
     </li>
@@ -1376,17 +1385,16 @@
   </div>
 
   <div class="annotation" style="background: rgba(168, 85, 247, 0.10); border-color: rgba(168, 85, 247, 0.35);">
-    <span class="annotation-icon">⏰</span>
+    <span class="annotation-icon">📆</span>
     <div class="annotation-text">
-      <strong style="color: #d8b4fe;">🆕 Toggle Cierre / Hoy</strong> (en el header global, junto al
-      selector de mes). <strong>Aparece solo cuando hay desfase</strong> entre el día calendario
-      y el último día con venta. Resuelve un bug clásico: si refrescabas el dashboard temprano sin
-      venta del día, el sistema mostraba <em>"REZAGADO -3pp"</em> engañoso. Ahora puedes alternar:
-      <ul style="margin: 8px 0 0 20px; padding: 0;">
-        <li><strong>Cierre [13-may]</strong> — usa el último día con venta real como referencia.</li>
-        <li><strong>Hoy [14-may]</strong> — usa el calendario (vista clásica).</li>
-      </ul>
-      Todo el dashboard se recalcula automáticamente al alternar (KPIs, %, vel. necesaria, semáforos).
+      <strong style="color: #d8b4fe;">🆕 Selector de día</strong> (V3.9, en el header global, junto al
+      selector de mes). Dropdown <span class="pill">📆 Hoy ▼</span> que te deja ver el dashboard
+      <strong>al cierre de cualquier día</strong> del mes (venta acumulada hasta ese día). La lista
+      resalta los días con venta (verde) vs sin venta (gris), e incluye atajos "Hoy" y "Cierre"
+      (último día con venta). Resuelve un caso clásico: si refrescabas temprano sin venta del día,
+      el sistema mostraba <em>"REZAGADO -3pp"</em> engañoso — ahora eliges el día de cierre real y
+      todo el dashboard se recalcula (KPIs, %, vel. necesaria, semáforos). <em>Reemplazó al antiguo
+      toggle Cierre/Hoy, cuya función quedó integrada en este dropdown.</em>
     </div>
   </div>
 
@@ -1457,12 +1465,15 @@
       </div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-card-label">⏰ Toggle Cierre / Hoy</div>
-      <div class="kpi-card-value" style="font-size: 18px;">🆕 Header global</div>
+      <div class="kpi-card-label">📆 Selector de día</div>
+      <div class="kpi-card-value" style="font-size: 18px;">🆕 V3.9 · Header global</div>
       <div class="kpi-card-detail">
-        Aparece <strong>solo si hay desfase</strong> entre el día calendario y el último día con
-        venta. Alterna entre <strong>"Cierre [día con venta]"</strong> y <strong>"Hoy [calendario]"</strong>.
-        Todo el dashboard se recalcula al alternar.
+        Dropdown <span class="pill">📆 Hoy ▼</span> en el header. Permite ver el dashboard
+        <strong>al cierre de cualquier día</strong> del mes seleccionado (venta acumulada hasta
+        ese día). La lista resalta los días <strong style="color:#10b981;">con venta</strong> (verde)
+        vs sin venta (gris). Incluye atajos "Hoy" y "Cierre" (último día con venta). Todo el
+        dashboard se recalcula al elegir un día. <em>Reemplazó al antiguo toggle Cierre/Hoy, ahora
+        integrado en este dropdown.</em>
       </div>
     </div>
     <div class="kpi-card">
@@ -1472,6 +1483,7 @@
         Dropdown <span class="pill">📅 Mayo 2026 ▼</span> al lado del título del territorio.
         Click → lista de los últimos 24 meses. Selecciona un mes pasado para ver
         ese período. Al volver al mes actual desaparece la etiqueta de "histórico".
+        Combínalo con el selector de día para llegar a cualquier fecha histórica.
       </div>
     </div>
     <div class="kpi-card">
@@ -1670,6 +1682,51 @@
       multi-select, modo de territorio).
     </p>
   </div>
+
+  <!-- E · Análisis profundo de Clientes (V3.9) -->
+  <div class="glass-card featured">
+    <h3>👥 Análisis profundo del tab Clientes <span class="pill green">Nuevo V3.9</span></h3>
+    <p>
+      El tab Clientes recibió 4 mejoras para analizar tu cartera a profundidad. Todas respetan
+      el toggle Pesos/Kilos, el filtro de territorios del sidebar y tu rol (RLS).
+    </p>
+
+    <h4>1 · Toggle de gráfica: "Mismo mes (3 años)" / "Evolución {año}"</h4>
+    <p style="margin-bottom: 8px;">
+      Arriba de la gráfica. <strong>Mismo mes (3 años)</strong> = la vista clásica (barras Abr 24/25/26).
+      <strong>Evolución</strong> = barras de volumen mes a mes del año en curso + línea de margen %
+      (agregado de los clientes visibles, solo meses transcurridos). Ideal para ver estacionalidad.
+    </p>
+
+    <h4>2 · Buscar por Clientes o Productos</h4>
+    <p style="margin-bottom: 8px;">
+      El buscador tiene un toggle <span class="pill blue">Clientes</span> /
+      <span class="pill blue">Productos</span>. En modo <strong>Productos</strong> eliges SKUs y
+      el chart + tabla muestran <strong>los clientes que más compran esos productos</strong> (suma
+      si eliges varios). En modo Productos + Evolución eliges <strong>un cliente</strong> (de un
+      dropdown con TODOS los que compran ese SKU, ordenados de mayor a menor con su monto) y ves
+      su compra mensual de esos productos.
+    </p>
+
+    <h4>3 · Tabla con 3 vistas</h4>
+    <p style="margin-bottom: 8px;">
+      Toggle arriba de la tabla:
+      <span class="pill">Año vs Año</span> (la clásica, 3 años + Var %),
+      <span class="pill">Meses {año}</span> (una columna por mes transcurrido + Total YTD), y
+      <span class="pill">vs Prom. 90d</span> (ritmo diario del mes en curso vs el de los últimos
+      90 días hábiles facturados, con <strong style="color:#10b981;">▲</strong>/<strong style="color:#ef4444;">▼</strong>
+      para detectar quién <strong>acelera o desacelera</strong> su compra).
+    </p>
+
+    <h4>4 · Desglose por línea de producto (dropdown por cliente)</h4>
+    <p style="margin-bottom: 0;">
+      En la vista "Año vs Año", click en cualquier cliente (chevron ▸) para expandir su
+      <strong>facturación por grupo de producto</strong>, y cada grupo se sub-expande a sus
+      <strong>SKUs</strong> (Venta / KG / Margen $ / Margen %). El desglose es al-día (hasta el
+      día de corte que tengas en el selector de día). Útil para ver de un vistazo qué le vendes
+      a cada cliente sin salir de la tabla.
+    </p>
+  </div>
 </section>
 
 <!-- ====================================================
@@ -1758,12 +1815,24 @@
   </div>
 
   <div class="glass-card">
-    <h4>🆕 ¿Por qué a veces aparece el toggle "Cierre / Hoy" y a veces no?</h4>
+    <h4>🆕 ¿Cómo veo el dashboard como cerró un día específico?</h4>
     <p style="margin-bottom: 0;">
-      Solo aparece cuando hay desfase entre el día calendario y el último día con venta —
-      por ejemplo, si entras al dashboard en la mañana antes de que se carguen las ventas del
-      día. Si ya hay venta del día actual, no hay desfase, y el toggle no se muestra
-      (no aportaría nada).
+      Usa el <strong>selector de día</strong> (V3.9) en el header — el dropdown
+      <span class="pill">📆 Hoy ▼</span>. Eliges cualquier día del mes y ves la venta acumulada
+      hasta ese día. Los días con venta aparecen en verde, los sin venta en gris. Tiene atajos
+      "Hoy" y "Cierre" (último día con venta). Combínalo con el selector de mes para llegar a
+      cualquier fecha histórica. <em>Reemplazó al antiguo toggle Cierre/Hoy.</em>
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h4>🆕 ¿Cómo sé qué clientes están comprando menos de lo normal?</h4>
+    <p style="margin-bottom: 0;">
+      En el tab <strong>Clientes</strong>, tabla inferior, cambia a la vista
+      <span class="pill">vs Prom. 90d</span>. Compara el ritmo diario del mes en curso contra el
+      ritmo de los últimos 90 días hábiles facturados de cada cliente. Los que aparecen con
+      <strong style="color:#ef4444;">▼</strong> rojo están comprando por debajo de su ritmo
+      normal (desacelerando) — buenos candidatos para una llamada o visita.
     </p>
   </div>
 
@@ -1790,10 +1859,10 @@
      ==================================================== -->
 <div class="footer">
   <p style="margin: 0;">
-    Dashboard Comercial Susazón · InCom · Versión 3.8.0 · Mayo 2026<br>
+    Dashboard Comercial Susazón · InCom · Versión 3.9.0 · Mayo 2026<br>
     Plataforma de uso restringido — solo para personal autorizado de Grupo Susazón.<br>
     Toda actividad queda registrada en el audit log.<br>
-    <span style="opacity: 0.5; font-size: 11px;">Última actualización del instructivo: 17 mayo 2026 · Cubre Fases 1-8 (incluye Tab Insights, Toggle Cierre/Hoy, PDF Avance Comercial y Seguridad de sesión)</span>
+    <span style="opacity: 0.5; font-size: 11px;">Última actualización del instructivo: 23 mayo 2026 · Cubre Fases 1-9 (incluye Tab Insights, Selector de día, análisis profundo del tab Clientes, PDF Avance Comercial y Seguridad de sesión)</span>
   </p>
 </div>
 

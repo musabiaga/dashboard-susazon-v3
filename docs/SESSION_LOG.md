@@ -13,11 +13,12 @@
 - **Cierre fase 6:** 2026-05-13 (UX comercial avanzada: Toggle Cierre/Hoy + Pesos/Kilos en 6 tabs + Comparativos al-día + PDF Avance Comercial)
 - **Cierre fase 7:** 2026-05-15 (Seguridad de sesión: timeout configurable + logout remoto admin + smart polling)
 - **Cierre fase 8:** 2026-05-17 (Tab Insights · Análisis de Concentración: Treemap squarify + Radar + Pareto expandible + Excluir del universo)
-- **Versión actual:** 3.8.0 (en producción)
+- **Cierre fase 9:** 2026-05-23 (Selector de día global + 4 mejoras al tab Clientes: toggle gráfica Mismo mes/Evolución, buscar por productos, tabla 3 vistas, desglose por línea de producto)
+- **Versión actual:** 3.9.0 (en producción)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
 - **URL prod canonical:** `https://www.dashboardcomercialsusazon.com`
 - **URL prod fallback:** `https://dashboard-susazon-v3.vercel.app`
-- **Última actualización:** 2026-05-17
+- **Última actualización:** 2026-05-23
 
 ---
 
@@ -381,6 +382,36 @@ Características:
 **Razón:** Recharts Treemap no produce el resultado profesional que el caso de uso requiere. Implementar squarify manual es ~500 líneas pero resuelve definitivamente la proporcionalidad visual.
 **Estado:** Vigente. Documentación del algoritmo + papers de referencia en el comment header del componente.
 
+### D026 — 2026-05-23 | Fase 9 · Selector de día libre (general)
+
+**Contexto:** El toggle Cierre/Hoy (D019) solo permitía 2 opciones (último día con venta vs hoy). Mauricio quería elegir CUALQUIER día y ver el dashboard al cierre de ese día.
+
+**Decisión:** Componente `DaySelector` (dropdown estilo MonthSelector) en el header global. Lista los días del mes seleccionado (tope: hoy CDMX en mes actual, fin de mes en histórico), resaltando días con venta (verde) vs sin venta (gris), con atajos "Hoy" y badge "Cierre" en el último día con venta. Click navega a `?asOf=YYYY-MM-DD` y todo el dashboard recalcula.
+
+**Reemplazó al CutoffToggle en el header** (se quitó del header por amontonamiento; el componente CutoffToggle.tsx se conserva sin uso). El backend (`page.tsx`) ya soportaba `?asOf=`; se extendió para que funcione también en meses históricos (antes forzaba `daysCurrent = daysTotal`) y para calcular `daysWithSale` (array de días con venta) para cualquier mes.
+
+**Razón:** Análisis retrospectivo de cualquier día sin depender de los 2 atajos. Combinado con el MonthSelector llega a cualquier fecha histórica.
+**Estado:** Vigente. Commits `dabb54a`, `f10f441`.
+
+### D027 — 2026-05-23 | Fase 9 · 4 mejoras de análisis profundo al tab Clientes
+
+**Contexto:** Mauricio pidió 4 mejoras al tab Clientes para analizar su cartera a profundidad.
+
+**Decisión:** Implementadas en el `DimensionTab` genérico mediante props opcionales (solo Clientes las activa → Grupo/Vendedores intactos):
+
+1. **Toggle de gráfica "Mismo mes (3 años) / Evolución"** — la vista Evolución muestra barras de volumen mensual (agregado de clientes visibles) + línea de margen %, solo meses transcurridos. Componente `ClientesEvolutionChart`. Endpoint lazy `clientes-evolution`.
+
+2. **Buscar por Clientes o Productos** — toggle en el buscador. En modo Productos, seleccionar SKUs muestra los clientes que más los compran (suma si varios). En modo Productos + Evolución: dropdown con TODOS los clientes del SKU (ordenados desc con monto) → evolución de 1 cliente comprando esos productos. Endpoint lazy `clientes-por-producto` + filtro `skus` en `clientes-evolution`.
+
+3. **Tabla con 3 vistas** — toggle "Año vs Año / Meses {año} / vs Prom. 90d". Meses = columna por mes transcurrido + Total YTD. Prom 90d = ritmo diario del mes vs ritmo de últimos 90 días hábiles facturados, con Δ% ▲/▼. Componente `ClientesTableViews`. Endpoint lazy `clientes-ritmo-90d` (calcula los 90 días hábiles con `isBusinessDay`).
+
+4. **Desglose por línea de producto** — cada fila de cliente se expande (chevron) a su facturación por grupo → sub-expand a SKUs. Al-día. Componente `ClienteDesglose`. Endpoint lazy `cliente-desglose` (1 query arma el árbol grupo→SKU server-side).
+
+Todas respetan toggle Pesos/Kilos, filtro de territorios del sidebar y RLS por rol. Decisiones de diseño confirmadas con Mauricio vía AskUserQuestion en cada paso.
+
+**Razón:** El tab Clientes era el más usado para análisis comercial; estas mejoras lo convierten en herramienta de análisis profundo sin salir del tab.
+**Estado:** Vigente. Commits `002f551`, `fb59c1f`, `1615153`, `351ad16`, `677eb0e`, `6524a2c`, `8950245`.
+
 ---
 
 ## Bugs Resueltos
@@ -423,6 +454,8 @@ Características:
 | 33 | 2026-05-17 | Recharts Treemap producía rectángulos amorfos no proporcionales al valor | Algoritmo interno de Recharts no era squarify puro; bloques con ratios incoherentes (largos arriba, cuadrados abajo). | Reemplazo completo: componente manual `ConcentracionGrid` con algoritmo Squarify (Bruls et al. 2000). Aspect ratio ≈ 1:1 garantizado. | (Fase 8, D025) |
 | 34 | 2026-05-17 | Bug crítico en métrica Margen %: stat mostraba "355.9%" | `pct = (item.margen_pct / universe.margen_pct) * 100` no aplica a métricas no aditivas (margen % no se "suma"). | Flag `isAdditive` por métrica. Para margen_pct: muestra valor raw del item, no "% del universo". % universo y acumulado solo aplican a métricas aditivas. | (Fase 8) |
 | 35 | 2026-05-17 | Vendedor con `allowed=['Cancún']` veía data de todos los territorios en Insights | Función SQL `insights_concentracion` v1 no respetaba RLS de `sales_rows` porque tenía SECURITY DEFINER. | Migración 020: SECURITY INVOKER + parámetro `p_territorios text[]` opcional. Hereda RLS del caller. Endpoint backend pasa territorios efectivos del sidebar. | (migración 020) |
+| 36 | 2026-05-21 | Tab Perdidos: labels YTD hardcoded a "Ene–Abr 25/26" (no se actualizaban al cambiar de mes) | `labelPrev`/`labelCurr` literales en vez de derivar de `monthShortYY` como ya hacía `dimLabel`. | Derivar ambos labels de `monthShortYY` (en mayo: "Ene–May 25/26"). | `87c2462` |
+| 37 | 2026-05-23 | `git commit` falló con "index.lock write error: Operation timed out" | iCloud Drive sincronizando archivos de `.git/` → timeout al escribir el lock. No es error de código. | Reintentar el commit (transitorio). Los `git add` previos sí quedaron staged. También afecta `rm -rf .next` (usar `mv .next /tmp/...` antes del build). | (operacional) |
 
 ---
 
@@ -509,9 +542,19 @@ Características:
 - [x] **Bug crítico Margen % "355.9%"** fixeado con flag `isAdditive` por métrica.
 - [x] **`LO_NUEVO.md`** generado con resumen ejecutivo de Fases 6-8.
 
-### Próximo a venir (acordado con Mauricio · post Fase 8)
+### Completados en fase 9 (2026-05-21 a 2026-05-23) · Selector de día + análisis profundo Clientes
 
-- [ ] **Tab "Reporteo Semanal"** — siguiente tab a construir tras esta documentación. (Quedó acordado al cierre de Fase 8 que la próxima sesión arranca con este tab.)
+- [x] **Mejora 1 — Selector de día libre** (D026): dropdown en header, ver dashboard al cierre de cualquier día. Reemplazó el CutoffToggle. Funciona en mes actual e histórico.
+- [x] **Mejora 2 — Toggle gráfica Clientes "Mismo mes / Evolución"** (D027): barras volumen mensual + línea margen %. Endpoint `clientes-evolution`.
+- [x] **Mejora 3 — Buscar por productos en Clientes** (D027): toggle Clientes/Productos; ver clientes que compran un SKU; evolución de 1 cliente por producto. Endpoint `clientes-por-producto`.
+- [x] **Mejora 4 — Tabla Clientes con 3 vistas** (D027): Año vs Año / Meses / vs Prom. 90d. Endpoint `clientes-ritmo-90d`. Componente `ClientesTableViews`.
+- [x] **Mejora 5 — Desglose por línea de producto** (D027): expand por cliente → grupo → SKU. Endpoint `cliente-desglose`. Componente `ClienteDesglose`.
+- [x] **Fix bug Perdidos labels YTD** hardcoded (bug 36).
+- [x] **Instructivo de usuario + docs actualizados** a v3.9.0.
+
+### Próximo a venir (acordado con Mauricio)
+
+- [ ] **Tab "Presentación Semanal"** — replica del PPT de la junta directiva (3 sub-tabs: Asesores / Ciudades / Productos). **BLOQUEADO**: requiere definir primero las **cuotas/objetivos por asesor** (Mauricio lo prepara de su lado). Spec recibido + discovery hecho; 7 preguntas pendientes (cuota, zona A/B/C/D, ciudad/plaza, par tablas, margen ponderado, posición del tab, naming). Ver detalle en la conversación / `CONTINUACION_NUEVA_CONVERSACION.md`.
 
 ### Mejoras opcionales (sin prisa)
 

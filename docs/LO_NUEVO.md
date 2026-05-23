@@ -1,15 +1,45 @@
 # 🆕 Lo Nuevo — Dashboard Comercial Susazón V3.0
 
-**Periodo cubierto:** 2026-05-11 al 2026-05-17
-**Versión:** 3.5.0 → 3.8.0
-**Fases:** 6 (UX comercial avanzada), 7 (Seguridad de sesión), 8 (Tab Insights)
+**Periodo cubierto:** 2026-05-11 al 2026-05-23
+**Versión:** 3.5.0 → 3.9.0
+**Fases:** 6 (UX comercial avanzada), 7 (Seguridad de sesión), 8 (Tab Insights), 9 (Selector de día + análisis profundo de Clientes)
 
 Este documento resume las features agregadas después de la **Fase 5 (2026-05-10)** —
 si vienes del SESSION_LOG previo, todo lo que está aquí es nuevo para ti.
 
 ---
 
-## 🎯 Resumen ejecutivo
+## ⭐ Fase 9 (2026-05-23) — Selector de día + análisis profundo del tab Clientes
+
+Lo más reciente. 1 mejora general + 4 al tab Clientes:
+
+1. **📆 Selector de día libre (general):** dropdown en el header para ver el dashboard
+   al cierre de **cualquier día** del mes (venta acumulada hasta ese día). Resalta días
+   con venta (verde) vs sin venta (gris); atajos "Hoy" y "Cierre". Reemplazó al toggle
+   Cierre/Hoy. Funciona en mes actual e histórico.
+
+2. **📊 Tab Clientes · Toggle gráfica "Mismo mes (3 años) / Evolución":** la vista
+   Evolución muestra barras de volumen mensual + línea de margen %, solo meses transcurridos.
+
+3. **🔎 Tab Clientes · Buscar por Clientes o Productos:** toggle en el buscador. En modo
+   Productos eliges SKUs y ves los clientes que más los compran. En Productos + Evolución
+   eliges 1 cliente (de todos los que compran ese SKU) y ves su compra mensual del producto.
+
+4. **📋 Tab Clientes · Tabla con 3 vistas:** "Año vs Año / Meses {año} / vs Prom. 90d".
+   La vista Prom 90d compara el ritmo diario del mes vs el de los últimos 90 días hábiles
+   (▲/▼ para detectar quién acelera o desacelera).
+
+5. **🧾 Tab Clientes · Desglose por línea de producto:** click en cualquier cliente para
+   expandir su facturación por grupo → sub-expand a SKUs.
+
+Todas respetan toggle Pesos/Kilos, filtro de territorios del sidebar y RLS. 4 endpoints
+lazy nuevos: `clientes-evolution`, `clientes-por-producto`, `clientes-ritmo-90d`,
+`cliente-desglose`. Implementadas como props opcionales del `DimensionTab` (Grupo y
+Vendedores intactos).
+
+---
+
+## 🎯 Resumen ejecutivo (Fases 6-8)
 
 | Área | Antes (≤ Fase 5) | Ahora (Fase 8) |
 |---|---|---|

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<instructivo version="3.0" fecha="2026-05-17" idioma="es-MX">
+<instructivo version="3.1" fecha="2026-05-23" idioma="es-MX">
 
   <contexto>
-    <proyecto>Dashboard Comercial Susazón V3.0 — InCom (versión 3.8.0)</proyecto>
+    <proyecto>Dashboard Comercial Susazón V3.0 — InCom (versión 3.9.0)</proyecto>
     <propietario>Mauricio Usabiaga, Director de Operaciones, Grupo Susazón</propietario>
     <empresa>Grupo Susazón (incluye marca Susazón y marca Suve)</empresa>
     <usuarios_finales>15 personas internas (admin, director, gerente regional, vendedor)</usuarios_finales>
@@ -18,13 +18,19 @@
       el V3.0 esté siendo evaluado. Útil como referencia de fórmulas y lógica de negocio.
     </predecesor>
     <estado_actual>
-      EN PRODUCCIÓN versión 3.8.0. Deploy live en Vercel desde repo privado
+      EN PRODUCCIÓN versión 3.9.0. Deploy live en Vercel desde repo privado
       github.com/musabiaga/dashboard-susazon-v3. URL canonical:
       https://www.dashboardcomercialsusazon.com (custom domain GoDaddy → Vercel).
 
-      ~120 commits totales tras Fase 8, 20 migraciones Supabase, 337K+ filas de datos
+      ~135 commits totales tras Fase 9, 20 migraciones Supabase, 337K+ filas de datos
       comerciales (Ene 2024 - May 2026). 15/15 usuarios autorizados en prod (admins +
       directores + gerentes + vendedores).
+
+      FASE 9 (Mayo 21-23, 2026): Selector de día libre en el header (ver dashboard al
+      cierre de cualquier día; reemplazó el CutoffToggle) + 4 mejoras de análisis profundo
+      al tab Clientes (toggle gráfica Mismo mes/Evolución, buscar por productos, tabla con
+      3 vistas Año/Meses/Prom-90d, desglose por línea de producto grupo→SKU). 4 endpoints
+      lazy nuevos en app/api/dashboard/. Ver &lt;fase_9&gt; para detalle.
 
       Stack actualizado en Fases 6, 7, 8 (Mayo 11-17, 2026):
 
@@ -335,6 +341,53 @@
     </cambios>
   </fase_8>
 
+  <fase_9 fecha="2026-05-21 al 2026-05-23" titulo="Selector de día + análisis profundo del tab Clientes">
+    <descripcion>
+      Selector de día libre en el header (general) + 4 mejoras de análisis profundo al tab
+      Clientes. Todas respetan toggle Pesos/Kilos, filtro de territorios del sidebar y RLS.
+    </descripcion>
+    <cambios>
+      <cambio tipo="feature" decision="D026">
+        Mejora 1 — Selector de día libre. Componente `DaySelector` (dropdown estilo MonthSelector)
+        en el header. Permite ver el dashboard al cierre de cualquier día del mes seleccionado
+        (venta acumulada hasta ese día). Resalta días con venta (verde) vs sin venta (gris),
+        atajos "Hoy" y badge "Cierre". Click → `?asOf=YYYY-MM-DD`. Reemplazó al CutoffToggle en
+        el header (componente conservado sin uso). page.tsx: `?asOf=` ahora aplica también en
+        histórico + calcula `daysWithSale`. Commits dabb54a, f10f441.
+      </cambio>
+      <cambio tipo="feature" decision="D027">
+        Mejora 2 — Toggle gráfica Clientes "Mismo mes (3 años) / Evolución {año}". Evolución =
+        barras volumen mensual (agregado de clientes visibles) + línea margen %, solo meses
+        transcurridos. Componente `ClientesEvolutionChart` (ComposedChart). Endpoint lazy
+        `clientes-evolution`. Commits 002f551, fb59c1f.
+      </cambio>
+      <cambio tipo="feature" decision="D027">
+        Mejora 3 — Buscar por Clientes o Productos. Toggle en el buscador. Modo Productos:
+        seleccionar SKUs → clientes que más los compran (suma si varios). Modo Productos +
+        Evolución: dropdown con TODOS los clientes del SKU (ordenados desc con monto) → evolución
+        de 1 cliente comprando esos productos. Endpoint `clientes-por-producto` + param `skus` en
+        `clientes-evolution`. Commits 1615153, 351ad16, 677eb0e.
+      </cambio>
+      <cambio tipo="feature" decision="D027">
+        Mejora 4 — Tabla Clientes con 3 vistas: "Año vs Año" / "Meses {año}" (col por mes + Total
+        YTD) / "vs Prom. 90d" (ritmo diario mes vs últimos 90 días hábiles, Δ% ▲/▼). Componente
+        `ClientesTableViews`. Endpoint `clientes-ritmo-90d` (calcula 90 días hábiles con
+        isBusinessDay). Commit 6524a2c.
+      </cambio>
+      <cambio tipo="feature" decision="D027">
+        Mejora 5 — Desglose por línea de producto. Cada fila de cliente se expande (chevron) a su
+        facturación por grupo → sub-expand a SKUs. Al-día. Columnas Venta/KG/Margen$/Margen%.
+        Componente `ClienteDesglose`. Endpoint `cliente-desglose` (1 query arma el árbol
+        grupo→SKU server-side). Commit 8950245.
+      </cambio>
+      <cambio tipo="nota">
+        Las 4 mejoras de Clientes se implementaron como props OPCIONALES del `DimensionTab`
+        genérico (enableEvolution, enableProductSearch, enableTableViews, enableRowExpand) — solo
+        el tab Clientes las activa; Grupo Producto y Vendedores quedan intactos.
+      </cambio>
+    </cambios>
+  </fase_9>
+
   <archivos>
     <directorio nombre="app/" descripcion="Páginas Next.js 16 (App Router)">
       <archivo path="app/layout.tsx" descripcion="Root layout con ThemeProvider + fonts" />
@@ -425,6 +478,10 @@
 
     <directorio nombre="app/api/dashboard/" descripcion="API routes específicas del dashboard (post Mejora 1)">
       <archivo path="app/api/dashboard/clientes-dia/route.ts" descripcion="Endpoint lazy para clientes de un día específico (expand row Tracking Diario). Cache HTTP 60s. RLS via security_invoker" />
+      <archivo path="app/api/dashboard/clientes-evolution/route.ts" descripcion="(Fase 9) Evolución mensual de clientes (Ene→mes). Param opcional skus filtra por producto. Vista Evolución del tab Clientes" />
+      <archivo path="app/api/dashboard/clientes-por-producto/route.ts" descripcion="(Fase 9) Clientes que compran ciertos SKUs (3 años + al-día). Modo Productos del buscador de Clientes" />
+      <archivo path="app/api/dashboard/clientes-ritmo-90d/route.ts" descripcion="(Fase 9) Venta de últimos 90 días hábiles por cliente. Vista 'vs Prom. 90d' de la tabla de Clientes" />
+      <archivo path="app/api/dashboard/cliente-desglose/route.ts" descripcion="(Fase 9) Facturación de un cliente por grupo→SKU (árbol). Dropdown de desglose en la tabla de Clientes" />
     </directorio>
 
     <directorio nombre="app/api/insights/" descripcion="(Fase 8) API routes del tab Insights">
@@ -444,6 +501,14 @@
       <archivo path="components/dashboard/insights/ConcentracionGrid.tsx" descripcion="Treemap squarify manual (~500 líneas). Algoritmo Bruls et al. 2000. ResizeObserver para tiers adaptativos" />
       <archivo path="components/dashboard/insights/TreemapHoverTooltip.tsx" descripcion="Tooltip flotante con accent bar + auto-flip (anti-clip en bordes)" />
       <archivo path="components/dashboard/insights/DateRangePicker.tsx" descripcion="Date range picker con 7 atajos (Este mes, Mes anterior, 30d, 90d, YTD, 12m, custom)" />
+    </directorio>
+
+    <directorio nombre="components/dashboard/ (Fase 9)" descripcion="Componentes del selector de día + mejoras del tab Clientes">
+      <archivo path="components/dashboard/DaySelector.tsx" descripcion="(Mejora 1) Dropdown de día en el header. Ver dashboard al cierre de cualquier día. Reemplazó al CutoffToggle" />
+      <archivo path="components/dashboard/ClientesEvolutionChart.tsx" descripcion="(Mejora 2) ComposedChart: barras volumen mensual + línea margen %. Vista Evolución del tab Clientes. Param skus opcional (1 cliente por producto)" />
+      <archivo path="components/dashboard/ClientesTableViews.tsx" descripcion="(Mejora 4) Vistas Meses / Prom 90d de la tabla de Clientes (fetch lazy)" />
+      <archivo path="components/dashboard/ClienteDesglose.tsx" descripcion="(Mejora 5) Fila expandida con árbol grupo→SKU de un cliente (sub-expand)" />
+      <archivo path="components/dashboard/DimensionTab.tsx" descripcion="Genérico (Grupo/Clientes/Vendedores). Fase 9 agregó props OPCIONALES solo para Clientes: enableEvolution, enableProductSearch, enableTableViews, enableRowExpand" />
     </directorio>
 
     <directorio nombre="components/dashboard/report-pdf/" descripcion="(Fase 6) Generador PDF Avance Comercial">

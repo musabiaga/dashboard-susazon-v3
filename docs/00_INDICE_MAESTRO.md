@@ -3,9 +3,9 @@
 **Proyecto:** Dashboard Comercial Susazón V3.0 — **InCom** (Inteligencia Comercial Susazón®)
 **Empresa:** Grupo Susazón (Susazón + Suve)
 **Owner:** Mauricio Usabiaga (Director de Operaciones)
-**Estado:** En producción (versión 3.8.0)
+**Estado:** En producción (versión 3.9.0)
 **URL canonical:** `https://www.dashboardcomercialsusazon.com`
-**Última actualización:** 2026-05-17
+**Última actualización:** 2026-05-23
 
 > 🆕 **Lee primero `LO_NUEVO.md`** si vienes de una sesión previa a Fase 6 (≤ 2026-05-10) — te
 > ahorra leer todo el SESSION_LOG para identificar qué se agregó recientemente (Fases 6, 7, 8).
@@ -22,13 +22,13 @@
 | 4 | `04_Manual_Usuario.docx` | Word | Manual para usuarios finales — incluye multi-select global, export Excel, expand clientes/día | 2.0 | 2026-05-10 |
 | 5 | `05_Guia_TI_Despliegue.docx` | Word | Guía para ingeniero de TI: despliegue, env vars, troubleshooting, monitoreo | 2.0 | 2026-05-10 |
 | 6 | `06_Guia_Reconstruccion.docx` | Word | Reconstrucción desde cero: paso a paso, algoritmos, dependencias, verificación | 2.0 | 2026-05-10 |
-| 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude que continúen el proyecto. **Incluye Fases 6, 7, 8** | **3.0** | **2026-05-17** |
-| 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones D001-D025, bugs 1-35, backlog. **Incluye Fases 6, 7, 8** | **3.0** | **2026-05-17** |
-| 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | **3.0** | **2026-05-17** |
+| 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude que continúen el proyecto. **Incluye Fases 6-9** | **3.1** | **2026-05-23** |
+| 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones D001-D027, bugs 1-37, backlog. **Incluye Fases 6-9** | **3.1** | **2026-05-23** |
+| 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | **3.1** | **2026-05-23** |
 | 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | **Contexto compacto para retomar el proyecto en otra sesión Claude** | **2.0** | **2026-05-17** |
 | 11 | `Instructivo_Usuario_Visual.pdf` | PDF | Instructivo visual para usuarios finales | 1.0 | 2026-04-30 |
 | 12 | `AUTH_FLOWS.md` | Markdown | **Documentación técnica del sistema de auth.** Diagramas de los 3 flows | 1.0 | 2026-05-01 |
-| 13 | **🆕 `LO_NUEVO.md`** | Markdown | **Resumen ejecutivo de Fases 6, 7, 8 (Mayo 11-17, 2026).** Cubre todo lo nuevo desde la última actualización de los `.docx`. Lee primero si vienes de una sesión previa. | **1.0** | **2026-05-17** |
+| 13 | **🆕 `LO_NUEVO.md`** | Markdown | **Resumen ejecutivo de Fases 6-9 (Mayo 11-23, 2026).** Cubre todo lo nuevo desde la última actualización de los `.docx`. Lee primero si vienes de una sesión previa. | **2.0** | **2026-05-23** |
 | 14 | `_backups/2026-05-10_pre-update/` | Snapshot | Snapshot inmutable de los 13 docs antes de actualizar con la sesión del 10-may | — | 2026-05-10 |
 
 > **Importante sobre los `.docx`:** los Word documents (1-6) reflejan el estado al **2026-05-10** (versión 3.3.0). Las Fases 6, 7 y 8 (2026-05-11 al 2026-05-17, versiones 3.5.0 → 3.8.0) están documentadas en los archivos vivos (`SESSION_LOG.md`, `INSTRUCTIVO_AGENTE.xml`) y resumidas en **`LO_NUEVO.md`**. Los `.docx` se regenerarán en una próxima sesión cuando haya cambios estructurales que lo ameriten.
