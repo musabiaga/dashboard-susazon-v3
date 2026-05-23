@@ -25,7 +25,7 @@
 | 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude que continúen el proyecto. **Incluye Fases 6-9** | **3.1** | **2026-05-23** |
 | 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones D001-D027, bugs 1-37, backlog. **Incluye Fases 6-9** | **3.1** | **2026-05-23** |
 | 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | **3.1** | **2026-05-23** |
-| 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | **Contexto compacto para retomar el proyecto en otra sesión Claude** | **2.0** | **2026-05-17** |
+| 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | **Contexto compacto para retomar el proyecto en otra sesión Claude** | **2.1** | **2026-05-23** |
 | 11 | `Instructivo_Usuario_Visual.pdf` | PDF | Instructivo visual para usuarios finales | 1.0 | 2026-04-30 |
 | 12 | `AUTH_FLOWS.md` | Markdown | **Documentación técnica del sistema de auth.** Diagramas de los 3 flows | 1.0 | 2026-05-01 |
 | 13 | **🆕 `LO_NUEVO.md`** | Markdown | **Resumen ejecutivo de Fases 6-9 (Mayo 11-23, 2026).** Cubre todo lo nuevo desde la última actualización de los `.docx`. Lee primero si vienes de una sesión previa. | **2.0** | **2026-05-23** |

@@ -13,7 +13,7 @@
 
 **Stack:** Next.js 16 + Supabase Postgres + Vercel. Frontend React 19, Tailwind 4 CSS-first, Recharts 3.x.
 
-**Estado:** EN PRODUCCIÓN versión **3.8.0** (deploy 2026-04-28; Fases 1-8 cerradas. Última: Fase 8 = Tab Insights, 2026-05-17).
+**Estado:** EN PRODUCCIÓN versión **3.9.0** (deploy 2026-04-28; Fases 1-9 cerradas. Última: Fase 9 = Selector de día + 4 mejoras análisis profundo del tab Clientes, 2026-05-23).
 
 > 🆕 **Si vienes de antes de Fase 6 (≤ 2026-05-10):** Lee primero `LO_NUEVO.md` — resume Fases 6, 7 y 8 en una página.
 
@@ -160,11 +160,24 @@ DASHBOARD SEMANAL VENTAS V3.0 [Claude Code]/
 
 ---
 
-## 📊 Estado del backlog (al 2026-05-17)
+## 📊 Estado del backlog (al 2026-05-23)
+
+### ✅ Fase 9 completada (2026-05-21 a 2026-05-23)
+
+Selector de día libre (general, reemplazó CutoffToggle) + 4 mejoras al tab Clientes:
+toggle gráfica Mismo mes/Evolución, buscar por productos, tabla 3 vistas (Año/Meses/Prom-90d),
+desglose por línea de producto (grupo→SKU). Ver D026-D027 en SESSION_LOG. 4 endpoints lazy
+nuevos en `app/api/dashboard/`. Componentes: DaySelector, ClientesEvolutionChart,
+ClientesTableViews, ClienteDesglose.
 
 ### 🚀 Siguiente tarea acordada con Mauricio
 
-- **Tab "Reporteo Semanal"** — al cierre de Fase 8 (2026-05-17) Mauricio acordó que la próxima sesión arranca con este tab. Detalles del scope se confirman con él al inicio de la sesión.
+- **Tab "Presentación Semanal"** — replica del PPT de la junta directiva (3 sub-tabs:
+  Asesores / Ciudades / Productos). **BLOQUEADO**: requiere que Mauricio defina primero las
+  **cuotas/objetivos por asesor** (de su lado). Spec completo recibido + discovery hecho;
+  7 preguntas pendientes (cuota por asesor, columna ZONA A/B/C/D, definición de ciudad/plaza,
+  par mes/QTD en tabla Ciudades, margen ponderado, posición del tab, naming "semanal").
+  Al retomar: confirmar con Mauricio si ya tiene las cuotas listas.
 
 ### Pendientes inmediatos (Mauricio, no Claude)
 
@@ -333,4 +346,4 @@ python3 scripts/gen_docs.py
 
 ---
 
-**Última actualización de este doc:** 2026-05-17 (cierre de Fase 8 — Tab Insights · Análisis de Concentración). Versión doc: 2.0.
+**Última actualización de este doc:** 2026-05-23 (cierre de Fase 9 — Selector de día + análisis profundo del tab Clientes). Versión doc: 2.1.
