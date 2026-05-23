@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Loader2, ChevronRight, ChevronDown } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
+import { ClienteDesglose } from "@/components/dashboard/ClienteDesglose";
 import {
   GroupedBarChart,
   type GroupedBarSeries,
@@ -131,6 +132,17 @@ interface Props {
   /** Contexto para las vistas alternativas de tabla (sin currentByClient,
    *  que se arma internamente desde tableRows). */
   tableViewsContext?: Omit<TableViewsContext, "currentByClient">;
+  /** Si true, cada fila de la tabla (vista Año vs Año) se expande para mostrar
+   *  el desglose por línea de producto (grupo → SKU) del cliente (Mejora 5).
+   *  Solo lo usa el tab Clientes. */
+  enableRowExpand?: boolean;
+  /** Contexto para el fetch lazy del desglose por cliente. */
+  rowExpandContext?: {
+    year: number;
+    month: number;
+    daysCurrent: number;
+    territorios: string[] | null;
+  };
 }
 
 /**
@@ -174,7 +186,22 @@ export function DimensionTab({
   productSearchContext,
   enableTableViews = false,
   tableViewsContext,
+  enableRowExpand = false,
+  rowExpandContext,
 }: Props) {
+  // ============ Filas expandibles (Mejora 5) ============
+  // Cada cliente se expande para ver su desglose por grupo → SKU.
+  const [expandedClients, setExpandedClients] = useState<Set<string>>(
+    new Set()
+  );
+  const toggleClientExpand = (name: string) => {
+    setExpandedClients((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
   // ============ Toggle de vistas de tabla (Mejora 4) ============
   // "anio" (default) | "meses" (12 meses + Total YTD) | "prom90" (ritmo vs 90d).
   const [tableView, setTableView] = useState<"anio" | "meses" | "prom90">(
@@ -1141,9 +1168,11 @@ export function DimensionTab({
                     mgPct26 != null && mgPct25 != null
                       ? mgPct26 - mgPct25
                       : null;
+                  const isExpanded =
+                    enableRowExpand && expandedClients.has(r.name);
                   return (
+                    <Fragment key={r.name + i}>
                     <tr
-                      key={r.name + i}
                       style={{
                         background:
                           i % 2 === 0
@@ -1151,7 +1180,32 @@ export function DimensionTab({
                             : "var(--bg-surface-muted)",
                       }}
                     >
-                      <Td>{r.name}</Td>
+                      <Td>
+                        {enableRowExpand && rowExpandContext ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleClientExpand(r.name)}
+                            className="flex items-center gap-1.5 text-left"
+                            style={{ color: "var(--text-primary)" }}
+                            title="Ver desglose por línea de producto"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown
+                                size={14}
+                                style={{ color: "var(--text-secondary)" }}
+                              />
+                            ) : (
+                              <ChevronRight
+                                size={14}
+                                style={{ color: "var(--text-secondary)" }}
+                              />
+                            )}
+                            {r.name}
+                          </button>
+                        ) : (
+                          r.name
+                        )}
+                      </Td>
                       <Td align="right">{formatMoney(v24Show)}</Td>
                       <Td align="right">{formatMoney(v25Show)}</Td>
                       <Td align="right">{formatMoney(v26Show)}</Td>
@@ -1216,6 +1270,14 @@ export function DimensionTab({
                           : `${deltaPp >= 0 ? "+" : ""}${deltaPp.toFixed(1)} pp`}
                       </Td>
                     </tr>
+                    {isExpanded && rowExpandContext && (
+                      <ClienteDesglose
+                        cliente={r.name}
+                        context={rowExpandContext}
+                        colSpan={9 + (showKg ? 4 : 0)}
+                      />
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>
