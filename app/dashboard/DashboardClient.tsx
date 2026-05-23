@@ -712,6 +712,14 @@ export function DashboardClient({
                       daysCurrent,
                       territorios: clientesTerritorios,
                     }}
+                    enableTableViews
+                    tableViewsContext={{
+                      year: currentYear,
+                      month: currentMonth,
+                      territorios: clientesTerritorios,
+                      daysCurrent,
+                      elapsedBizDays,
+                    }}
                   />
                 );
               }

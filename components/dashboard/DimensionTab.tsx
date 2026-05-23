@@ -9,6 +9,10 @@ import {
 } from "@/components/dashboard/GroupedBarChart";
 import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
 import { ClientesEvolutionChart } from "@/components/dashboard/ClientesEvolutionChart";
+import {
+  ClientesTableViews,
+  type TableViewsContext,
+} from "@/components/dashboard/ClientesTableViews";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
 import { ReportButton } from "@/components/dashboard/ReportButton";
 import type { BuildReportInput } from "@/lib/report-pdf/data";
@@ -121,6 +125,12 @@ interface Props {
     daysCurrent: number;
     territorios: string[] | null;
   };
+  /** Si true, agrega un toggle de vistas a la tabla inferior:
+   *  "Año vs Año" | "Meses 2026" | "vs Prom. 90d" (Mejora 4). Solo Clientes. */
+  enableTableViews?: boolean;
+  /** Contexto para las vistas alternativas de tabla (sin currentByClient,
+   *  que se arma internamente desde tableRows). */
+  tableViewsContext?: Omit<TableViewsContext, "currentByClient">;
 }
 
 /**
@@ -162,7 +172,33 @@ export function DimensionTab({
   enableProductSearch = false,
   productOptions,
   productSearchContext,
+  enableTableViews = false,
+  tableViewsContext,
 }: Props) {
+  // ============ Toggle de vistas de tabla (Mejora 4) ============
+  // "anio" (default) | "meses" (12 meses + Total YTD) | "prom90" (ritmo vs 90d).
+  const [tableView, setTableView] = useState<"anio" | "meses" | "prom90">(
+    "anio"
+  );
+  useEffect(() => {
+    if (!enableTableViews) return;
+    try {
+      const saved = window.localStorage.getItem("clientes-table-view");
+      if (saved === "anio" || saved === "meses" || saved === "prom90") {
+        setTableView(saved);
+      }
+    } catch {
+      // ignore
+    }
+  }, [enableTableViews]);
+  const switchTableView = (next: "anio" | "meses" | "prom90") => {
+    setTableView(next);
+    try {
+      window.localStorage.setItem("clientes-table-view", next);
+    } catch {
+      // ignore
+    }
+  };
   // ============ Modo de búsqueda: Clientes / Productos (Mejora 3) ============
   // Solo se activa con enableProductSearch (tab Clientes). En modo Productos,
   // seleccionar SKUs muestra los clientes que más los compran (fetch lazy).
@@ -601,6 +637,18 @@ export function DimensionTab({
       ? evolutionClient
       : (sorted[0]?.name ?? null);
 
+  // Venta/kg al-día del mes actual por cliente (para la vista "vs Prom. 90d").
+  const currentByClient = useMemo(() => {
+    const map: Record<string, { venta: number; kg: number }> = {};
+    for (const r of tableRows) {
+      map[r.name] = {
+        venta: r.v26_alDia ?? r.v26,
+        kg: r.k26_alDia ?? r.k26 ?? 0,
+      };
+    }
+    return map;
+  }, [tableRows]);
+
   return (
     <div className="space-y-4">
       {/* Toolbar superior: toggle Pesos/Kilos (si aplica) + botones de
@@ -958,6 +1006,63 @@ export function DimensionTab({
 
       {/* Tabla */}
       {tableRows.length > 0 && (
+        <div className="space-y-2">
+          {/* Toggle de vistas de tabla (Mejora 4) */}
+          {enableTableViews && tableViewsContext && (
+            <div
+              className="inline-flex w-fit items-center gap-0.5 rounded-[var(--radius)] border p-0.5"
+              style={{
+                background: "var(--bg-surface-muted)",
+                borderColor: "var(--border)",
+              }}
+            >
+              {(
+                [
+                  ["anio", "Año vs Año"],
+                  ["meses", `Meses ${tableViewsContext.year}`],
+                  ["prom90", "vs Prom. 90d"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => switchTableView(key)}
+                  className="rounded-[var(--radius-sm)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                  style={{
+                    background:
+                      tableView === key ? "var(--bg-surface)" : "transparent",
+                    color:
+                      tableView === key ? "var(--accent)" : "var(--text-muted)",
+                    boxShadow:
+                      tableView === key ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Vistas alternativas (Meses / Prom 90d) */}
+          {enableTableViews &&
+          tableViewsContext &&
+          tableView !== "anio" ? (
+            <div
+              className="rounded-[var(--radius-lg)] border"
+              style={{
+                background: "var(--bg-surface)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <ClientesTableViews
+                view={tableView}
+                clientes={tableRows.map((r) => r.name)}
+                context={{ ...tableViewsContext, currentByClient }}
+                mode={mode}
+                dimensionLabel={dimensionLabel}
+              />
+            </div>
+          ) : (
         <div
           className="rounded-[var(--radius-lg)] border"
           style={{
@@ -1127,6 +1232,8 @@ export function DimensionTab({
               Mostrando top {tableRows.length} de {sorted.length}{" "}
               {dimensionLabelPlural.toLowerCase()}
             </div>
+          )}
+        </div>
           )}
         </div>
       )}
