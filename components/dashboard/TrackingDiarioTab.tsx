@@ -18,6 +18,7 @@ import { countBizDays, isBusinessDay } from "@/lib/business-days";
 import { computePrevYearAlDia } from "@/lib/prev-year-al-dia";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
+import { VariedadCard } from "@/components/dashboard/VariedadCard";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
 import { ReportButton } from "@/components/dashboard/ReportButton";
 import type { BuildReportInput } from "@/lib/report-pdf/data";
@@ -59,6 +60,11 @@ interface Props {
   prevMonthShortYY: string;
   elapsedBizDays: number;
   totalBizDays: number;
+  /** Día calendario de corte del mes (al-día) — para el card de Variedad. */
+  daysCurrent: number;
+  /** Territorios efectivos del sidebar (null=todos, []=ninguno, [...]=subset),
+   *  para el fetch lazy del card de Variedad (Fase 10). */
+  variedadTerritorios: string[] | null;
   /** Territorio activo del dashboard. "" = todos los territorios visibles
    *  (el RLS de Supabase filtra automáticamente por permisos del usuario). */
   territorio?: string;
@@ -77,6 +83,8 @@ export function TrackingDiarioTab({
   prevMonthShortYY,
   elapsedBizDays,
   totalBizDays,
+  daysCurrent,
+  variedadTerritorios,
   territorio = "",
   canExportExcel = false,
   reportInput = null,
@@ -759,6 +767,15 @@ export function TrackingDiarioTab({
             />
           </>
         )}
+        {/* Card de Variedad (SKUs vendidos) — aparece en ambas vistas
+            (Pesos/Kilos), es un conteo independiente del toggle. Ocupa 2
+            columnas. Fetch lazy (Fase 10). */}
+        <VariedadCard
+          year={currentYear}
+          month={currentMonth}
+          daysCurrent={daysCurrent}
+          territorios={variedadTerritorios}
+        />
       </div>
 
       {/* ============ Progress bar (Pesos: vs PTTO | Kilos: vs cierre 2025) ============ */}

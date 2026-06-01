@@ -602,6 +602,16 @@ export function DashboardClient({
               };
 
               if (activeTab === "tracking") {
+                // Territorios efectivos según el sidebar (mismo cálculo que
+                // Clientes/Insights) — para el card de Variedad (Fase 10).
+                const trackingTerritorios: string[] | null =
+                  selectionMode === "single"
+                    ? [effectiveSelected]
+                    : selectionMode === "aggregated-custom"
+                      ? Array.from(aggregatedTerritories)
+                      : selectionMode === "aggregated-none"
+                        ? []
+                        : null; // aggregated-all → no filtrar
                 return (
                   <TrackingDiarioTab
                     kpi={activeKpi}
@@ -612,6 +622,8 @@ export function DashboardClient({
                     prevMonthShortYY={prevMonthShortYY}
                     elapsedBizDays={elapsedBizDays}
                     totalBizDays={totalBizDays}
+                    daysCurrent={daysCurrent}
+                    variedadTerritorios={trackingTerritorios}
                     territorio={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
                     reportInput={reportInput}
