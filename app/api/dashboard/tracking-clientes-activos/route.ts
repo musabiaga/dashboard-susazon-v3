@@ -6,9 +6,18 @@ import { countBizDays, findCalendarDayForBizDays } from "@/lib/business-days";
  * GET /api/dashboard/tracking-clientes-activos
  *
  * Métricas de CLIENTES ACTIVOS para el card del tab Tracking Diario (Fase 10).
- * "Activo" = cliente distinto (por no_cliente) con compra (venta>0) en el mes
- * en curso, hasta el día de corte (al-día). Comparativos apples-to-apples
- * (mismo día hábil elapsed entre periodos).
+ * "Activo" = cliente distinto con compra (venta>0) en el mes en curso, hasta
+ * el día de corte (al-día). Comparativos apples-to-apples (mismo día hábil
+ * elapsed entre periodos).
+ *
+ * IMPORTANTE — conteo por NOMBRE (cliente), NO por no_cliente:
+ *   Cada ERP (Susazón=0, Suve=1) numera a sus clientes por separado, así que
+ *   un mismo cliente físico tiene no_cliente DISTINTO en cada empresa (ej.
+ *   "20 CANCUN" = CL-000364 en Susazón y CL-000982 en Suve). Contar por
+ *   no_cliente lo duplicaría. El nombre del cliente es consistente entre
+ *   empresas, así que un cliente que compra en ambas cuenta UNA sola vez.
+ *   Es además la convención del resto del dashboard (tab Clientes/Perdidos
+ *   agrupan por nombre).
  *
  * Devuelve:
  *   clientesActivos:   # de clientes distintos con compra este mes al-día
@@ -19,7 +28,7 @@ import { countBizDays, findCalendarDayForBizDays } from "@/lib/business-days";
  *   ticketPromedio:    venta promedio por cliente activo ($ venta ÷ clientes)
  *
  * Query params: year, month, daysCurrent, territorios (igual que tracking-variedad).
- * Conteo por no_cliente (ID único), no por nombre. RLS respetada.
+ * Conteo por nombre de cliente. RLS respetada.
  */
 
 const MONTH_SHORT_ES = [
@@ -109,9 +118,9 @@ export async function GET(request: NextRequest) {
   const prevYearCutoff = findCalendarDayForBizDays(year - 1, month, elapsedBizDays);
 
   const [curRes, prevYearRes, ...prevMonthsRes] = await Promise.all([
-    cliQuery(year, month, daysCurrent, "no_cliente, vendedor, venta"),
-    cliQuery(year - 1, month, prevYearCutoff, "no_cliente"),
-    ...prevMonths.map((pm) => cliQuery(pm.y, pm.m, pm.cutoff, "no_cliente")),
+    cliQuery(year, month, daysCurrent, "cliente, vendedor, venta"),
+    cliQuery(year - 1, month, prevYearCutoff, "cliente"),
+    ...prevMonths.map((pm) => cliQuery(pm.y, pm.m, pm.cutoff, "cliente")),
   ]);
 
   if (curRes.error) {
@@ -119,35 +128,36 @@ export async function GET(request: NextRequest) {
   }
 
   // ===== Mes actual: clientes activos + por vendedor + ticket promedio =====
+  // Conteo por NOMBRE de cliente (dedup Susazón+Suve, ver comment header).
   const cliSet = new Set<string>();
   const byVendedor = new Map<string, Set<string>>();
   let ventaTotal = 0;
   for (const r of (curRes.data ?? []) as unknown as {
-    no_cliente: string | null;
+    cliente: string | null;
     vendedor: string | null;
     venta: number | null;
   }[]) {
-    const nc = r.no_cliente ?? "";
-    if (!nc) continue;
-    cliSet.add(nc);
+    const name = r.cliente ?? "";
+    if (!name) continue;
+    cliSet.add(name);
     ventaTotal += Number(r.venta) || 0;
     const ven = r.vendedor ?? "(sin vendedor)";
     if (!byVendedor.has(ven)) byVendedor.set(ven, new Set());
-    byVendedor.get(ven)!.add(nc);
+    byVendedor.get(ven)!.add(name);
   }
   const clientesActivos = cliSet.size;
   const sumVendedor = Array.from(byVendedor.values()).reduce((a, s) => a + s.size, 0);
   const clientesPorVendedor = byVendedor.size > 0 ? sumVendedor / byVendedor.size : 0;
   const ticketPromedio = clientesActivos > 0 ? ventaTotal / clientesActivos : 0;
 
-  // ===== Conteo distinct de no_cliente para periodos comparativos =====
+  // ===== Conteo distinct de cliente (por nombre) para periodos comparativos =====
   const distinctClientes = (
     res: { data: unknown[] | null; error: unknown } | undefined
   ): number | null => {
     if (!res || res.error) return null;
     const s = new Set<string>();
-    for (const r of (res.data ?? []) as { no_cliente: string | null }[]) {
-      if (r.no_cliente) s.add(r.no_cliente);
+    for (const r of (res.data ?? []) as { cliente: string | null }[]) {
+      if (r.cliente) s.add(r.cliente);
     }
     return s.size;
   };
