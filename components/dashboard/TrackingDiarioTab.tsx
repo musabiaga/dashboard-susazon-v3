@@ -19,6 +19,7 @@ import { computePrevYearAlDia } from "@/lib/prev-year-al-dia";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
 import { VariedadCard } from "@/components/dashboard/VariedadCard";
+import { ClientesActivosCard } from "@/components/dashboard/ClientesActivosCard";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
 import { ReportButton } from "@/components/dashboard/ReportButton";
 import type { BuildReportInput } from "@/lib/report-pdf/data";
@@ -767,10 +768,16 @@ export function TrackingDiarioTab({
             />
           </>
         )}
-        {/* Card de Variedad (SKUs vendidos) — aparece en ambas vistas
-            (Pesos/Kilos), es un conteo independiente del toggle. Ocupa 2
-            columnas. Fetch lazy (Fase 10). */}
+        {/* Cards de Variedad (SKUs) y Clientes activos — aparecen en ambas
+            vistas (Pesos/Kilos), son conteos independientes del toggle. Cada
+            uno ocupa 2 columnas. Fetch lazy (Fase 10). */}
         <VariedadCard
+          year={currentYear}
+          month={currentMonth}
+          daysCurrent={daysCurrent}
+          territorios={variedadTerritorios}
+        />
+        <ClientesActivosCard
           year={currentYear}
           month={currentMonth}
           daysCurrent={daysCurrent}
