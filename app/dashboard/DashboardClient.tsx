@@ -13,6 +13,7 @@ import {
   type DimensionRow,
 } from "@/components/dashboard/DimensionTab";
 import { ProductosTab } from "@/components/dashboard/ProductosTab";
+import { ClientesProductosTab } from "@/components/dashboard/ClientesProductosTab";
 import { VendedoresTab } from "@/components/dashboard/VendedoresTab";
 import {
   PerdidosTab,
@@ -663,23 +664,12 @@ export function DashboardClient({
                   />
                 );
               }
-              if (activeTab === "productos") {
-                return (
-                  <ProductosTab
-                    rows={resolveDimRows(skus)}
-                    monthLabel24={prev2MonthShortYY}
-                    monthLabel25={prevMonthShortYY}
-                    monthLabel26={monthShortYY}
-                    exportTerritory={exportTerritoryLabel}
-                    exportPeriodLabel={monthShortYY}
-                    canExportExcel={canExportExcel}
-                    reportInput={reportInput}
-                  />
-                );
-              }
-              if (activeTab === "clientes") {
+              if (activeTab === "clientes-productos") {
+                // Tab unificado (Fase 1): toggle maestro Clientes | Productos.
+                // Cada vista conserva TODAS sus features actuales; el
+                // contenedor solo alterna entre ellas (solo la activa se monta).
                 // Territorios efectivos según el sidebar (mismo cálculo que
-                // Insights) — para el fetch lazy de evolución mensual (Mejora 2).
+                // Insights) — para los fetches lazy de la vista Clientes.
                 const clientesTerritorios: string[] | null =
                   selectionMode === "single"
                     ? [effectiveSelected]
@@ -689,56 +679,72 @@ export function DashboardClient({
                         ? []
                         : null; // aggregated-all → no filtrar
                 return (
-                  <DimensionTab
-                    rows={resolveDimRows(clientes)}
-                    monthLabel24={prev2MonthShortYY}
-                    monthLabel25={prevMonthShortYY}
-                    monthLabel26={monthShortYY}
-                    dimensionLabel="Cliente"
-                    dimensionLabelPlural="Clientes"
-                    topNChart={10}
-                    topNTable={50}
-                    showKg
-                    enableMultiSelect
-                    selectionStorageKey="clientes-selected"
-                    multiSelectMaxItems={15}
-                    multiSelectPlaceholder="Buscar cliente…"
-                    exportTabName="Clientes"
-                    exportPeriodLabel={monthShortYY}
-                    exportTerritory={exportTerritoryLabel}
-                    canExportExcel={canExportExcel}
-                    reportInput={reportInput}
-                    modeStorageKey="clientes-tab-mode"
-                    enableEvolution
-                    evolutionContext={{
-                      year: currentYear,
-                      month: currentMonth,
-                      territorios: clientesTerritorios,
-                    }}
-                    evolutionStorageKey="clientes-chart-view"
-                    enableProductSearch
-                    productOptions={resolveDimRows(skus).map((r) => r.name)}
-                    productSearchContext={{
-                      year: currentYear,
-                      month: currentMonth,
-                      daysCurrent,
-                      territorios: clientesTerritorios,
-                    }}
-                    enableTableViews
-                    tableViewsContext={{
-                      year: currentYear,
-                      month: currentMonth,
-                      territorios: clientesTerritorios,
-                      daysCurrent,
-                      elapsedBizDays,
-                    }}
-                    enableRowExpand
-                    rowExpandContext={{
-                      year: currentYear,
-                      month: currentMonth,
-                      daysCurrent,
-                      territorios: clientesTerritorios,
-                    }}
+                  <ClientesProductosTab
+                    clienteView={
+                      <DimensionTab
+                        rows={resolveDimRows(clientes)}
+                        monthLabel24={prev2MonthShortYY}
+                        monthLabel25={prevMonthShortYY}
+                        monthLabel26={monthShortYY}
+                        dimensionLabel="Cliente"
+                        dimensionLabelPlural="Clientes"
+                        topNChart={10}
+                        topNTable={50}
+                        showKg
+                        enableMultiSelect
+                        selectionStorageKey="clientes-selected"
+                        multiSelectMaxItems={15}
+                        multiSelectPlaceholder="Buscar cliente…"
+                        exportTabName="Clientes"
+                        exportPeriodLabel={monthShortYY}
+                        exportTerritory={exportTerritoryLabel}
+                        canExportExcel={canExportExcel}
+                        reportInput={reportInput}
+                        modeStorageKey="clientes-tab-mode"
+                        enableEvolution
+                        evolutionContext={{
+                          year: currentYear,
+                          month: currentMonth,
+                          territorios: clientesTerritorios,
+                        }}
+                        evolutionStorageKey="clientes-chart-view"
+                        enableProductSearch
+                        productOptions={resolveDimRows(skus).map((r) => r.name)}
+                        productSearchContext={{
+                          year: currentYear,
+                          month: currentMonth,
+                          daysCurrent,
+                          territorios: clientesTerritorios,
+                        }}
+                        enableTableViews
+                        tableViewsContext={{
+                          year: currentYear,
+                          month: currentMonth,
+                          territorios: clientesTerritorios,
+                          daysCurrent,
+                          elapsedBizDays,
+                        }}
+                        enableRowExpand
+                        rowExpandContext={{
+                          year: currentYear,
+                          month: currentMonth,
+                          daysCurrent,
+                          territorios: clientesTerritorios,
+                        }}
+                      />
+                    }
+                    productoView={
+                      <ProductosTab
+                        rows={resolveDimRows(skus)}
+                        monthLabel24={prev2MonthShortYY}
+                        monthLabel25={prevMonthShortYY}
+                        monthLabel26={monthShortYY}
+                        exportTerritory={exportTerritoryLabel}
+                        exportPeriodLabel={monthShortYY}
+                        canExportExcel={canExportExcel}
+                        reportInput={reportInput}
+                      />
+                    }
                   />
                 );
               }

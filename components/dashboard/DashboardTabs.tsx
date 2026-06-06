@@ -4,7 +4,6 @@ import {
   CalendarDays,
   BarChart3,
   Layers3,
-  Package,
   Users,
   UserCircle2,
   AlertOctagon,
@@ -16,8 +15,7 @@ export type TabKey =
   | "tracking"
   | "ventas"
   | "grupo"
-  | "productos"
-  | "clientes"
+  | "clientes-productos"
   | "vendedores"
   | "perdidos"
   | "insights";
@@ -32,8 +30,7 @@ const TABS: TabConfig[] = [
   { key: "tracking", label: "Tracking Diario", icon: <CalendarDays size={14} /> },
   { key: "ventas", label: "Ventas", icon: <BarChart3 size={14} /> },
   { key: "grupo", label: "Grupo Producto", icon: <Layers3 size={14} /> },
-  { key: "productos", label: "Productos", icon: <Package size={14} /> },
-  { key: "clientes", label: "Clientes", icon: <Users size={14} /> },
+  { key: "clientes-productos", label: "Clientes y Productos", icon: <Users size={14} /> },
   { key: "vendedores", label: "Vendedores", icon: <UserCircle2 size={14} /> },
   { key: "perdidos", label: "Perdidos", icon: <AlertOctagon size={14} /> },
   { key: "insights", label: "Insights", icon: <Lightbulb size={14} /> },
