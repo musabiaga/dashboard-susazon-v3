@@ -6,18 +6,23 @@ import { isBusinessDay } from "@/lib/business-days";
  * GET /api/dashboard/clientes-ritmo-90d
  *
  * Devuelve la venta/kg de los últimos 90 DÍAS HÁBILES (L-S menos feriados LFT)
- * por cliente, para la vista "vs Prom. 90d" de la tabla del tab Clientes
- * (Mejora 4). El componente calcula el ritmo diario (÷ días hábiles) y lo
- * compara contra el ritmo del mes en curso.
+ * por entidad (cliente o SKU), para la vista "vs Prom. 90d" de la tabla del
+ * tab unificado Clientes y Productos (Mejora 4 + Fase 2). El componente calcula
+ * el ritmo diario (÷ días hábiles) y lo compara contra el ritmo del mes.
  *
  * Query params:
  *   year:        YYYY (solo informativo / validación)
- *   asOf:        YYYY-MM-DD — día de corte (toDate). Default: hoy del rango.
- *   clientes:    CSV de nombres de cliente
+ *   asOf:        YYYY-MM-DD — día de corte (toDate).
+ *   dim:         "cliente" (default) | "sku" — dimensión del ritmo
+ *   items:       CSV de nombres (clientes o SKUs según dim).
+ *                Fallback: `clientes` (compat con llamados previos).
  *   territorios: null (todos por RLS) | "" (ninguno) | CSV
  *
  * Calcula fromDate = el día calendario que está 90 días hábiles antes de asOf.
  * Respeta RLS de territorio.
+ *
+ * Respuesta: { clientes: [{name, venta90d, kg90d}], bizDays, fromDate, toDate }
+ * (key "clientes" conservada por compatibilidad — es el arreglo de series).
  */
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -38,12 +43,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "asOf inválido (YYYY-MM-DD)" }, { status: 400 });
   }
 
-  const clientesRaw = sp.get("clientes") ?? "";
-  const clientes = clientesRaw
+  const dim = sp.get("dim") === "sku" ? "sku" : "cliente";
+  const column = dim === "sku" ? "sku" : "cliente";
+
+  // Entidades (clientes o SKUs según dim). `items` canónico, `clientes` fallback.
+  const itemsRaw = sp.get("items") ?? sp.get("clientes") ?? "";
+  const items = itemsRaw
     .split(",")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
-  if (clientes.length === 0) {
+  if (items.length === 0) {
     return NextResponse.json({ clientes: [], bizDays: 0, fromDate: asOf, toDate: asOf });
   }
 
@@ -60,7 +69,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ clientes: [], bizDays: 0, fromDate: asOf, toDate: asOf });
   }
 
-  // Calcular fromDate: retroceder día por día desde asOf contando días hábiles
+  // Calcular fromDate: retroceder dia por dia desde asOf contando dias habiles
   // hasta acumular 90. El día asOf cuenta si es hábil.
   const [ay, am, ad] = asOf.split("-").map((s) => parseInt(s, 10));
   const cursor = new Date(ay, am - 1, ad);
@@ -85,8 +94,8 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("sales_rows")
-    .select("cliente, venta, kg")
-    .in("cliente", clientes)
+    .select(`${column}, venta, kg`)
+    .in(column, items)
     .gte("fecha", fromDate)
     .lte("fecha", toDate);
   if (territoriosFilter !== null) {
@@ -98,23 +107,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: `Error: ${error.message}` }, { status: 500 });
   }
 
-  const byCliente = new Map<string, { venta90d: number; kg90d: number }>();
-  for (const r of data ?? []) {
-    const name = r.cliente ?? "(sin nombre)";
-    const cur = byCliente.get(name) ?? { venta90d: 0, kg90d: 0 };
+  const byName = new Map<string, { venta90d: number; kg90d: number }>();
+  for (const r of (data ?? []) as Record<string, unknown>[]) {
+    const name = (r[column] as string | null) ?? "(sin nombre)";
+    const cur = byName.get(name) ?? { venta90d: 0, kg90d: 0 };
     cur.venta90d += Number(r.venta) || 0;
     cur.kg90d += Number(r.kg) || 0;
-    byCliente.set(name, cur);
+    byName.set(name, cur);
   }
 
-  const clientesOut = clientes.map((name) => ({
+  const itemsOut = items.map((name) => ({
     name,
-    venta90d: byCliente.get(name)?.venta90d ?? 0,
-    kg90d: byCliente.get(name)?.kg90d ?? 0,
+    venta90d: byName.get(name)?.venta90d ?? 0,
+    kg90d: byName.get(name)?.kg90d ?? 0,
   }));
 
   return NextResponse.json({
-    clientes: clientesOut,
+    clientes: itemsOut,
     bizDays: TARGET_BIZ_DAYS,
     fromDate,
     toDate,
