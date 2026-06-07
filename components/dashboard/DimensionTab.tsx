@@ -147,6 +147,16 @@ interface Props {
    *  endpoints llaman las features ricas (evolución / meses / prom 90d).
    *  Permite reutilizar el motor para Productos (Fase 2). */
   dimension?: "cliente" | "sku";
+  /** Modo Pesos/Kilos controlado externamente. Si se pasa, se usa este en vez
+   *  del estado interno y se oculta el ModeToggle propio (el contenedor
+   *  unificado lo controla una sola vez para gráfica + tabla). */
+  controlledMode?: DimensionViewMode;
+  /** Si false, oculta la sección gráfica (toolbar de modo + chart + buscador).
+   *  Default true. El contenedor lo usa para mostrar solo una sección por
+   *  instancia (gráfica de una dimensión, tabla de otra). */
+  showChart?: boolean;
+  /** Si false, oculta la sección tabla. Default true. */
+  showTable?: boolean;
 }
 
 /**
@@ -193,6 +203,9 @@ export function DimensionTab({
   enableRowExpand = false,
   rowExpandContext,
   dimension = "cliente",
+  controlledMode,
+  showChart = true,
+  showTable = true,
 }: Props) {
   // ============ Filas expandibles (Mejora 5) ============
   // Cada cliente se expande para ver su desglose por grupo → SKU.
@@ -290,7 +303,10 @@ export function DimensionTab({
       // ignore
     }
   };
-  const isKg = mode === "kg";
+  // Modo efectivo: el controlado externamente (contenedor unificado) o el
+  // interno. isKg y los hijos usan effectiveMode.
+  const effectiveMode = controlledMode ?? mode;
+  const isKg = effectiveMode === "kg";
   // Selección custom (multi-select). Vacía = comportamiento default Top N.
   // Persistencia en localStorage si selectionStorageKey está definido.
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -683,13 +699,13 @@ export function DimensionTab({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar superior: toggle Pesos/Kilos (si aplica) + botones de
-          exportación. Se renderiza si hay toggle o si tiene permiso. */}
-      {(modeStorageKey ||
+      {/* Toolbar superior: toggle Pesos/Kilos (si aplica y NO es controlado por
+          el contenedor) + botones de exportación. */}
+      {((modeStorageKey && !controlledMode) ||
         (canExportExcel && (handleExportExcel || reportInput !== undefined))) && (
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {modeStorageKey && (
-            <ModeToggle mode={mode} onChange={switchMode} />
+          {modeStorageKey && !controlledMode && (
+            <ModeToggle mode={effectiveMode} onChange={switchMode} />
           )}
           {canExportExcel && handleExportExcel && (
             <ExportExcelButton
@@ -709,7 +725,8 @@ export function DimensionTab({
         </div>
       )}
 
-      {/* Chart top N */}
+      {/* Chart top N — gateado por showChart (contenedor unificado) */}
+      {showChart && (
       <div
         className="rounded-[var(--radius-lg)] border p-4"
         style={{
@@ -959,7 +976,7 @@ export function DimensionTab({
                       territorios={evolutionContext.territorios}
                       clientes={[effectiveEvolutionClient]}
                       skus={selectedProducts}
-                      mode={mode}
+                      mode={effectiveMode}
                     />
                   )}
                 </div>
@@ -971,7 +988,7 @@ export function DimensionTab({
                   month={evolutionContext.month}
                   territorios={evolutionContext.territorios}
                   clientes={top.map((r) => r.name)}
-                  mode={mode}
+                  mode={effectiveMode}
                   dim={dimension}
                 />
               )
@@ -1037,9 +1054,10 @@ export function DimensionTab({
           </>
         )}
       </div>
+      )}
 
-      {/* Tabla */}
-      {tableRows.length > 0 && (
+      {/* Tabla — gateada por showTable (contenedor unificado) */}
+      {showTable && tableRows.length > 0 && (
         <div className="space-y-2">
           {/* Toggle de vistas de tabla (Mejora 4) */}
           {enableTableViews && tableViewsContext && (
@@ -1092,7 +1110,7 @@ export function DimensionTab({
                 view={tableView}
                 clientes={tableRows.map((r) => r.name)}
                 context={{ ...tableViewsContext, currentByClient }}
-                mode={mode}
+                mode={effectiveMode}
                 dimensionLabel={dimensionLabel}
                 dim={dimension}
               />
