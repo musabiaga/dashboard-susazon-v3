@@ -14,8 +14,9 @@ import { useEffect, useState } from "react";
 import { Lightbulb } from "lucide-react";
 import { ConcentracionAnalysis } from "@/components/dashboard/insights/ConcentracionAnalysis";
 import { PrecioAnalysis } from "@/components/dashboard/insights/PrecioAnalysis";
+import { CuadranteAnalysis } from "@/components/dashboard/insights/CuadranteAnalysis";
 
-type SubAnalysis = "concentracion" | "precio";
+type SubAnalysis = "concentracion" | "precio" | "cuadrante";
 
 const STORAGE_KEY = "insights-sub-analysis";
 
@@ -53,8 +54,13 @@ const SUB_ANALYSES: SubAnalysisDef[] = [
     description:
       "Dispersión de precio: ¿a qué precio/kg le vendemos el mismo producto a cada cliente? ¿Dónde dejamos dinero en la mesa?",
   },
+  {
+    key: "cuadrante",
+    label: "Cuadrante",
+    description:
+      "Cartera tipo BCG: tamaño vs crecimiento. ¿A quién cuido (estrellas), a quién rescato (en riesgo), en quién apuesto y a quién suelto?",
+  },
   // Futuros sub-análisis se agregan aquí:
-  // { key: "cuadrante", label: "Cuadrante", description: "..." },
   // { key: "estacionalidad", label: "Estacionalidad", description: "..." },
 ];
 
@@ -174,6 +180,13 @@ export function InsightsTab({ today, territorios, contextLabel }: Props) {
       )}
       {active === "precio" && (
         <PrecioAnalysis
+          today={today}
+          territorios={territorios}
+          contextLabel={contextLabel}
+        />
+      )}
+      {active === "cuadrante" && (
+        <CuadranteAnalysis
           today={today}
           territorios={territorios}
           contextLabel={contextLabel}
