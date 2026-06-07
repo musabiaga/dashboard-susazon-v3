@@ -34,7 +34,7 @@ import {
   Tooltip,
   Cell,
 } from "recharts";
-import { Loader2, TrendingDown, Info } from "lucide-react";
+import { Loader2, TrendingDown, Info, ChevronUp, ChevronDown } from "lucide-react";
 import {
   DateRangePicker,
   type DateRange,
@@ -47,6 +47,15 @@ const LEVEL_LABEL: Record<Level, string> = {
   grupo: "Grupo",
   familia: "Familia",
 };
+
+type SortCol =
+  | "name"
+  | "precioKg"
+  | "vsAvgPct"
+  | "kg"
+  | "venta"
+  | "margenPct"
+  | "oportunidad";
 
 const SK_LEVEL = "insights-precio-level";
 const SK_UMBRAL = "insights-precio-umbral";
@@ -122,6 +131,9 @@ export function PrecioAnalysis({ today, territorios, contextLabel }: Props) {
   const [item, setItem] = useState<string | null>(null);
   const [umbralPct, setUmbralPct] = useState(10);
   const [pisoPct, setPisoPct] = useState(95);
+  // Ordenamiento de la tabla inferior (default: dinero en la mesa, desc).
+  const [sortCol, setSortCol] = useState<SortCol>("oportunidad");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [items, setItems] = useState<PickerOption[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -285,10 +297,25 @@ export function PrecioAnalysis({ today, territorios, contextLabel }: Props) {
     return { visible, excluded, totalOportunidad, belowCount, minP, maxP };
   }, [detail, pisoPct, umbralPct, avg, umbralPrecio]);
 
-  const tableRows = useMemo(
-    () => [...enriched.visible].sort((a, b) => b.oportunidad - a.oportunidad),
-    [enriched.visible]
-  );
+  const tableRows = useMemo(() => {
+    const arr = [...enriched.visible];
+    const mul = sortDir === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      if (sortCol === "name") return a.name.localeCompare(b.name) * mul;
+      return ((a[sortCol] ?? 0) - (b[sortCol] ?? 0)) * mul;
+    });
+    return arr;
+  }, [enriched.visible, sortCol, sortDir]);
+
+  const handleSort = (col: SortCol) => {
+    if (col === sortCol) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortCol(col);
+      // Texto asc por default; números desc (lo más grande arriba).
+      setSortDir(col === "name" ? "asc" : "desc");
+    }
+  };
 
   const xDomain = useMemo<[number, number]>(() => {
     if (enriched.visible.length === 0) return [0, 1];
@@ -613,13 +640,13 @@ export function PrecioAnalysis({ today, territorios, contextLabel }: Props) {
               <table className="w-full text-[13px] tabular-nums">
                 <thead>
                   <tr style={{ background: "var(--bg-surface-muted)" }}>
-                    <Th>Cliente</Th>
-                    <Th align="right">Precio/kg</Th>
-                    <Th align="right">vs prom.</Th>
-                    <Th align="right">Volumen</Th>
-                    <Th align="right">Venta</Th>
-                    <Th align="right">Margen %</Th>
-                    <Th align="right">💰 En la mesa</Th>
+                    <SortTh col="name" label="Cliente" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="precioKg" label="Precio/kg" align="right" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="vsAvgPct" label="vs prom." align="right" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="kg" label="Volumen" align="right" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="venta" label="Venta" align="right" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="margenPct" label="Margen %" align="right" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="oportunidad" label="💰 En la mesa" align="right" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
                   </tr>
                 </thead>
                 <tbody>
@@ -752,22 +779,44 @@ function Legend({ color, text }: { color: string; text: string }) {
   );
 }
 
-function Th({
-  children,
+function SortTh({
+  col,
+  label,
   align = "left",
+  sortCol,
+  sortDir,
+  onSort,
 }: {
-  children?: React.ReactNode;
+  col: SortCol;
+  label: string;
   align?: "left" | "right";
+  sortCol: SortCol;
+  sortDir: "asc" | "desc";
+  onSort: (col: SortCol) => void;
 }) {
+  const active = sortCol === col;
   return (
     <th
-      className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider"
+      className="cursor-pointer select-none px-3 py-2 text-[10px] font-semibold uppercase tracking-wider transition-colors"
       style={{
-        color: "var(--text-muted)",
+        color: active ? "var(--accent)" : "var(--text-muted)",
         textAlign: align,
       }}
+      onClick={() => onSort(col)}
+      title="Ordenar por esta columna"
     >
-      {children}
+      <span className="inline-flex items-center gap-1 align-middle">
+        {label}
+        {active ? (
+          sortDir === "asc" ? (
+            <ChevronUp size={11} />
+          ) : (
+            <ChevronDown size={11} />
+          )
+        ) : (
+          <ChevronDown size={11} style={{ opacity: 0.25 }} />
+        )}
+      </span>
     </th>
   );
 }
