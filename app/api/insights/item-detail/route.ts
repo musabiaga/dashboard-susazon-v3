@@ -19,7 +19,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * con el client del usuario, no service_role).
  */
 
-const ALLOWED_DIMENSIONS = new Set(["clientes", "grupos", "productos"]);
+const ALLOWED_DIMENSIONS = new Set([
+  "clientes",
+  "grupos",
+  "productos",
+  "territorios",
+]);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROWS = 500;
 
@@ -77,7 +82,9 @@ export async function GET(request: NextRequest) {
       ? "cliente"
       : dimension === "grupos"
         ? "grupo"
-        : "sku";
+        : dimension === "territorios"
+          ? "territorio"
+          : "sku";
 
   // Para grupos y productos: agrupar por cliente (resume cuáles clientes
   // compraron ese grupo/producto). Para clientes: agrupar por fecha

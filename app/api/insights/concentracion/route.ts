@@ -20,7 +20,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * trivial si solo se agregan los % por item).
  */
 
-const ALLOWED_DIMENSIONS = new Set(["clientes", "grupos", "productos"]);
+const ALLOWED_DIMENSIONS = new Set([
+  "clientes",
+  "grupos",
+  "productos",
+  "territorios",
+]);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(request: NextRequest) {

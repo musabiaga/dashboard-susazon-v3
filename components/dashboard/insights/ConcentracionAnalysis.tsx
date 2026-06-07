@@ -4,26 +4,27 @@
  * ConcentracionAnalysis — primer sub-análisis del tab "Insights".
  *
  * Permite al usuario dimensionar la concentración / dependencia del negocio
- * sobre clientes, grupos o productos en distintas métricas (Pesos, Kilos,
- * Margen $, Margen %) en un rango de fechas libre.
+ * sobre clientes, grupos, productos o territorios en distintas métricas
+ * (Pesos, Kilos, Margen $, Margen %) en un rango de fechas libre.
  *
  * Visualización dual:
  *   - Treemap: bloques proporcionales al valor de cada item (área = valor)
- *   - Radar: cada eje = un item, valor = % del universo (ó margen % crudo
- *     cuando la métrica es Margen %)
+ *   - Pareto: barras por item ordenadas de mayor a menor (valor de la métrica)
+ *     + línea de % ACUMULADO del universo (eje derecho). Es el estándar para
+ *     leer concentración: "el top N cubre X% del total".
  *
  * Importante sobre Margen %:
  *   El Margen % NO es aditivo. No tiene sentido hablar de "% del universo"
  *   ni "acumulado" para esta métrica (un cliente con 30% de margen NO es
  *   "30% del universo del margen"). Para Margen %:
- *     - Radar: eje muestra el margen % crudo (0–max+padding)
- *     - Treemap: no aplica (se muestra mensaje de cambiar a Radar)
+ *     - Pareto: barras del margen % crudo de cada item (sin línea acumulada)
+ *     - Treemap: no aplica (se muestra mensaje de cambiar a Pareto)
  *     - Tabla: se reemplaza "% Universo" y "Acumulado" por "Δ pp vs universo"
  *     - Stats: "Cubren" → "Margen ponderado de los items"
  *             "Top dependencia" → "Mejor margen"
  *
- * El usuario empieza con Top 7 + "Resto del universo" (= octágono) y puede
- * borrar items o agregar otros sin límite. La tabla Pareto debajo da los
+ * El usuario empieza con Top 7 + "Resto del universo" y puede borrar items
+ * o agregar otros sin límite. La tabla Pareto debajo da los
  * números exactos. Las filas son expandibles para ver el detalle (facturas
  * por día del cliente, o clientes que compraron del grupo/producto).
  */
@@ -31,18 +32,20 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Cell,
   Tooltip,
 } from "recharts";
 import {
   AlertTriangle,
   Loader2,
   LayoutGrid,
-  Radar as RadarIcon,
+  BarChart3,
   ChevronRight,
   Ban,
   RotateCcw,
@@ -54,14 +57,15 @@ import {
 } from "@/components/dashboard/DateRangePicker";
 import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
 
-type Dimension = "clientes" | "grupos" | "productos";
+type Dimension = "clientes" | "grupos" | "productos" | "territorios";
 type Metric = "venta" | "kg" | "margen" | "margen_pct";
-type ChartKind = "treemap" | "radar";
+type ChartKind = "treemap" | "pareto";
 
 const DIMENSION_LABEL: Record<Dimension, { sg: string; pl: string }> = {
   clientes: { sg: "Cliente", pl: "Clientes" },
   grupos: { sg: "Grupo", pl: "Grupos" },
   productos: { sg: "Producto (SKU)", pl: "Productos" },
+  territorios: { sg: "Territorio", pl: "Territorios" },
 };
 
 const METRIC_LABEL: Record<Metric, string> = {
@@ -81,7 +85,12 @@ const STORAGE_KEY_TOPN = "insights-concentracion-topn";
 const STORAGE_KEY_EXCLUDED = "insights-concentracion-excluded";
 
 type ExcludedMap = Record<Dimension, string[]>;
-const EMPTY_EXCLUDED: ExcludedMap = { clientes: [], grupos: [], productos: [] };
+const EMPTY_EXCLUDED: ExcludedMap = {
+  clientes: [],
+  grupos: [],
+  productos: [],
+  territorios: [],
+};
 
 interface ApiItem {
   name: string;
@@ -168,7 +177,12 @@ export function ConcentracionAnalysis({
   useEffect(() => {
     try {
       const dim = window.localStorage.getItem(STORAGE_KEY_DIMENSION);
-      if (dim === "clientes" || dim === "grupos" || dim === "productos") {
+      if (
+        dim === "clientes" ||
+        dim === "grupos" ||
+        dim === "productos" ||
+        dim === "territorios"
+      ) {
         setDimension(dim);
       }
       const met = window.localStorage.getItem(STORAGE_KEY_METRIC);
@@ -181,7 +195,9 @@ export function ConcentracionAnalysis({
         setMetric(met);
       }
       const chart = window.localStorage.getItem(STORAGE_KEY_CHART);
-      if (chart === "treemap" || chart === "radar") setChartKind(chart);
+      if (chart === "treemap" || chart === "pareto") setChartKind(chart);
+      // Migración: "radar" quedó deprecado (reemplazado por Pareto).
+      else if (chart === "radar") setChartKind("pareto");
       const tn = window.localStorage.getItem(STORAGE_KEY_TOPN);
       const parsed = tn ? Number(tn) : NaN;
       if (parsed === 7 || parsed === 10 || parsed === 15) setTopN(parsed);
@@ -194,6 +210,9 @@ export function ConcentracionAnalysis({
           grupos: Array.isArray(parsedExc.grupos) ? parsedExc.grupos : [],
           productos: Array.isArray(parsedExc.productos)
             ? parsedExc.productos
+            : [],
+          territorios: Array.isArray(parsedExc.territorios)
+            ? parsedExc.territorios
             : [],
         });
       }
@@ -472,37 +491,55 @@ export function ConcentracionAnalysis({
     return items;
   }, [visibleItems, metric, restoValue, restoPct, isAdditive]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ============== Radar data ==============
-  // Aditivas: eje = % del universo (0–100+). Incluye "Resto".
-  // Margen %: eje = margen % crudo de cada item (0–max).
-  const radarData = useMemo(() => {
+  // ============== Pareto data ==============
+  // Aditivas: cada item es una barra (valor de la métrica) ordenada de mayor
+  //   a menor + una línea de % ACUMULADO del universo (eje derecho 0–100).
+  //   Incluye la barra "Resto" al final → la línea cierra en ~100%.
+  // Margen %: cada item es una barra de margen % crudo (no aditivo → sin
+  //   acumulado; la línea no se dibuja).
+  type ParetoRow = {
+    name: string;
+    value: number;
+    share: number;
+    cumPct: number | null;
+    isResto: boolean;
+  };
+  const paretoData = useMemo<ParetoRow[]>(() => {
     if (isAdditive) {
-      const items = visibleItems.map((i) => ({
-        name: i.name,
-        value: shareOf(i), // 0–100
-        raw: valueOf(i),
-      }));
-      items.push({
-        name: "Resto",
-        value: restoPct,
-        raw: restoValue,
+      let cum = 0;
+      const rows: ParetoRow[] = visibleItems.map((i) => {
+        const raw = valueOf(i);
+        const share = shareOf(i); // % del universo
+        cum += share;
+        return {
+          name: i.name,
+          value: raw,
+          share,
+          cumPct: Math.min(100, cum),
+          isResto: false,
+        };
       });
-      return items;
+      if (restoValue > 0) {
+        cum += restoPct;
+        rows.push({
+          name: "Resto",
+          value: restoValue,
+          share: restoPct,
+          cumPct: Math.min(100, cum),
+          isResto: true,
+        });
+      }
+      return rows;
     }
-    // Margen %: eje = margen % crudo
+    // Margen %: barras de margen % por item (sin acumulado).
     return visibleItems.map((i) => ({
       name: i.name,
       value: i.margen_pct,
-      raw: i.margen_pct,
+      share: i.margen_pct,
+      cumPct: null,
+      isResto: false,
     }));
   }, [visibleItems, metric, restoValue, restoPct, isAdditive]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const radarMax = useMemo(() => {
-    const vals = radarData.map((d) => d.value);
-    const max = vals.length > 0 ? Math.max(...vals) : 0;
-    // Redondear arriba al siguiente múltiplo de 10
-    return Math.max(10, Math.ceil(max / 10) * 10);
-  }, [radarData]);
 
   // ============== Stats panel (adaptativo según métrica) ==============
   // Para aditivas: % del universo, top dependencia, etc.
@@ -718,6 +755,7 @@ export function ConcentracionAnalysis({
             { value: "grupos", label: "Grupos" },
             { value: "clientes", label: "Clientes" },
             { value: "productos", label: "Productos" },
+            { value: "territorios", label: "Territorios" },
           ]}
           value={dimension}
           onChange={(v) => persistDimension(v as Dimension)}
@@ -737,7 +775,7 @@ export function ConcentracionAnalysis({
           label="Vista"
           options={[
             { value: "treemap", label: "Treemap", icon: <LayoutGrid size={11} /> },
-            { value: "radar", label: "Radar", icon: <RadarIcon size={11} /> },
+            { value: "pareto", label: "Pareto", icon: <BarChart3 size={11} /> },
           ]}
           value={chartKind}
           onChange={(v) => persistChart(v as ChartKind)}
@@ -881,7 +919,7 @@ export function ConcentracionAnalysis({
             style={{ color: "var(--text-secondary)" }}
           >
             El treemap no aplica para <strong>Margen %</strong> (no es una métrica aditiva).
-            Usa la vista <strong>Radar</strong> para ver el margen % de cada item, o cambia a
+            Usa la vista <strong>Pareto</strong> para ver el margen % de cada item, o cambia a
             otra métrica para ver bloques proporcionales.
           </div>
         ) : chartKind === "treemap" ? (
@@ -897,104 +935,126 @@ export function ConcentracionAnalysis({
             valueOf={valueOf}
           />
         ) : (
-          // Radar adaptativo: ajusta font/truncado según cantidad de ejes
-          // + gradiente radial moderno + dots visibles en cada vértice.
+          // Pareto: barras (valor de la métrica) ordenadas de mayor a menor +
+          // línea de % ACUMULADO del universo (eje derecho) para métricas
+          // aditivas. Margen % → solo barras (no aditivo). Estándar para leer
+          // concentración: "el top N cubre X% del total".
           (() => {
-            const n = radarData.length;
-            const labelFont = n <= 8 ? 11 : n <= 11 ? 10 : 9;
-            const truncLen = n <= 8 ? 24 : n <= 11 ? 18 : 14;
-            const horizMargin = n <= 8 ? 60 : n <= 11 ? 80 : 100;
-            // ID único para no colisionar entre re-mounts
-            const gradientId = "radar-gradient-insights";
+            const n = paretoData.length;
+            const truncLen = n <= 8 ? 16 : n <= 12 ? 12 : 9;
+            const labelFont = n <= 12 ? 11 : 9;
+            // Formateador compacto para el eje izquierdo (valores grandes).
+            const fmtCompact = (v: number) => {
+              if (metric === "margen_pct") return `${Math.round(v)}%`;
+              const abs = Math.abs(v);
+              const sign = v < 0 ? "-" : "";
+              let s: string;
+              if (abs >= 1_000_000) s = `${(abs / 1_000_000).toFixed(1)}M`;
+              else if (abs >= 1_000) s = `${Math.round(abs / 1_000)}K`;
+              else s = `${Math.round(abs)}`;
+              return metric === "kg" ? `${sign}${s}` : `${sign}$${s}`;
+            };
+            const chartData = paretoData.map((d) => ({
+              ...d,
+              shortName: truncate(d.name, truncLen),
+              fullName: d.name,
+            }));
             return (
-              <ResponsiveContainer width="100%" height={n <= 8 ? 520 : 580}>
-                <RadarChart
-                  data={radarData.map((d) => ({
-                    ...d,
-                    name: truncate(d.name, truncLen),
-                    fullName: d.name,
-                  }))}
+              <ResponsiveContainer width="100%" height={n <= 8 ? 460 : 520}>
+                <ComposedChart
+                  data={chartData}
                   margin={{
-                    top: 30,
-                    right: horizMargin,
-                    bottom: 30,
-                    left: horizMargin,
+                    top: 20,
+                    right: isAdditive ? 12 : 8,
+                    bottom: 96,
+                    left: 8,
                   }}
                 >
-                  {/* SVG defs para el gradiente radial del fill del polígono */}
-                  <defs>
-                    <radialGradient id={gradientId} cx="50%" cy="50%" r="60%">
-                      <stop
-                        offset="0%"
-                        stopColor="var(--accent)"
-                        stopOpacity={0.55}
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor="var(--accent)"
-                        stopOpacity={0.12}
-                      />
-                    </radialGradient>
-                  </defs>
-                  <PolarGrid
-                    stroke="var(--border)"
+                  <CartesianGrid
                     strokeDasharray="2 4"
-                    radialLines={true}
+                    stroke="var(--border)"
+                    vertical={false}
                   />
-                  <PolarAngleAxis
-                    dataKey="name"
+                  <XAxis
+                    dataKey="shortName"
+                    interval={0}
+                    angle={-35}
+                    textAnchor="end"
+                    height={96}
                     tick={{
                       fontSize: labelFont,
                       fill: "var(--text-secondary)",
-                      fontWeight: 500,
                     }}
+                    tickLine={false}
+                    stroke="var(--border)"
                   />
-                  <PolarRadiusAxis
-                    angle={90}
-                    domain={[0, radarMax]}
-                    tick={{ fontSize: 9, fill: "var(--text-muted)" }}
-                    tickFormatter={(v) => `${v}%`}
+                  <YAxis
+                    yAxisId="left"
+                    tickFormatter={fmtCompact}
+                    tick={{ fontSize: 10, fill: "var(--text-muted)" }}
+                    tickLine={false}
                     axisLine={false}
+                    width={54}
                   />
-                  <Radar
-                    name={
-                      isAdditive
-                        ? `${METRIC_LABEL[metric]} (% del universo)`
-                        : "Margen %"
-                    }
-                    dataKey="value"
-                    stroke="var(--accent)"
-                    fill={`url(#${gradientId})`}
-                    fillOpacity={1}
-                    strokeWidth={2.5}
-                    dot={{
-                      r: 2.5,
-                      strokeWidth: 1.5,
-                      stroke: "var(--accent)",
-                      fill: "var(--bg-surface)",
-                    }}
-                    activeDot={{
-                      r: 4,
-                      strokeWidth: 1.5,
-                      stroke: "var(--accent)",
-                      fill: "var(--accent)",
-                    }}
-                  />
+                  {isAdditive && (
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      domain={[0, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                      tick={{ fontSize: 10, fill: "var(--text-primary)" }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={42}
+                    />
+                  )}
                   <Tooltip
                     content={
-                      <RadarTooltip
+                      <ParetoTooltip
                         formatValue={formatMetricValue}
                         metricLabel={METRIC_LABEL[metric]}
                         isAdditive={isAdditive}
                       />
                     }
-                    cursor={{
-                      stroke: "var(--accent)",
-                      strokeWidth: 1,
-                      strokeDasharray: "3 3",
-                    }}
+                    cursor={{ fill: "var(--bg-surface-muted)", opacity: 0.5 }}
                   />
-                </RadarChart>
+                  <Bar
+                    yAxisId="left"
+                    dataKey="value"
+                    name={isAdditive ? METRIC_LABEL[metric] : "Margen %"}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={64}
+                    isAnimationActive={false}
+                  >
+                    {chartData.map((d, idx) => (
+                      <Cell
+                        key={idx}
+                        fill={
+                          d.isResto ? "var(--text-muted)" : "var(--accent)"
+                        }
+                        fillOpacity={d.isResto ? 0.35 : 0.9}
+                      />
+                    ))}
+                  </Bar>
+                  {isAdditive && (
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="cumPct"
+                      name="% acumulado"
+                      stroke="var(--text-primary)"
+                      strokeWidth={2.5}
+                      isAnimationActive={false}
+                      dot={{
+                        r: 3,
+                        strokeWidth: 1.5,
+                        stroke: "var(--text-primary)",
+                        fill: "var(--bg-surface)",
+                      }}
+                      activeDot={{ r: 5 }}
+                    />
+                  )}
+                </ComposedChart>
               </ResponsiveContainer>
             );
           })()
@@ -1025,7 +1085,9 @@ export function ConcentracionAnalysis({
               </span>
             </div>
           )}
-          {(dimension === "grupos" || dimension === "productos") && (
+          {(dimension === "grupos" ||
+            dimension === "productos" ||
+            dimension === "territorios") && (
             <div
               className="border-b px-3 py-1.5 text-[10px] uppercase tracking-wider"
               style={{
@@ -1035,7 +1097,9 @@ export function ConcentracionAnalysis({
               }}
             >
               <span style={{ color: "var(--text-secondary)" }}>
-                ⓘ Click en la flecha para expandir y ver qué clientes compraron en el rango
+                {dimension === "territorios"
+                  ? "ⓘ Click en la flecha para expandir y ver qué clientes facturaron en ese territorio"
+                  : "ⓘ Click en la flecha para expandir y ver qué clientes compraron en el rango"}
               </span>
             </div>
           )}
@@ -2655,6 +2719,10 @@ interface TooltipPayloadItem {
     value?: number;
     pct?: number;
     raw?: number;
+    // Pareto: % del total (share), % acumulado, y bandera de "Resto".
+    share?: number;
+    cumPct?: number | null;
+    isResto?: boolean;
   };
 }
 
@@ -2757,7 +2825,7 @@ function TreemapTooltip({
   );
 }
 
-function RadarTooltip({
+function ParetoTooltip({
   active,
   payload,
   formatValue,
@@ -2774,7 +2842,7 @@ function RadarTooltip({
   const d = payload[0].payload;
   if (!d) return null;
   const displayName = d.fullName ?? d.name ?? "";
-  const isResto = displayName === "Resto";
+  const isResto = d.isResto ?? displayName === "Resto";
   return (
     <TooltipCard isResto={isResto}>
       {/* Header con nombre completo (sin truncar) */}
@@ -2802,11 +2870,11 @@ function RadarTooltip({
               className="text-base font-bold leading-tight"
               style={{ color: "var(--accent)" }}
             >
-              {formatValue(d.raw ?? 0)}
+              {formatValue(d.value ?? 0)}
             </div>
           </div>
-          {/* Pill con % del universo */}
-          <div className="flex items-center gap-2">
+          {/* Pills: % del total + % acumulado */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <span
               className="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
               style={{
@@ -2816,14 +2884,19 @@ function RadarTooltip({
                 color: isResto ? "var(--text-secondary)" : "var(--accent)",
               }}
             >
-              {(d.value ?? 0).toFixed(1)}%
+              {(d.share ?? 0).toFixed(1)}% del total
             </span>
-            <span
-              className="text-[10px]"
-              style={{ color: "var(--text-muted)" }}
-            >
-              del universo total
-            </span>
+            {d.cumPct != null && (
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+                style={{
+                  background: "var(--bg-surface-muted)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {(d.cumPct ?? 0).toFixed(1)}% acum.
+              </span>
+            )}
           </div>
         </>
       ) : (
