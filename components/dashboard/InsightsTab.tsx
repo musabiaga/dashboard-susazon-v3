@@ -15,8 +15,9 @@ import { Lightbulb } from "lucide-react";
 import { ConcentracionAnalysis } from "@/components/dashboard/insights/ConcentracionAnalysis";
 import { PrecioAnalysis } from "@/components/dashboard/insights/PrecioAnalysis";
 import { CuadranteAnalysis } from "@/components/dashboard/insights/CuadranteAnalysis";
+import { EstacionalidadAnalysis } from "@/components/dashboard/insights/EstacionalidadAnalysis";
 
-type SubAnalysis = "concentracion" | "precio" | "cuadrante";
+type SubAnalysis = "concentracion" | "precio" | "cuadrante" | "estacionalidad";
 
 const STORAGE_KEY = "insights-sub-analysis";
 
@@ -60,8 +61,12 @@ const SUB_ANALYSES: SubAnalysisDef[] = [
     description:
       "Cartera tipo BCG: tamaño vs crecimiento. ¿A quién cuido (estrellas), a quién rescato (en riesgo), en quién apuesto y a quién suelto?",
   },
-  // Futuros sub-análisis se agregan aquí:
-  // { key: "estacionalidad", label: "Estacionalidad", description: "..." },
+  {
+    key: "estacionalidad",
+    label: "Estacionalidad",
+    description:
+      "Heatmap mes × dimensión: ¿qué meses son pico/valle por grupo, territorio, cliente o SKU? ¿Cuándo compro, produzco y promociono?",
+  },
 ];
 
 export function InsightsTab({ today, territorios, contextLabel }: Props) {
@@ -187,6 +192,13 @@ export function InsightsTab({ today, territorios, contextLabel }: Props) {
       )}
       {active === "cuadrante" && (
         <CuadranteAnalysis
+          today={today}
+          territorios={territorios}
+          contextLabel={contextLabel}
+        />
+      )}
+      {active === "estacionalidad" && (
+        <EstacionalidadAnalysis
           today={today}
           territorios={territorios}
           contextLabel={contextLabel}
