@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { Loader2, ChevronRight, ChevronDown } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 import { ClienteDesglose } from "@/components/dashboard/ClienteDesglose";
+import { ProductoDesglose } from "@/components/dashboard/ProductoDesglose";
 import {
   GroupedBarChart,
   type GroupedBarSeries,
@@ -1059,39 +1060,68 @@ export function DimensionTab({
       {/* Tabla — gateada por showTable (contenedor unificado) */}
       {showTable && tableRows.length > 0 && (
         <div className="space-y-2">
-          {/* Toggle de vistas de tabla (Mejora 4) */}
-          {enableTableViews && tableViewsContext && (
-            <div
-              className="inline-flex w-fit items-center gap-0.5 rounded-[var(--radius)] border p-0.5"
-              style={{
-                background: "var(--bg-surface-muted)",
-                borderColor: "var(--border)",
-              }}
-            >
-              {(
-                [
-                  ["anio", "Año vs Año"],
-                  ["meses", `Meses ${tableViewsContext.year}`],
-                  ["prom90", "vs Prom. 90d"],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => switchTableView(key)}
-                  className="rounded-[var(--radius-sm)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+          {/* Header de la tabla: toggle de vistas (Mejora 4) a la izquierda +
+              buscador propio a la derecha cuando la tabla es standalone
+              (showChart=false). En modo monolítico el buscador vive en la
+              gráfica y ya filtra ambas secciones, por eso no se duplica. */}
+          {((enableTableViews && tableViewsContext) ||
+            (enableMultiSelect && !showChart)) && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {enableTableViews && tableViewsContext ? (
+                <div
+                  className="inline-flex w-fit items-center gap-0.5 rounded-[var(--radius)] border p-0.5"
                   style={{
-                    background:
-                      tableView === key ? "var(--bg-surface)" : "transparent",
-                    color:
-                      tableView === key ? "var(--accent)" : "var(--text-muted)",
-                    boxShadow:
-                      tableView === key ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
+                    background: "var(--bg-surface-muted)",
+                    borderColor: "var(--border)",
                   }}
                 >
-                  {label}
-                </button>
-              ))}
+                  {(
+                    [
+                      ["anio", "Año vs Año"],
+                      ["meses", `Meses ${tableViewsContext.year}`],
+                      ["prom90", "vs Prom. 90d"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => switchTableView(key)}
+                      className="rounded-[var(--radius-sm)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                      style={{
+                        background:
+                          tableView === key
+                            ? "var(--bg-surface)"
+                            : "transparent",
+                        color:
+                          tableView === key
+                            ? "var(--accent)"
+                            : "var(--text-muted)",
+                        boxShadow:
+                          tableView === key
+                            ? "0 1px 2px rgba(0,0,0,0.05)"
+                            : "none",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div />
+              )}
+              {/* Buscador propio de la tabla (solo cuando es standalone). Usa el
+                  mismo estado de selección que ya filtra tableRows
+                  (isCustomMode): seleccionar fija esas filas en la tabla. */}
+              {enableMultiSelect && !showChart && (
+                <MultiSelectChips
+                  options={availableItems}
+                  selected={selectedItems}
+                  onChange={updateSelected}
+                  maxItems={multiSelectMaxItems}
+                  placeholder={multiSelectPlaceholder}
+                  emptyLabel="Top default"
+                />
+              )}
             </div>
           )}
 
@@ -1213,7 +1243,11 @@ export function DimensionTab({
                             onClick={() => toggleClientExpand(r.name)}
                             className="flex items-center gap-1.5 text-left"
                             style={{ color: "var(--text-primary)" }}
-                            title="Ver desglose por línea de producto"
+                            title={
+                              dimension === "sku"
+                                ? "Ver clientes que compran este SKU"
+                                : "Ver desglose por línea de producto"
+                            }
                           >
                             {isExpanded ? (
                               <ChevronDown
@@ -1296,13 +1330,21 @@ export function DimensionTab({
                           : `${deltaPp >= 0 ? "+" : ""}${deltaPp.toFixed(1)} pp`}
                       </Td>
                     </tr>
-                    {isExpanded && rowExpandContext && (
-                      <ClienteDesglose
-                        cliente={r.name}
-                        context={rowExpandContext}
-                        colSpan={9 + (showKg ? 4 : 0)}
-                      />
-                    )}
+                    {isExpanded &&
+                      rowExpandContext &&
+                      (dimension === "sku" ? (
+                        <ProductoDesglose
+                          sku={r.name}
+                          context={rowExpandContext}
+                          colSpan={9 + (showKg ? 4 : 0)}
+                        />
+                      ) : (
+                        <ClienteDesglose
+                          cliente={r.name}
+                          context={rowExpandContext}
+                          colSpan={9 + (showKg ? 4 : 0)}
+                        />
+                      ))}
                     </Fragment>
                   );
                 })}

@@ -770,6 +770,13 @@ export function DashboardClient({
                             daysCurrent,
                             elapsedBizDays,
                           }}
+                          enableRowExpand
+                          rowExpandContext={{
+                            year: currentYear,
+                            month: currentMonth,
+                            daysCurrent,
+                            territorios: cypTerritorios,
+                          }}
                         />
                       )
                     }
