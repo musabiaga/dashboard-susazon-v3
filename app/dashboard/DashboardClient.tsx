@@ -12,7 +12,6 @@ import {
   DimensionTab,
   type DimensionRow,
 } from "@/components/dashboard/DimensionTab";
-import { ProductosTab } from "@/components/dashboard/ProductosTab";
 import { ClientesProductosTab } from "@/components/dashboard/ClientesProductosTab";
 import { VendedoresTab } from "@/components/dashboard/VendedoresTab";
 import {
@@ -665,12 +664,14 @@ export function DashboardClient({
                 );
               }
               if (activeTab === "clientes-productos") {
-                // Tab unificado (Fase 1): toggle maestro Clientes | Productos.
-                // Cada vista conserva TODAS sus features actuales; el
-                // contenedor solo alterna entre ellas (solo la activa se monta).
+                // Tab unificado (Fase 2): toggles independientes de dimensión
+                // para gráfica y tabla. Si ambas dimensiones coinciden →
+                // DimensionTab monolítico (idéntico al comportamiento histórico).
+                // Si difieren → gráfica de una dimensión + tabla de otra.
+                //
                 // Territorios efectivos según el sidebar (mismo cálculo que
-                // Insights) — para los fetches lazy de la vista Clientes.
-                const clientesTerritorios: string[] | null =
+                // Insights) — para los fetches lazy.
+                const cypTerritorios: string[] | null =
                   selectionMode === "single"
                     ? [effectiveSelected]
                     : selectionMode === "aggregated-custom"
@@ -680,70 +681,105 @@ export function DashboardClient({
                         : null; // aggregated-all → no filtrar
                 return (
                   <ClientesProductosTab
-                    clienteView={
-                      <DimensionTab
-                        rows={resolveDimRows(clientes)}
-                        monthLabel24={prev2MonthShortYY}
-                        monthLabel25={prevMonthShortYY}
-                        monthLabel26={monthShortYY}
-                        dimensionLabel="Cliente"
-                        dimensionLabelPlural="Clientes"
-                        topNChart={10}
-                        topNTable={50}
-                        showKg
-                        enableMultiSelect
-                        selectionStorageKey="clientes-selected"
-                        multiSelectMaxItems={15}
-                        multiSelectPlaceholder="Buscar cliente…"
-                        exportTabName="Clientes"
-                        exportPeriodLabel={monthShortYY}
-                        exportTerritory={exportTerritoryLabel}
-                        canExportExcel={canExportExcel}
-                        reportInput={reportInput}
-                        modeStorageKey="clientes-tab-mode"
-                        enableEvolution
-                        evolutionContext={{
-                          year: currentYear,
-                          month: currentMonth,
-                          territorios: clientesTerritorios,
-                        }}
-                        evolutionStorageKey="clientes-chart-view"
-                        enableProductSearch
-                        productOptions={resolveDimRows(skus).map((r) => r.name)}
-                        productSearchContext={{
-                          year: currentYear,
-                          month: currentMonth,
-                          daysCurrent,
-                          territorios: clientesTerritorios,
-                        }}
-                        enableTableViews
-                        tableViewsContext={{
-                          year: currentYear,
-                          month: currentMonth,
-                          territorios: clientesTerritorios,
-                          daysCurrent,
-                          elapsedBizDays,
-                        }}
-                        enableRowExpand
-                        rowExpandContext={{
-                          year: currentYear,
-                          month: currentMonth,
-                          daysCurrent,
-                          territorios: clientesTerritorios,
-                        }}
-                      />
-                    }
-                    productoView={
-                      <ProductosTab
-                        rows={resolveDimRows(skus)}
-                        monthLabel24={prev2MonthShortYY}
-                        monthLabel25={prevMonthShortYY}
-                        monthLabel26={monthShortYY}
-                        exportTerritory={exportTerritoryLabel}
-                        exportPeriodLabel={monthShortYY}
-                        canExportExcel={canExportExcel}
-                        reportInput={reportInput}
-                      />
+                    render={({ dim, mode, showChart, showTable }) =>
+                      dim === "clientes" ? (
+                        <DimensionTab
+                          rows={resolveDimRows(clientes)}
+                          dimension="cliente"
+                          controlledMode={mode}
+                          showChart={showChart}
+                          showTable={showTable}
+                          monthLabel24={prev2MonthShortYY}
+                          monthLabel25={prevMonthShortYY}
+                          monthLabel26={monthShortYY}
+                          dimensionLabel="Cliente"
+                          dimensionLabelPlural="Clientes"
+                          topNChart={10}
+                          topNTable={50}
+                          showKg
+                          enableMultiSelect
+                          selectionStorageKey="clientes-selected"
+                          multiSelectMaxItems={15}
+                          multiSelectPlaceholder="Buscar cliente…"
+                          exportTabName="Clientes"
+                          exportPeriodLabel={monthShortYY}
+                          exportTerritory={exportTerritoryLabel}
+                          canExportExcel={showTable && canExportExcel}
+                          reportInput={reportInput}
+                          modeStorageKey="clientes-tab-mode"
+                          enableEvolution
+                          evolutionContext={{
+                            year: currentYear,
+                            month: currentMonth,
+                            territorios: cypTerritorios,
+                          }}
+                          evolutionStorageKey="clientes-chart-view"
+                          enableProductSearch
+                          productOptions={resolveDimRows(skus).map((r) => r.name)}
+                          productSearchContext={{
+                            year: currentYear,
+                            month: currentMonth,
+                            daysCurrent,
+                            territorios: cypTerritorios,
+                          }}
+                          enableTableViews
+                          tableViewsContext={{
+                            year: currentYear,
+                            month: currentMonth,
+                            territorios: cypTerritorios,
+                            daysCurrent,
+                            elapsedBizDays,
+                          }}
+                          enableRowExpand
+                          rowExpandContext={{
+                            year: currentYear,
+                            month: currentMonth,
+                            daysCurrent,
+                            territorios: cypTerritorios,
+                          }}
+                        />
+                      ) : (
+                        <DimensionTab
+                          rows={resolveDimRows(skus)}
+                          dimension="sku"
+                          controlledMode={mode}
+                          showChart={showChart}
+                          showTable={showTable}
+                          monthLabel24={prev2MonthShortYY}
+                          monthLabel25={prevMonthShortYY}
+                          monthLabel26={monthShortYY}
+                          dimensionLabel="Producto"
+                          dimensionLabelPlural="Productos"
+                          topNChart={15}
+                          topNTable={50}
+                          showKg
+                          enableMultiSelect
+                          selectionStorageKey="productos-selected"
+                          multiSelectMaxItems={15}
+                          multiSelectPlaceholder="Buscar producto (SKU)…"
+                          exportTabName="Productos"
+                          exportPeriodLabel={monthShortYY}
+                          exportTerritory={exportTerritoryLabel}
+                          canExportExcel={showTable && canExportExcel}
+                          reportInput={reportInput}
+                          modeStorageKey="productos-tab-mode"
+                          enableEvolution
+                          evolutionContext={{
+                            year: currentYear,
+                            month: currentMonth,
+                            territorios: cypTerritorios,
+                          }}
+                          evolutionStorageKey="productos-chart-view"
+                          enableTableViews
+                          tableViewsContext={{
+                            year: currentYear,
+                            month: currentMonth,
+                            territorios: cypTerritorios,
+                            daysCurrent,
+                            elapsedBizDays,
+                          }}
+                        />
+                      )
                     }
                   />
                 );
