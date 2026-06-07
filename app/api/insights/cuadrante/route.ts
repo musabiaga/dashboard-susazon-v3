@@ -93,12 +93,31 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // Cap del periodo ACTUAL a la última fecha con datos dentro del rango. Evita
+  // comparar un periodo actual incompleto (ej. datos al día 5) contra la
+  // ventana completa del año anterior (día 7), que castigaría injustamente el
+  // crecimiento. Así ambos lados cubren las MISMAS fechas calendario reales.
+  let effectiveTo = toParam;
+  {
+    let maxQ = supabase
+      .from("sales_rows")
+      .select("fecha")
+      .gte("fecha", fromParam)
+      .lte("fecha", toParam)
+      .order("fecha", { ascending: false })
+      .limit(1);
+    if (territoriosFilter !== null) maxQ = maxQ.in("territorio", territoriosFilter);
+    const { data: maxData } = await maxQ;
+    const last = (maxData?.[0]?.fecha as string | undefined) ?? undefined;
+    if (last && last < toParam) effectiveTo = last;
+  }
+
   const prevFrom = shiftYear(fromParam, -1);
-  const prevTo = shiftYear(toParam, -1);
+  const prevTo = shiftYear(effectiveTo, -1);
 
   const { data, error } = await supabase.rpc("insights_cuadrante", {
     p_from: fromParam,
-    p_to: toParam,
+    p_to: effectiveTo,
     p_from_prev: prevFrom,
     p_to_prev: prevTo,
     p_dimension: dimension,
@@ -139,6 +158,8 @@ export async function GET(request: NextRequest) {
     dimension,
     from: fromParam,
     to: toParam,
+    effectiveTo,
+    capped: effectiveTo !== toParam,
     prevFrom,
     prevTo,
     items,

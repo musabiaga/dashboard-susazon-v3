@@ -77,6 +77,22 @@ interface ApiItem {
   margenPct: number;
   crecimiento: number | null;
 }
+interface Meta {
+  from: string;
+  to: string;
+  effectiveTo: string;
+  prevFrom: string;
+  prevTo: string;
+  capped: boolean;
+}
+
+// Formato corto de fecha ISO → "5 jun 2026"
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+function fmtDate(iso?: string): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${d} ${MESES[m - 1]} ${y}`;
+}
 
 // ===== Formatos =====
 function moneyCompact(n: number): string {
@@ -121,6 +137,7 @@ export function CuadranteAnalysis({ today, territorios, contextLabel }: Props) {
   const [sizeThreshold, setSizeThreshold] = useState<number | null>(null);
 
   const [items, setItems] = useState<ApiItem[]>([]);
+  const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,6 +180,7 @@ export function CuadranteAnalysis({ today, territorios, contextLabel }: Props) {
     let cancelled = false;
     if (tKey === "__NONE__") {
       setItems([]);
+      setMeta(null);
       return;
     }
     setLoading(true);
@@ -177,8 +195,21 @@ export function CuadranteAnalysis({ today, territorios, contextLabel }: Props) {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then((json: { items?: ApiItem[] }) => {
-        if (!cancelled) setItems(json.items ?? []);
+      .then((json: { items?: ApiItem[] } & Partial<Meta>) => {
+        if (cancelled) return;
+        setItems(json.items ?? []);
+        setMeta(
+          json.effectiveTo
+            ? {
+                from: json.from ?? range.from,
+                to: json.to ?? range.to,
+                effectiveTo: json.effectiveTo,
+                prevFrom: json.prevFrom ?? "",
+                prevTo: json.prevTo ?? "",
+                capped: !!json.capped,
+              }
+            : null
+        );
       })
       .catch((e) => {
         if (!cancelled) setError(String(e?.message ?? e));
@@ -384,6 +415,29 @@ export function CuadranteAnalysis({ today, territorios, contextLabel }: Props) {
           <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>%</span>
         </label>
       </div>
+
+      {/* Ventana de comparación (mismo tramo de fechas en ambos años) */}
+      {meta && !loading && (
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-[var(--radius)] border px-3 py-2 text-[11px]"
+          style={{ background: "var(--bg-surface-muted)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+        >
+          <span>
+            Comparando{" "}
+            <strong>{fmtDate(meta.from)} → {fmtDate(meta.effectiveTo)}</strong>{" "}
+            vs mismo rango{" "}
+            <strong>{fmtDate(meta.prevFrom)} → {fmtDate(meta.prevTo)}</strong>
+          </span>
+          {meta.capped && (
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+              style={{ background: "var(--warning-soft)", color: "var(--warning)" }}
+            >
+              ⓘ periodo actual ajustado al último día con datos ({fmtDate(meta.effectiveTo)}) para una comparación justa
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Resumen por cuadrante */}
       {!loading && points.length > 0 && (
