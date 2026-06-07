@@ -61,6 +61,10 @@ interface Props {
   /** (Opcional) SKUs para filtrar la evolución a esos productos (modo
    *  Productos + 1 cliente). Si se omite, usa la venta total del cliente. */
   skus?: string[];
+  /** Dimensión de la evolución: "cliente" (default) | "sku". Determina cómo
+   *  agrupa el endpoint. La prop `clientes` contiene los nombres de la
+   *  dimensión activa. */
+  dim?: "cliente" | "sku";
 }
 
 export function ClientesEvolutionChart({
@@ -70,6 +74,7 @@ export function ClientesEvolutionChart({
   clientes,
   mode,
   skus,
+  dim = "cliente",
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -93,7 +98,8 @@ export function ClientesEvolutionChart({
     const params = new URLSearchParams();
     params.set("year", String(year));
     params.set("month", String(month));
-    params.set("clientes", clientes.join(","));
+    params.set("dim", dim);
+    params.set("items", clientes.join(","));
     if (territorios !== null) params.set("territorios", territorios.join(","));
     if (skus && skus.length > 0) params.set("skus", skus.join(","));
 
@@ -116,7 +122,7 @@ export function ClientesEvolutionChart({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, territoriosKey, clientesKey, skusKey]);
+  }, [year, month, territoriosKey, clientesKey, skusKey, dim]);
 
   const isKg = mode === "kg";
 

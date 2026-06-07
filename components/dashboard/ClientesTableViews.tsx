@@ -57,11 +57,13 @@ export interface TableViewsContext {
 
 interface Props {
   view: "meses" | "prom90";
-  /** Nombres de clientes de la tabla (en orden). */
+  /** Nombres de las entidades de la tabla (clientes o SKUs, en orden). */
   clientes: string[];
   context: TableViewsContext;
   mode: "pesos" | "kg";
   dimensionLabel: string;
+  /** Dimensión: "cliente" (default) | "sku". */
+  dim?: "cliente" | "sku";
 }
 
 export function ClientesTableViews({
@@ -70,6 +72,7 @@ export function ClientesTableViews({
   context,
   mode,
   dimensionLabel,
+  dim = "cliente",
 }: Props) {
   const isKg = mode === "kg";
   const fmt = isKg ? formatKilos : formatMoney;
@@ -93,7 +96,8 @@ export function ClientesTableViews({
 
     const baseParams = new URLSearchParams();
     baseParams.set("year", String(context.year));
-    baseParams.set("clientes", clientes.join(","));
+    baseParams.set("dim", dim);
+    baseParams.set("items", clientes.join(","));
     if (context.territorios !== null)
       baseParams.set("territorios", context.territorios.join(","));
 
@@ -131,7 +135,7 @@ export function ClientesTableViews({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, context.year, context.month, context.daysCurrent, territoriosKey, clientesKey]);
+  }, [view, context.year, context.month, context.daysCurrent, territoriosKey, clientesKey, dim]);
 
   // ============ Vista MESES ============
   const mesesRows = useMemo(() => {

@@ -143,6 +143,10 @@ interface Props {
     daysCurrent: number;
     territorios: string[] | null;
   };
+  /** Dimensión de los datos: "cliente" (default) | "sku". Determina a qué
+   *  endpoints llaman las features ricas (evolución / meses / prom 90d).
+   *  Permite reutilizar el motor para Productos (Fase 2). */
+  dimension?: "cliente" | "sku";
 }
 
 /**
@@ -188,6 +192,7 @@ export function DimensionTab({
   tableViewsContext,
   enableRowExpand = false,
   rowExpandContext,
+  dimension = "cliente",
 }: Props) {
   // ============ Filas expandibles (Mejora 5) ============
   // Cada cliente se expande para ver su desglose por grupo → SKU.
@@ -959,13 +964,15 @@ export function DimensionTab({
                   )}
                 </div>
               ) : (
-                /* Modo Clientes: agregado de los clientes visibles. */
+                /* Modo agregado: evolución de las entidades visibles
+                   (clientes o SKUs según la dimensión). */
                 <ClientesEvolutionChart
                   year={evolutionContext.year}
                   month={evolutionContext.month}
                   territorios={evolutionContext.territorios}
                   clientes={top.map((r) => r.name)}
                   mode={mode}
+                  dim={dimension}
                 />
               )
             ) : (
@@ -1087,6 +1094,7 @@ export function DimensionTab({
                 context={{ ...tableViewsContext, currentByClient }}
                 mode={mode}
                 dimensionLabel={dimensionLabel}
+                dim={dimension}
               />
             </div>
           ) : (
