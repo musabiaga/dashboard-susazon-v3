@@ -714,14 +714,6 @@ export function DashboardClient({
                             territorios: cypTerritorios,
                           }}
                           evolutionStorageKey="clientes-chart-view"
-                          enableProductSearch
-                          productOptions={resolveDimRows(skus).map((r) => r.name)}
-                          productSearchContext={{
-                            year: currentYear,
-                            month: currentMonth,
-                            daysCurrent,
-                            territorios: cypTerritorios,
-                          }}
                           enableTableViews
                           tableViewsContext={{
                             year: currentYear,
