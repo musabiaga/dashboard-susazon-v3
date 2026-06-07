@@ -13,8 +13,9 @@
 import { useEffect, useState } from "react";
 import { Lightbulb } from "lucide-react";
 import { ConcentracionAnalysis } from "@/components/dashboard/insights/ConcentracionAnalysis";
+import { PrecioAnalysis } from "@/components/dashboard/insights/PrecioAnalysis";
 
-type SubAnalysis = "concentracion";
+type SubAnalysis = "concentracion" | "precio";
 
 const STORAGE_KEY = "insights-sub-analysis";
 
@@ -46,9 +47,15 @@ const SUB_ANALYSES: SubAnalysisDef[] = [
     description:
       "Análisis tipo Pareto: ¿qué tan dependientes somos de los top clientes / grupos / productos?",
   },
+  {
+    key: "precio",
+    label: "Precio $/kg",
+    description:
+      "Dispersión de precio: ¿a qué precio/kg le vendemos el mismo producto a cada cliente? ¿Dónde dejamos dinero en la mesa?",
+  },
   // Futuros sub-análisis se agregan aquí:
+  // { key: "cuadrante", label: "Cuadrante", description: "..." },
   // { key: "estacionalidad", label: "Estacionalidad", description: "..." },
-  // { key: "crecimiento", label: "Crecimiento YoY", description: "..." },
 ];
 
 export function InsightsTab({ today, territorios, contextLabel }: Props) {
@@ -160,6 +167,13 @@ export function InsightsTab({ today, territorios, contextLabel }: Props) {
       {/* Render del sub-análisis activo */}
       {active === "concentracion" && (
         <ConcentracionAnalysis
+          today={today}
+          territorios={territorios}
+          contextLabel={contextLabel}
+        />
+      )}
+      {active === "precio" && (
+        <PrecioAnalysis
           today={today}
           territorios={territorios}
           contextLabel={contextLabel}
