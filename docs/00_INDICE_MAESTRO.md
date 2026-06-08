@@ -28,6 +28,7 @@
 | 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | Contexto compacto para retomar el proyecto en otra sesión Claude | **4.0** | **2026-06-07** |
 | 11 | `Instructivo_Usuario_Visual.html` / `.pdf` | HTML/PDF | Manual visual para usuarios finales (el HTML es el que se abre desde el dashboard). **V4.0 con secciones nuevas marcadas** | **4.0** | **2026-06-07** |
 | 12 | `AUTH_FLOWS.md` | Markdown | Documentación técnica del sistema de auth. Diagramas de los 3 flows | 1.0 | 2026-05-01 |
+| 12b | `GUIA_OBTENER_SECRETS.md` | Markdown | **Cómo obtener CADA credencial** (Supabase, Vercel, GitHub, APIs, Resend, GoDaddy) para reconstruir desde cero. Sin valores reales (committeable) | **1.0** | **2026-06-07** |
 | 13 | `LO_NUEVO.md` | Markdown | **Resumen ejecutivo de V4.0 (Fases 10-12).** Lee primero si vienes de una sesión previa | **3.0** | **2026-06-07** |
 | 14 | `_backups/2026-05-10_pre-update/` | Snapshot | Snapshot inmutable de los docs antes de la actualización del 10-may | — | 2026-05-10 |
 

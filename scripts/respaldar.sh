@@ -129,6 +129,7 @@ kebab_name_for() {
     "05_Guia_TI_Despliegue.docx")        echo "05_guia-ti-despliegue.docx" ;;
     "06_Guia_Reconstruccion.docx")       echo "06_guia-reconstruccion.docx" ;;
     "AUTH_FLOWS.md")                     echo "auth-flows.md" ;;
+    "GUIA_OBTENER_SECRETS.md")           echo "guia-obtener-secrets.md" ;;
     "CONTINUACION_NUEVA_CONVERSACION.md") echo "continuacion-nueva-conversacion.md" ;;
     "Instructivo_Usuario_Visual.html")   echo "instructivo-usuario-visual.html" ;;
     "Instructivo_Usuario_Visual.pdf")    echo "instructivo-usuario-visual.pdf" ;;
