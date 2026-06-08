@@ -11,6 +11,13 @@ const VALID_ACTIONS = new Set([
   "user_updated",
   "user_deleted",
   "data_refresh",
+  "settings_toggle",
+  "force_signout",
+  "force_signout_all",
+  "invite",
+  "reset",
+  "session_timeout_changed",
+  "session_timeout_exemption_changed",
 ]);
 
 const MAX_LIMIT = 200;

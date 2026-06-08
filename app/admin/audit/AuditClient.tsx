@@ -17,6 +17,13 @@ import {
   UserCog,
   UserX,
   RefreshCw,
+  Settings,
+  ShieldOff,
+  ShieldAlert,
+  ShieldCheck,
+  Mail,
+  KeyRound,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -29,7 +36,14 @@ export type AuditAction =
   | "user_created"
   | "user_updated"
   | "user_deleted"
-  | "data_refresh";
+  | "data_refresh"
+  | "settings_toggle"
+  | "force_signout"
+  | "force_signout_all"
+  | "invite"
+  | "reset"
+  | "session_timeout_changed"
+  | "session_timeout_exemption_changed";
 
 export interface AuditEvent {
   id: string;
@@ -104,6 +118,48 @@ const ACTION_CONFIG: Record<
     color: "var(--text-secondary)",
     bg: "var(--bg-surface-muted)",
   },
+  settings_toggle: {
+    label: "Toggle ajuste",
+    icon: Settings,
+    color: "var(--warning)",
+    bg: "var(--warning-soft)",
+  },
+  force_signout: {
+    label: "Cierre de sesión remoto",
+    icon: ShieldOff,
+    color: "var(--danger)",
+    bg: "var(--danger-soft)",
+  },
+  force_signout_all: {
+    label: "Cierre de TODAS las sesiones",
+    icon: ShieldAlert,
+    color: "var(--danger)",
+    bg: "var(--danger-soft)",
+  },
+  invite: {
+    label: "Invitación de usuario",
+    icon: Mail,
+    color: "var(--success)",
+    bg: "var(--success-soft)",
+  },
+  reset: {
+    label: "Reset de contraseña",
+    icon: KeyRound,
+    color: "var(--accent)",
+    bg: "var(--accent-soft)",
+  },
+  session_timeout_changed: {
+    label: "Cambio de timeout de sesión",
+    icon: Clock,
+    color: "var(--accent)",
+    bg: "var(--accent-soft)",
+  },
+  session_timeout_exemption_changed: {
+    label: "Exención de timeout",
+    icon: ShieldCheck,
+    color: "var(--accent)",
+    bg: "var(--accent-soft)",
+  },
 };
 
 const ACTION_ORDER: AuditAction[] = [
@@ -116,6 +172,13 @@ const ACTION_ORDER: AuditAction[] = [
   "user_updated",
   "user_deleted",
   "data_refresh",
+  "settings_toggle",
+  "invite",
+  "reset",
+  "force_signout",
+  "force_signout_all",
+  "session_timeout_changed",
+  "session_timeout_exemption_changed",
 ];
 
 export function AuditClient({ initial, totalCount: initialCount, pageSize }: Props) {
@@ -363,7 +426,15 @@ export function AuditClient({ initial, totalCount: initialCount, pageSize }: Pro
           <tbody>
             {events.map((ev, i) => {
               const isOpen = expanded.has(ev.id);
-              const config = ACTION_CONFIG[ev.action];
+              // Fallback defensivo: si llega una acción sin mapeo (ej. un valor
+              // nuevo del enum aún no agregado aquí), mostramos el string crudo
+              // en vez de reventar el render (causa del bug "te saca de la página").
+              const config = ACTION_CONFIG[ev.action] ?? {
+                label: ev.action,
+                icon: AlertCircle,
+                color: "var(--text-muted)",
+                bg: "var(--bg-surface-muted)",
+              };
               const Icon = config.icon;
               return (
                 <RowFragment
