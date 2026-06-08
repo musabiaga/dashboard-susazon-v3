@@ -169,7 +169,9 @@ else
     dst_name="${mtime}_session_${hash}.jsonl"
 
     # Buscar si ya existe alguna versión de este hash en sessions/
-    existing=$(ls "$PRINCIPAL/sessions/"*"_session_${hash}.jsonl" 2>/dev/null | head -1)
+    # (|| true: con set -o pipefail+errexit, `ls` sin match aborta el script
+    #  la primera vez que se respalda una sesión nueva — este guard lo evita).
+    existing=$(ls "$PRINCIPAL/sessions/"*"_session_${hash}.jsonl" 2>/dev/null | head -1 || true)
     if [ -n "$existing" ]; then
       dst_name=$(basename "$existing")
     fi

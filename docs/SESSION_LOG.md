@@ -17,6 +17,7 @@
 - **Cierre fase 10:** 2026-06-02 (Tracking Diario: cards Variedad de SKUs + Clientes Activos + fix conteo por nombre, no por no_cliente)
 - **Cierre fase 11:** 2026-06-06 (Tab unificado "Clientes y Productos": fusión Productos+Clientes con toggles independientes gráfica/tabla, buscador en tabla, desglose simétrico SKU→clientes)
 - **Cierre fase 12:** 2026-06-07 (Insights ampliado: Pareto reemplaza Radar + dimensión Territorios + 3 sub-análisis nuevos — Precio $/kg, Cuadrante BCG, Estacionalidad — + comparación YoY justa + popovers de ayuda)
+- **Cierre fase 13:** 2026-06-07 (Documentación V4.0 completa: docs vivos + 6 .docx regenerados + manual HTML/PDF + sync a Plan Z + auditoría de reconstrucción desde cero)
 - **Versión actual:** 4.0.0 (en producción)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
 - **URL prod canonical:** `https://www.dashboardcomercialsusazon.com`
@@ -463,6 +464,22 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 **Razón:** Sin el cap, comparaba 5 días (2026) vs 7 días (2025) → −24% falso cuando la realidad era +12% (bug #41).
 **Estado:** Vigente. Commit `191973c`.
 
+### D032 — 2026-06-07 | Fase 13 · Documentación V4.0 completa + auditoría de reconstrucción
+
+**Contexto:** Mauricio pidió etiquetar todo como "Dashboard Comercial Susazón V4.0" y dejar AMBAS carpetas (repo `/docs` + `[Respaldo Profesional Plan Z]`) al 100% para poder reconstruir el sistema desde cero (por Claude Code o un developer), con estándar de industria.
+
+**Decisión:** Overhaul de documentación a V4.0:
+1. **Docs vivos** (md/xml): SESSION_LOG (Fases 10-13, D028-D032, bugs #38-#43), INSTRUCTIVO_AGENTE.xml (v4.0, fase_10/11/12, migraciones/endpoints), LO_NUEVO (reescrito), 00_INDICE_MAESTRO, CONTINUACION, AGENTS.md, README.md.
+2. **6 .docx regenerados** a v4.0.0 vía `gen_docs.py` (VERSION bump + secciones V4.0/Fases 6-12 en ChangeLog y Manual + nota de estado en los técnicos).
+3. **Manual in-app** (`public/instructivo.html` + espejo en docs) a V4.0 marcando lo nuevo; **PDF regenerado** desde el HTML con `chrome-headless-shell` de Playwright (el Chrome headless del sistema fallaba por GPU).
+4. **Sync a Plan Z** con `scripts/respaldar.sh` (código + docs kebab-case + AGENTS + sesiones JSONL). CHANGELOG.md de Plan Z con entrada `[4.0.0]`.
+5. **Auditoría de reconstrucción** (ambas carpetas): 24 migraciones sin gaps, deps locked (package-lock), `.env.example` completo (incl. Suve documentado), código completo en ambas, secrets gitignored + documentados. Verificación doble: todos los hechos (24 migr · 29 endpoints · 7 tabs · 4 sub-análisis) cuadran con el código real.
+
+**Nota:** los NOMBRES de carpeta conservan "V3.0" a propósito (renombrarlas rompería el repo git/paths/Vercel); el contenido y el producto son V4.0.
+
+**Razón:** Continuidad: cualquier agente o developer puede reconstruir el sistema desde cero con solo estas carpetas.
+**Estado:** Vigente. Commits `52261a2`, `fec30fc`, `0631f8e`, `b6daf47`, `80968e6`.
+
 ---
 
 ## Bugs Resueltos
@@ -512,6 +529,7 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 | 40 | 2026-06-07 | Cuadrante BCG: el eje Y (crecimiento) se aplastaba por outliers extremos | Un cliente diminuto que pasó de ~$50 a ~$63K daba +126,777% de crecimiento, comprimiendo todos los demás puntos. | Acotar el dominio del eje Y con el **p95** del crecimiento (+ clamp del valor ploteado); el valor real se muestra en el tooltip. Estos casos (chico + crece muchísimo) caen correctamente en "Apuesta". | `0bb5601` |
 | 41 | 2026-06-07 | Cuadrante BCG: comparación YoY injusta (mostraba −24% falso) | El periodo actual default termina "hoy" (07-jun) pero los datos llegan al 05-jun → comparaba 5 días de 2026 contra 7 días de 2025. | Capar el periodo actual a la última fecha con datos (`effectiveTo`) y alinear la ventana del año anterior al mismo tramo de fechas calendario. Validado: pasaba de −24% (falso) a +12% (real). | `191973c` |
 | 42 | 2026-06-07 | Build local quedaba vacío / no compilaba al validar | El comando incluía `pkill -f "next build"`, que mataba el propio wrapper de shell (cuya línea de comando también contenía esa cadena) antes de que `npm run build` arrancara. | Correr el build sin `pkill` (asegurando que no haya builds concurrentes) + workaround iCloud `mv .next /tmp/...`. | (operacional) |
+| 43 | 2026-06-07 | `respaldar.sh` abortaba en la sección 4 (backup de sesiones JSONL) | `existing=$(ls ...sessions...*_session_${hash}.jsonl 2>/dev/null \| head -1)` bajo `set -o pipefail` + `errexit`: cuando NO existía una sesión previa de ese hash (primera vez), `ls` retornaba ≠0 y abortaba el script. | Agregar `\|\| true` a la sustitución para que el pipeline retorne 0 cuando no hay match. Re-corrido: 7 sesiones (115MB) respaldadas a ambas carpetas. | (scripts/respaldar.sh) |
 
 ---
 
@@ -608,9 +626,39 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 - [x] **Fix bug Perdidos labels YTD** hardcoded (bug 36).
 - [x] **Instructivo de usuario + docs actualizados** a v3.9.0.
 
+### Completados en V4.0 — fase 10 (2026-06-01 a 2026-06-02) · Tracking Diario
+
+- [x] **Card Variedad de SKUs** (D028): SKUs distintos del mes, al-día vs mes/año anterior. Endpoint `tracking-variedad`.
+- [x] **Card Clientes Activos** (D028): clientes distintos del mes, al-día. Endpoint `tracking-clientes-activos`.
+- [x] **Fix conteo por nombre, no por no_cliente** (bug 38): cada ERP Sus/Suve numera aparte → doble conteo. Verificado con SQL (898→648 real en Mayo).
+
+### Completados en V4.0 — fase 11 (2026-06-06) · Tab unificado Clientes y Productos
+
+- [x] **Fusión Productos + Clientes** (D029): 8 → 7 tabs. `ClientesProductosTab` con 3 toggles (Gráfica/Tabla/Volumen). Monolítico si gráfica=tabla; partido si difieren.
+- [x] **DimensionTab generalizado**: `dimension=cliente|sku` + `controlledMode` + `showChart`/`showTable`. Endpoints `clientes-evolution`/`clientes-ritmo-90d` con param `dim`.
+- [x] **Buscador propio en la tabla** standalone + **desglose simétrico SKU→clientes** (`ProductoDesglose`).
+- [x] **Quitar sub-toggle redundante** del buscador (bug 39).
+
+### Completados en V4.0 — fase 12 (2026-06-06 a 2026-06-07) · Insights ampliado
+
+- [x] **Concentración: Radar → Pareto + dimensión Territorios** (D030). Migración 021.
+- [x] **Sub-análisis Precio $/kg** (D030): scatter precio/kg vs volumen, umbral/piso configurables, tabla ordenable con "dinero en la mesa". Migración 022, endpoint `precio-dispersion`, `PrecioAnalysis` + `ItemPicker`.
+- [x] **Sub-análisis Cuadrante BCG** (D030): tamaño (log) vs crecimiento YoY, 4 cuadrantes, Nuevos aparte. Migración 023, endpoint `cuadrante`, `CuadranteAnalysis`. Comparación YoY justa (D031, bug 41) + eje Y acotado por p95 (bug 40).
+- [x] **Sub-análisis Estacionalidad** (D030): heatmap mes × dimensión, índice de estacionalidad. Migración 024, endpoint `estacionalidad`, `EstacionalidadAnalysis`.
+- [x] **Popovers de ayuda "Cómo leer esto"** en el foco del header de Insights.
+- [x] **Tabla ordenable por columna** en Precio $/kg.
+
+### Completados en V4.0 — fase 13 (2026-06-07) · Documentación V4.0
+
+- [x] **Docs vivos a V4.0** (D032): SESSION_LOG, INSTRUCTIVO_AGENTE.xml, LO_NUEVO, ÍNDICE, CONTINUACION, AGENTS, README.
+- [x] **6 .docx regenerados** a v4.0.0 (`gen_docs.py`) + manual HTML/PDF a V4.0 (PDF vía `chrome-headless-shell` de Playwright).
+- [x] **Sync a Plan Z** (`respaldar.sh`, fix bug 43) + CHANGELOG `[4.0.0]`.
+- [x] **Auditoría de reconstrucción desde cero**: 24 migraciones sin gaps, deps locked, `.env.example` completo (Suve documentado), código completo en ambas carpetas, secrets gitignored + documentados.
+
 ### Próximo a venir (acordado con Mauricio)
 
-- [ ] **Tab "Presentación Semanal"** — replica del PPT de la junta directiva (3 sub-tabs: Asesores / Ciudades / Productos). **BLOQUEADO**: requiere definir primero las **cuotas/objetivos por asesor** (Mauricio lo prepara de su lado). Spec recibido + discovery hecho; 7 preguntas pendientes (cuota, zona A/B/C/D, ciudad/plaza, par tablas, margen ponderado, posición del tab, naming). Ver detalle en la conversación / `CONTINUACION_NUEVA_CONVERSACION.md`.
+- [ ] **Tab "Presentación Semanal"** — replica del PPT de la junta directiva (3 sub-tabs: Asesores / Ciudades / Productos). **BLOQUEADO**: requiere definir primero las **cuotas/objetivos por asesor** (Mauricio lo prepara de su lado). Spec recibido + discovery hecho; 7 preguntas pendientes (cuota, zona A/B/C/D, ciudad/plaza, par tablas, margen ponderado, posición del tab, naming). Ver detalle en `CONTINUACION_NUEVA_CONVERSACION.md`.
+- [ ] **Fase 3 del tab Clientes y Productos** (acordada, no iniciada): selector global de rango de fechas donde los toggles operan sobre el rango seleccionado; comparativo = mismas fechas calendario.
 
 ### Mejoras opcionales (sin prisa)
 
