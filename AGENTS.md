@@ -4,22 +4,22 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# Dashboard Comercial Susazón V3.0 — Project Context
+# Dashboard Comercial Susazón V4.0 — Project Context
 
 **Owner:** Mauricio Usabiaga (Director de Operaciones, Grupo Susazón). Habla español. **Regla absoluta: NUNCA alucinar. Ante cualquier duda, preguntar antes de implementar (AskUserQuestion).**
 
 ## Estado actual
 
-**EN PRODUCCIÓN — versión 1.3.0** — deployado desde 2026-04-28. Última versión: 2026-05-01.
+**EN PRODUCCIÓN — versión 4.0.0** — deployado desde 2026-04-28. Última versión: 2026-06-07.
 
 - **URL canonical:** `https://www.dashboardcomercialsusazon.com` (custom domain en GoDaddy)
 - **URL fallback:** `https://dashboard-susazon-v3-44sp.vercel.app`
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
 
-- ✅ Fases 0-3 completas (auth, RLS, dashboard 7 tabs, admin panel)
-- ✅ Fase 5 completa (admin panel: territorios + usuarios + audit log)
-- ✅ 6 themes (Clean, Editorial, Warm Neo, Susazón Moderno, Stock Market, Liquid Glass) + selector modal
-- ✅ Deploy a Vercel + 11 hotfixes post-deploy aplicados (bugs 5-21 en SESSION_LOG)
+- ✅ **Fases 0-12 completas.** Dashboard con **7 tabs** (Tracking, Ventas, Grupo Producto, Clientes y Productos, Vendedores, Perdidos, Insights), admin panel (territorios + usuarios + audit + config de sesión), auth + RLS por territorio, 6 themes, PDF Avance Comercial, seguridad de sesión.
+- ✅ **V4.0 (Fases 10-12, Jun 2026):** Tracking +2 cards (Variedad SKUs, Clientes Activos); tabs Productos+Clientes fusionados en "Clientes y Productos"; **Insights ampliado a 4 sub-análisis** (Concentración con Pareto+Territorios, Precio $/kg, Cuadrante BCG, Estacionalidad).
+- ✅ **24 migraciones SQL**, **29 endpoints**, 337K+ filas (Ene 2024 – Jun 2026), 15/15 usuarios en prod.
+- 📌 **Lee `docs/LO_NUEVO.md` + `docs/CONTINUACION_NUEVA_CONVERSACION.md` primero** para retomar.
 
 **Fase 2 (2026-04-29 / 2026-04-30):**
 - ✅ **Custom domain** `dashboardcomercialsusazon.com` configurado (GoDaddy + Vercel + Supabase Site URL)

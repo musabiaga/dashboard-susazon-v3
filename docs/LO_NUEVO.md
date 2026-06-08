@@ -1,266 +1,183 @@
-# 🆕 Lo Nuevo — Dashboard Comercial Susazón V3.0
+# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.0
 
-**Periodo cubierto:** 2026-05-11 al 2026-05-23
-**Versión:** 3.5.0 → 3.9.0
-**Fases:** 6 (UX comercial avanzada), 7 (Seguridad de sesión), 8 (Tab Insights), 9 (Selector de día + análisis profundo de Clientes)
+**Periodo cubierto:** 2026-05-23 al 2026-06-07
+**Versión:** 3.9.0 → **4.0.0**
+**Fases:** 10 (Tracking Diario · 2 cards nuevas), 11 (Tab unificado "Clientes y Productos"), 12 (Insights ampliado: 4 sub-análisis)
 
-Este documento resume las features agregadas después de la **Fase 5 (2026-05-10)** —
-si vienes del SESSION_LOG previo, todo lo que está aquí es nuevo para ti.
+Este documento resume las features agregadas después de la **Fase 9 (2026-05-23)** —
+si vienes del SESSION_LOG previo (v3.9.0), todo lo que está aquí es nuevo para ti.
 
----
-
-## ⭐ Fase 9 (2026-05-23) — Selector de día + análisis profundo del tab Clientes
-
-Lo más reciente. 1 mejora general + 4 al tab Clientes:
-
-1. **📆 Selector de día libre (general):** dropdown en el header para ver el dashboard
-   al cierre de **cualquier día** del mes (venta acumulada hasta ese día). Resalta días
-   con venta (verde) vs sin venta (gris); atajos "Hoy" y "Cierre". Reemplazó al toggle
-   Cierre/Hoy. Funciona en mes actual e histórico.
-
-2. **📊 Tab Clientes · Toggle gráfica "Mismo mes (3 años) / Evolución":** la vista
-   Evolución muestra barras de volumen mensual + línea de margen %, solo meses transcurridos.
-
-3. **🔎 Tab Clientes · Buscar por Clientes o Productos:** toggle en el buscador. En modo
-   Productos eliges SKUs y ves los clientes que más los compran. En Productos + Evolución
-   eliges 1 cliente (de todos los que compran ese SKU) y ves su compra mensual del producto.
-
-4. **📋 Tab Clientes · Tabla con 3 vistas:** "Año vs Año / Meses {año} / vs Prom. 90d".
-   La vista Prom 90d compara el ritmo diario del mes vs el de los últimos 90 días hábiles
-   (▲/▼ para detectar quién acelera o desacelera).
-
-5. **🧾 Tab Clientes · Desglose por línea de producto:** click en cualquier cliente para
-   expandir su facturación por grupo → sub-expand a SKUs.
-
-Todas respetan toggle Pesos/Kilos, filtro de territorios del sidebar y RLS. 4 endpoints
-lazy nuevos: `clientes-evolution`, `clientes-por-producto`, `clientes-ritmo-90d`,
-`cliente-desglose`. Implementadas como props opcionales del `DimensionTab` (Grupo y
-Vendedores intactos).
+> **¿Por qué V4.0?** Tres bloques grandes: el tab Insights pasó de 1 a **4 sub-análisis**
+> (de un solo análisis a una suite de inteligencia comercial), los tabs Productos y
+> Clientes se **fusionaron** en uno solo combinable, y Tracking Diario ganó 2 cards.
+> Es un salto mayor de capacidad → versión mayor.
 
 ---
 
-## 🎯 Resumen ejecutivo (Fases 6-8)
+## 🎯 Resumen ejecutivo (V3.9 → V4.0)
 
-| Área | Antes (≤ Fase 5) | Ahora (Fase 8) |
+| Área | Antes (v3.9.0) | Ahora (v4.0.0) |
 |---|---|---|
-| **Tabs del dashboard** | 7 (Tracking, Ventas, Grupo Producto, Productos, Clientes, Vendedores, Perdidos) | **8** (+ Insights) |
-| **Toggle Pesos/Kilos** | Solo en Tracking Diario | **En 6 tabs** (Tracking, Ventas, Productos, Grupo, Clientes, Vendedores) |
-| **PDF descargable** | No existía | **PDF "Avance Comercial"** completo (3 páginas) |
-| **Seguridad de sesión** | Solo Supabase Auth default | Timeout configurable + logout remoto admin + Smart Polling |
-| **Comparativos YoY** | Cierre completo (sesgaba primeros días del mes) | **Al-día equivalente** (apples-to-apples) |
-| **Desfase data-vs-calendario** | Mostraba "REZAGADO" si refrescabas en la mañana | Toggle **Cierre/Hoy** lo resuelve |
-| **Migraciones SQL aplicadas** | 16 | **20** |
-| **Endpoints backend** | 11 | **18** (+7 nuevos) |
+| **Tabs del dashboard** | 8 (Tracking, Ventas, Grupo, **Productos**, **Clientes**, Vendedores, Perdidos, Insights) | **7** (Productos + Clientes → **"Clientes y Productos"** combinable) |
+| **Sub-análisis de Insights** | 1 (Concentración) | **4** (Concentración, Precio $/kg, Cuadrante BCG, Estacionalidad) |
+| **Vista de Concentración** | Treemap + **Radar** | Treemap + **Pareto** (barras + % acumulado) |
+| **Dimensiones de Concentración** | 3 (Clientes/Grupos/Productos) | **4** (+ **Territorios**) |
+| **Cards de Tracking Diario** | KPIs base | + **Variedad de SKUs** + **Clientes Activos** |
+| **Migraciones SQL aplicadas** | 20 | **24** (021-024) |
+| **Endpoints backend** | 18 | **29 totales** (5 nuevos esta versión) |
+| **Ayuda contextual** | — | **Popover "Cómo leer esto"** en el foco de Insights (por sub-análisis) |
 
 ---
 
-## 🚀 Features nuevas — destacadas
+## ⭐ Fase 12 (2026-06-06 al 2026-06-07) — Insights: de 1 a 4 sub-análisis
 
-### 1. 💡 Tab **Insights · Análisis de Concentración** (Fase 8)
+Lo más grande de V4.0. El tab Insights ahora es una **suite de inteligencia comercial**
+con 4 sub-análisis detrás de un toggle (Concentración · Precio $/kg · Cuadrante · Estacionalidad).
+Cada uno es un componente independiente y "podable" (quitar uno = borrar una línea de
+`SUB_ANALYSES`).
 
-Un tab nuevo (icono 💡) dedicado a análisis avanzados no operativos. Primer
-sub-análisis: **Concentración / Pareto**.
+### a) Concentración — Pareto reemplaza Radar + dimensión Territorios
+- La vista **Radar** se reemplazó por **Pareto** (barras por item de mayor a menor +
+  línea de **% acumulado** en eje derecho). Es el estándar para leer concentración:
+  *"el top N cubre X% del total"*. El Radar no comunicaba dependencia; el Pareto sí.
+- Nueva dimensión **Territorios** (además de Clientes/Grupos/Productos). El drill-down de
+  un territorio muestra los clientes que facturaron ahí.
+- Migración suave de localStorage: quien tenía `radar` guardado pasa a `pareto`.
 
-**Pregunta que responde:** *"¿qué tan dependientes somos del top X clientes /
-grupos / productos?"*
+### b) 🆕 Precio $/kg (Dispersión de precio)
+**Pregunta:** *¿a qué precio/kg le vendemos el MISMO producto a cada cliente? ¿Dónde
+dejamos dinero en la mesa?*
+- Eliges **nivel** (SKU / Grupo / Familia) y un **item** (selector con búsqueda — hay 411 SKUs).
+- **Scatter**: cada punto = un cliente. X = precio/kg ponderado (Σventa÷Σkg), Y = volumen.
+  Línea de **promedio ponderado** + umbral **"paga barato"** (−X% configurable en vivo).
+  🔴 paga barato · 🟡 bajo promedio · 🟢 en/sobre.
+- **Piso de volumen** configurable (cubrir X% del volumen, default 95%) para descartar la
+  cola de compras mínimas.
+- **Tabla ordenable por columna** con **"dinero en la mesa"** = (promedio − precio del
+  cliente) × su volumen, en pesos concretos.
+- Maneja el caso de marca privada / 1 cliente (sin dispersión) con mensaje claro.
 
-**Características:**
-- **Date Range Picker** con atajos rápidos: Este mes, Mes anterior, 30d, 90d, YTD, 12m, custom
-- **3 dimensiones**: Grupos / Clientes / Productos (toggle independiente)
-- **4 métricas**: Pesos, Kilos, Margen $, Margen % (toggle)
-- **2 visualizaciones**:
-  - **Treemap squarify** (algoritmo manual, área proporcional al valor, bloques cuadrados)
-  - **Radar** (gradient fill + dots adaptativos + truncado dinámico para 10-15 ejes)
-- **Top N selector**: 7 / 10 / 15 items + "Resto del universo"
-- **Multi-select** sin límite para análisis ad-hoc
-- **Estado inicial bonito**: Top 7 + Resto = octágono perfecto
-- **Tabla Pareto expandible**:
-  - Cada fila se expande con click para mostrar facturas del cliente o clientes que compraron del grupo/producto
-  - Columnas: Venta, Kilos, Margen $, Margen %, % Universo, Acumulado, Δ pp
-- **Excluir items del universo**: botón "Excluir" por fila — el 100% se recalcula sin ellos
-  (útil para ignorar intercompañías, clientes atípicos, etc.)
-- **Tooltip flotante moderno** con accent bar + jerarquía visual
-- **Filtra por territorios del sidebar**: respeta single / aggregated-custom / aggregated-all del sidebar
-- **RLS por territorio** activa (un vendedor con `allowed=['Cancún']` solo ve Cancún)
+### c) 🆕 Cuadrante de cartera (BCG)
+**Pregunta:** *¿a quién cuido, a quién rescato, en quién apuesto, a quién suelto?*
+- **Scatter**: X = tamaño (venta, escala **log**), Y = crecimiento YoY %, burbuja = margen $.
+- 4 cuadrantes: ⭐ **Estrella** (grande+crece) · 🟥 **En riesgo** (grande+cae) ·
+  🔷 **Apuesta** (chico+crece) · ⬜ **Marginal** (chico+cae).
+- **Umbrales configurables en vivo** (tamaño default = mediana del periodo, crecimiento = 0%).
+- **Nuevos del periodo** (sin venta el año anterior) van en sección aparte.
+- **Comparación YoY justa:** el periodo actual se capa a la última fecha con datos y se
+  compara contra **el mismo tramo de fechas** del año anterior (ver bug #41). Reusa la
+  dimensión (Clientes/Grupos/Productos/Territorios) y el date range del tab.
 
-**Stack técnico:**
-- `app/api/insights/concentracion` + `/api/insights/item-detail`
-- Función SQL `insights_concentracion(p_from, p_to, p_dim, p_territorios)` con SECURITY INVOKER
-- Componentes: `InsightsTab`, `ConcentracionAnalysis`, `ConcentracionGrid` (squarify), `TreemapHoverTooltip`, `DateRangePicker`
+### d) 🆕 Estacionalidad (heatmap)
+**Pregunta:** *¿qué meses son pico/valle? ¿cuándo compro, produzco y promociono?*
+- **Heatmap** mes × dimensión. Celda = **índice de estacionalidad** (valor del mes ÷
+  promedio mensual de ESE item × 100; 100 = mes típico, 🔵 valle <100, 🟧 pico >100) o
+  **valor absoluto** (toggle).
+- **Año** seleccionable (2024/2025/2026); el año parcial se marca y blanquea los meses
+  sin datos.
+- **Métrica Kg** por default (planeación de producción), toggle a Pesos.
+- Dimensiones: Grupos/Territorios completos; Clientes/SKUs con **Top N** (alta cardinalidad).
 
-**Architecture-ready para crecer:** el tab Insights es un contenedor con sub-toggles.
-En el futuro se pueden agregar más sub-análisis (Estacionalidad, Cohortes, Crecimiento YoY, etc.).
+### e) Popover de ayuda "Cómo leer esto"
+- Hover (o focus por teclado) sobre el **foco 💡** del header de Insights abre un popover
+  que explica cómo interpretar el sub-análisis activo. Texto distinto por sub-análisis.
+  Badge **"?"** para señalar que es interactivo.
 
----
-
-### 2. 🔐 Seguridad de sesión completa (Fase 7)
-
-3 mecanismos coordinados que se complementan:
-
-#### a) Timeout de inactividad configurable
-- Admin elige en `/admin/configuracion`: Sin límite (default) / 35 / 45 / 60 / 90 / 120 minutos
-- Listeners de mouse/keyboard/scroll/touch resetean el timer (100% cliente, 0 polling)
-- A los 60s antes de expirar → modal **"¿Sigues ahí?"** con countdown grande
-- Usuario marca exenciones por persona (`session_timeout_exempt` en `users_permissions`)
-- Al expirar redirige a `/login?reason=idle` con banner amarillo
-
-#### b) Logout remoto desde admin
-- Panel `/admin/usuarios`: botón **"Excluir sesión"** por fila + botón **"Cerrar todas las sesiones"**
-- "Cerrar todas" excluye al admin actual + usuarios marcados como exentos
-- Implementación SQL: función `force_signout_user(uuid)` que borra de `auth.sessions` + `auth.refresh_tokens`
-- (El método `auth.admin.signOut()` del SDK Supabase requería JWT del usuario — no funcionaba con user_id)
-- Usuario afectado redirige a `/login?reason=admin` con banner rojo
-
-#### c) Smart Polling para detectar logout remoto
-3 capas combinadas:
-1. **Middleware** valida en CADA request existente — 0 requests extra
-2. **`visibilitychange` + `focus`** al regresar a la tab — ~10 req/día/usuario
-3. **Polling fallback cada 30 min** — safety net para "usuario observando sin tocar"
-
-Total: **~5,600 req/mes para 15 usuarios** (vs. 21,000 con polling cada 60s = **−74%**)
-
-**Migraciones:** `017_session_security`, `018_force_signout_function`
+**Stack Fase 12:** migraciones `021_insights_concentracion_dim_territorios`,
+`022_insights_precio_items`, `023_insights_cuadrante`, `024_insights_estacionalidad`.
+Endpoints `precio-dispersion`, `cuadrante`, `estacionalidad`. Componentes
+`PrecioAnalysis`, `CuadranteAnalysis`, `EstacionalidadAnalysis`, `ItemPicker`.
 
 ---
 
-### 3. ⏰ Toggle **Cierre / Hoy** — desfase data vs calendario (Fase 6)
+## 🔗 Fase 11 (2026-06-06) — Tab unificado "Clientes y Productos"
 
-**Problema resuelto:** si refrescabas el dashboard temprano (sin venta del día), el
-sistema mostraba "REZAGADO -3pp" engañoso porque comparaba venta acumulada (hasta ayer)
-contra meta lineal de hoy.
+Los tabs **Productos** y **Clientes** se fusionaron en uno solo (8 → 7 tabs) sin perder
+nada de Clientes y replicando todo Productos encima.
 
-**Solución:** toggle en el header global (junto al MonthSelector) que aparece SOLO
-cuando hay desfase. Permite alternar entre:
-- **Cierre [13-may]** (último día con venta real)
-- **Hoy [14-may]** (calendario)
+**3 toggles independientes en el header:**
+- **Gráfica:** Clientes | Productos
+- **Tabla:** Clientes | Productos
+- **Volumen:** Pesos | Kilos (compartido)
 
-**Cómo funciona:**
-- Detecta automáticamente `lastDayWithSale` en el server (`max(d) WHERE venta>0`)
-- Si `lastDayWithSale === actualTodayDay` → no aparece el toggle (no hay desfase)
-- Click navega a `/dashboard?asOf=YYYY-MM-DD` — el server recalcula `daysCurrent`
-- TODO el dashboard se recalcula automáticamente (KPIs, %, vel necesaria, etc.)
+**Estrategia (sin romper Clientes):** si gráfica y tabla son la misma dimensión →
+un solo `DimensionTab` monolítico (idéntico al Clientes de siempre). Si difieren →
+una instancia solo-gráfica + otra solo-tabla (ej. gráfica de Clientes + tabla de Productos).
 
----
+**Mejoras encima:**
+- **Buscador propio en la tabla** cuando es standalone (gráfica y tabla con dimensiones
+  distintas) — antes la tabla no tenía buscador en ese modo.
+- **Desglose simétrico SKU → clientes:** en la tabla de Productos, vista "Año vs Año",
+  expandir un SKU muestra los **clientes que lo compran** (espejo del desglose
+  cliente → grupo → SKU de Clientes).
 
-### 4. 🔀 Toggle **Pesos / Kilos** en 6 tabs (Fase 6)
-
-Antes solo el tab Tracking Diario tenía toggle. Ahora también:
-- Ventas (12 meses)
-- Productos
-- Grupo Producto
-- Clientes
-- Vendedores
-
-**Comportamiento idéntico en todos**: las **líneas de margen %** se mantienen FIJAS
-en el eje Y derecho cuando alternas Pesos/KG. El insight es:
-
-> *"¿cuándo vendí más kg, mi margen % subió o bajó?"*
-
-**Persistencia independiente** por tab (localStorage keys distintas).
+**Stack:** `ClientesProductosTab` (contenedor render-prop), `DimensionTab` generalizado
+con `dim=cliente|sku` + `controlledMode` + `showChart`/`showTable`, `ProductoDesglose`.
+Endpoints `clientes-evolution` / `clientes-ritmo-90d` generalizados a `dim`.
 
 ---
 
-### 5. 📊 Comparativos **al-día año anterior** (Fase 6)
+## 📊 Fase 10 (2026-06-01 al 2026-06-02) — Tracking Diario: 2 cards nuevas
 
-**Problema resuelto:** los KPIs "vs mismo mes año anterior" comparaban contra el
-CIERRE COMPLETO del mes anterior. Resultado: en el día 10 de Mayo 2026 ($22M) vs.
-Mayo 2025 completo ($60M) daba **-63% engañoso**.
-
-**Solución:** Helper `computePrevYearAlDia()` que calcula el valor del mismo día
-hábil del año anterior usando `findCalendarDayForBizDays()`.
-
-**Aplicado en:**
-- KPIs del Tracking Diario (Pesos y Kilos)
-- Tablas Por Territorio del PDF (Kilos y Margen)
-- Stat panel del Tracking Diario muestra ambos: "al-día" y "cierre" en gris
-
-**El comparativo principal ahora es apples-to-apples** (día N vs día N) y el cierre
-se conserva como referencia secundaria.
+- 🆕 **Variedad de SKUs:** cuántos SKUs distintos se han facturado en el mes (vs mes
+  anterior y año anterior al-día). Endpoint `tracking-variedad`.
+- 🆕 **Clientes Activos:** cuántos clientes distintos compraron en el mes (al-día).
+  Endpoint `tracking-clientes-activos`.
+- 🐞 **Fix crítico de conteo:** Clientes Activos se contaba por `no_cliente`, pero cada ERP
+  (Susazón / Suve) numera a sus clientes por separado → el mismo cliente (ej. "20 CANCUN")
+  se contaba doble. Se corrigió a **contar por nombre de cliente** (ver bug #38).
 
 ---
 
-### 6. 📄 PDF **Avance Comercial** (Fase 6)
+## 🔢 Migraciones SQL nuevas (V4.0)
 
-Reporte completo de 3 páginas generado con `@react-pdf/renderer` (lazy import ~600KB).
+| # | Archivo | Propósito |
+|---|---|---|
+| 021 | `insights_concentracion_dim_territorios.sql` | Agrega `territorios` como dimensión de agrupación a `insights_concentracion` |
+| 022 | `insights_precio_items.sql` | Lista items por nivel (sku/grupo/familia) con kg+venta — alimenta el selector de Precio $/kg |
+| 023 | `insights_cuadrante.sql` | venta/kg/margen actual + venta del mismo rango año anterior, por dimensión (BCG) |
+| 024 | `insights_estacionalidad.sql` | Valor mensual (kg/venta) por item del Top N, para un año (heatmap) |
 
-**Página 1 — Tracking Diario completo:**
-- 8 stats Pesos + 8 stats Kilos (idénticos al tab)
-- Progress bar avance vs PTTO con marca de pace 2025
-- Chart compuesto barras+líneas (acumulado, ptto lineal, año anterior) con eje Y numerado
-
-**Página 2 — Tablas comerciales (estilo AvComSS extendido):**
-- Por División (Foodservice / Distribuidores / Retail)
-- Por Empresa (Susazón / Suve)
-- Pesos por Territorio (11 territorios + TOTAL, con comparativo al-día 2025)
-- Kilos por Territorio (con cierre como referencia)
-- Margen por Territorio
-
-**Página 3 — Detalle:**
-- Top 10 Clientes con comparativo al-día año anterior + Var %
-- Tracking Diario detallado por día con semáforo de velocidad necesaria
-
-**3 modos según selección del sidebar:**
-- Single (1 territorio) → reporte focalizado
-- Multi (subset custom) → con tablas
-- All (todos) → réplica AvComSS clásico
-
-Botón **"Generar PDF"** disponible en los 7 tabs operativos (mismo permiso que Excel).
+Todas con `SECURITY INVOKER` (heredan la RLS de territorio del usuario).
 
 ---
 
-### 7. ✨ Mejoras visuales transversales
+## 🐞 Bugs notables resueltos (V4.0)
 
-#### Theme-aware
-Todo el tab Insights usa `var(--*)` CSS variables — se ve consistente en los **6 themes**
-(Clean, Editorial, Warm Neo, Susazón Moderno, Stock Market, Liquid Glass).
+- **#38** Clientes Activos contaba doble (por `no_cliente` en vez de por nombre) → −250 clientes fantasma en mayo.
+- **#41** Cuadrante BCG comparaba un periodo actual incompleto contra una ventana más larga del año anterior (ej. 5 días 2026 vs 7 días 2025) → mostraba −24% falso cuando en realidad era +12%. Fix: capar el periodo actual a la última fecha con datos y alinear la ventana previa al mismo tramo.
 
-#### Tooltips modernos
-Componente común `TooltipCard` con accent bar vertical + jerarquía clara:
-- Header: nombre/rank en uppercase
-- Valor grande en accent
-- Pill con % y label contextual
-
-#### Treemap squarify manual
-Implementación propia del algoritmo Squarify (Bruls et al. 2000) — el mismo que usa D3.
-Garantiza bloques con áreas proporcionales al valor PERO con aspect ratio cercano a
-1:1 (cuadrados). NUNCA produce rectángulos amorfos delgados.
-
----
-
-## 📊 Métricas técnicas (Fase 6 → Fase 8)
-
-| Indicador | Valor |
-|---|---|
-| Commits agregados (post Fase 5) | ~28 |
-| Migraciones SQL aplicadas | +4 (017, 018, 019, 020) |
-| Endpoints backend nuevos | +7 |
-| Componentes nuevos | +12 |
-| Hooks custom nuevos | +2 (`useIdleTimeout`, `useSessionPolling`) |
-| Build time típico | 4.0-4.6s (Turbopack) |
-| Bundle size delta | Mínimo (lazy imports en PDF + report-pdf) |
+(Detalle completo en `SESSION_LOG.md`, bugs #38-#42.)
 
 ---
 
 ## 🔮 Próximo a venir (acordado)
 
-- **Tab "Reporteo Semanal"** — el siguiente tab a construir tras esta documentación
+- **Tab "Presentación Semanal"** — réplica del PPT de la junta directiva (sub-tabs
+  Asesores / Ciudades / Productos). **BLOQUEADO**: requiere que Mauricio defina primero
+  las **cuotas/objetivos por asesor**. Spec + discovery hechos.
+- **Fase 3 del tab Clientes y Productos** (acordada, no iniciada): selector global de
+  rango de fechas donde los toggles operan sobre el rango, comparativo = mismas fechas
+  calendario.
 
 ---
 
-## 📚 Documentos que se actualizaron en este respaldo
+## 📚 Documentos actualizados en este respaldo (V4.0)
 
-- ✅ `SESSION_LOG.md` — fases 6, 7, 8 + decisiones D018-D025 + bugs resueltos
-- ✅ `INSTRUCTIVO_AGENTE.xml` — contexto técnico actualizado a versión 3.8.0
-- ✅ `00_INDICE_MAESTRO.md` — fecha + versión + nuevos archivos
-- ✅ `CONTINUACION_NUEVA_CONVERSACION.md` — handoff actualizado
-- ✅ `LO_NUEVO.md` (este archivo) — vista ejecutiva de las features nuevas
+**Repo `/docs`:**
+- ✅ `SESSION_LOG.md` — Fases 10-12 + decisiones D028-D031 + bugs #38-#42 + versión 4.0.0
+- ✅ `INSTRUCTIVO_AGENTE.xml` — Fases 10-12, componentes/endpoints/migraciones nuevos, versión 4.0
+- ✅ `00_INDICE_MAESTRO.md` — versiones, fechas y descripciones a V4.0
+- ✅ `CONTINUACION_NUEVA_CONVERSACION.md` — handoff al estado actual
+- ✅ `LO_NUEVO.md` (este archivo) — vista ejecutiva de V4.0
+- ✅ `01`-`06` `.docx` — regenerados a v4.0.0 vía `gen_docs.py`
+- ✅ `Instructivo_Usuario_Visual.html` / `.pdf` — manual con secciones nuevas marcadas
+- ✅ `CHANGELOG.md` (root) — entrada V4.0
 
-**Replicados en Plan Z** (kebab-case):
-- ✅ Plan Z `docs/` (mismo conjunto en formato kebab-case)
-- ✅ `CHANGELOG.md` del root del Plan Z
+**Plan Z** (kebab-case, vía `scripts/respaldar.sh`):
+- ✅ Mismo conjunto replicado.
 
 ---
 
-> 🔔 **Nota para el próximo agente**: lee este archivo PRIMERO si vas a continuar el
-> trabajo después de Fase 8. Te ahorra leer el SESSION_LOG entero para identificar
-> qué cambió recientemente.
+> 🔔 **Nota para el próximo agente**: lee este archivo PRIMERO si continúas después de la
+> Fase 12. Te ahorra leer el SESSION_LOG entero para identificar qué cambió en V4.0.

@@ -1,4 +1,4 @@
-# Continuación en Nueva Conversación — Dashboard Comercial Susazón V3.0
+# Continuación en Nueva Conversación — Dashboard Comercial Susazón V4.0
 
 > **Para Claude / Agente AI que está retomando el proyecto.**
 > Lee este archivo primero (toma 5 min), luego pasa a los recursos específicos según lo que vayas a hacer.
@@ -13,9 +13,9 @@
 
 **Stack:** Next.js 16 + Supabase Postgres + Vercel. Frontend React 19, Tailwind 4 CSS-first, Recharts 3.x.
 
-**Estado:** EN PRODUCCIÓN versión **3.9.0** (deploy 2026-04-28; Fases 1-9 cerradas. Última: Fase 9 = Selector de día + 4 mejoras análisis profundo del tab Clientes, 2026-05-23).
+**Estado:** EN PRODUCCIÓN versión **4.0.0** (deploy 2026-04-28; Fases 1-12 cerradas. Última: Fase 12 = Insights ampliado a 4 sub-análisis, 2026-06-07).
 
-> 🆕 **Si vienes de antes de Fase 6 (≤ 2026-05-10):** Lee primero `LO_NUEVO.md` — resume Fases 6, 7 y 8 en una página.
+> 🆕 **Si vienes de antes de Fase 10 (≤ 2026-05-23):** Lee primero `LO_NUEVO.md` — resume V4.0 (Fases 10, 11, 12) en una página.
 
 **URL canonical:** `https://www.dashboardcomercialsusazon.com`
 
@@ -28,11 +28,11 @@
 | Paso | Archivo | Para qué |
 |------|---------|----------|
 | 1 | `AGENTS.md` (raíz del repo) | Auto-cargado al `cd`. Stack, gotchas críticos, reglas absolutas. |
-| 2 | **🆕 `docs/LO_NUEVO.md`** | **Si la última sesión fue antes de 2026-05-11.** Resumen ejecutivo de Fases 6, 7, 8. |
+| 2 | **🆕 `docs/LO_NUEVO.md`** | **Si la última sesión fue antes de 2026-05-23.** Resumen ejecutivo de V4.0 (Fases 10, 11, 12). |
 | 3 | Este archivo (`CONTINUACION_NUEVA_CONVERSACION.md`) | Estás aquí. Contexto compacto. |
-| 4 | `docs/SESSION_LOG.md` | **Todas** las decisiones (D001-D025) + bugs resueltos (1-35). Lee si vas a tocar algo relacionado. |
-| 5 | `docs/INSTRUCTIVO_AGENTE.xml` | Inventario estructurado (v3.0, fecha 2026-05-17). Lee si vas a hacer cambios estructurales. |
-| 6 | `docs/01_Arquitectura_Tecnica.docx` | Diseño del sistema y por qué decisiones arquitectónicas. ⚠️ Refleja estado al 2026-05-10 (v3.3); para Fases 6-8 leer `LO_NUEVO.md`. |
+| 4 | `docs/SESSION_LOG.md` | **Todas** las decisiones (D001-D031) + bugs resueltos (1-42). Lee si vas a tocar algo relacionado. |
+| 5 | `docs/INSTRUCTIVO_AGENTE.xml` | Inventario estructurado (v4.0, fecha 2026-06-07). Lee si vas a hacer cambios estructurales. |
+| 6 | `docs/01_Arquitectura_Tecnica.docx` | Diseño del sistema y decisiones arquitectónicas (regenerado a v4.0.0). |
 | 7 | `~/Downloads/SECRETS_DASHBOARD_V3.txt` | Tokens, API keys, credenciales (privado, no en repo). |
 
 **Memoria persistente del usuario** (auto-cargada): `~/.claude/projects/-Users-mauusabiaga-Desktop-Claude-Code-PROJECTS-/memory/MEMORY.md` y archivos relacionados.

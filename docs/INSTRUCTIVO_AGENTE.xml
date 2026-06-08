@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<instructivo version="3.1" fecha="2026-05-23" idioma="es-MX">
+<instructivo version="4.0" fecha="2026-06-07" idioma="es-MX">
 
   <contexto>
-    <proyecto>Dashboard Comercial Susazón V3.0 — InCom (versión 3.9.0)</proyecto>
+    <proyecto>Dashboard Comercial Susazón V4.0 — InCom (versión 4.0.0)</proyecto>
     <propietario>Mauricio Usabiaga, Director de Operaciones, Grupo Susazón</propietario>
     <empresa>Grupo Susazón (incluye marca Susazón y marca Suve)</empresa>
     <usuarios_finales>15 personas internas (admin, director, gerente regional, vendedor)</usuarios_finales>
@@ -18,13 +18,37 @@
       el V3.0 esté siendo evaluado. Útil como referencia de fórmulas y lógica de negocio.
     </predecesor>
     <estado_actual>
-      EN PRODUCCIÓN versión 3.9.0. Deploy live en Vercel desde repo privado
+      EN PRODUCCIÓN versión 4.0.0. Deploy live en Vercel desde repo privado
       github.com/musabiaga/dashboard-susazon-v3. URL canonical:
       https://www.dashboardcomercialsusazon.com (custom domain GoDaddy → Vercel).
 
-      ~135 commits totales tras Fase 9, 20 migraciones Supabase, 337K+ filas de datos
-      comerciales (Ene 2024 - May 2026). 15/15 usuarios autorizados en prod (admins +
-      directores + gerentes + vendedores).
+      24 migraciones Supabase, 337K+ filas de datos comerciales (Ene 2024 - Jun 2026;
+      última fecha con datos 2026-06-05). 15/15 usuarios autorizados en prod.
+
+      === V4.0 (Fases 10-12 · 2026-06-01 al 2026-06-07) ===
+      Tres bloques grandes sobre v3.9.0:
+
+      FASE 10 (Jun 1-2): Tracking Diario gana 2 cards — Variedad de SKUs (cuántos SKUs
+      distintos en el mes) y Clientes Activos (cuántos clientes distintos), ambas al-día.
+      Endpoints tracking-variedad + tracking-clientes-activos. REGLA CLAVE: un cliente se
+      cuenta por NOMBRE, no por no_cliente (cada ERP Sus/Suve lo numera aparte → doble conteo;
+      Mayo 2026: 898 por no_cliente vs 648 por nombre).
+
+      FASE 11 (Jun 6): Tabs Productos y Clientes fusionados en "Clientes y Productos"
+      (8 → 7 tabs). Contenedor ClientesProductosTab con 3 toggles independientes: Gráfica
+      (Clientes|Productos), Tabla (Clientes|Productos), Volumen (Pesos|Kilos). DimensionTab
+      generalizado a dim=cliente|sku + controlledMode + showChart/showTable. Buscador propio
+      en la tabla standalone + desglose simétrico SKU→clientes (ProductoDesglose).
+
+      FASE 12 (Jun 6-7): Insights pasa de 1 a 4 sub-análisis. (1) Concentración: Radar
+      reemplazado por Pareto (barras + % acumulado) + dimensión Territorios (3→4 dims).
+      (2) Precio $/kg: dispersión de precio por cliente para un SKU/grupo/familia, con
+      "dinero en la mesa". (3) Cuadrante BCG: tamaño (log) vs crecimiento YoY, 4 cuadrantes,
+      Nuevos aparte, comparación YoY justa (capa a la última fecha con datos, mismas fechas
+      calendario). (4) Estacionalidad: heatmap mes × dimensión con índice de estacionalidad.
+      Popovers de ayuda "Cómo leer esto" en el foco del header. Migraciones 021-024;
+      endpoints precio-dispersion/cuadrante/estacionalidad; componentes Precio/Cuadrante/
+      Estacionalidad/ItemPicker. Ver &lt;fase_10&gt;, &lt;fase_11&gt;, &lt;fase_12&gt;.
 
       FASE 9 (Mayo 21-23, 2026): Selector de día libre en el header (ver dashboard al
       cierre de cualquier día; reemplazó el CutoffToggle) + 4 mejoras de análisis profundo
@@ -85,7 +109,9 @@
 
       LO_NUEVO.md generado en docs/ con resumen ejecutivo de Fases 6-8.
 
-      Estado pendiente: nuevo tab "Reporteo Semanal" (acordado con Mauricio post Fase 8).
+      Estado pendiente: tab "Presentación Semanal" (réplica del PPT de junta directiva,
+      sub-tabs Asesores/Ciudades/Productos). BLOQUEADO: requiere que Mauricio defina primero
+      las cuotas/objetivos por asesor. Spec + discovery hechos.
     </estado_actual>
     <urls>
       <url tipo="canonical">https://www.dashboardcomercialsusazon.com</url>
@@ -388,6 +414,57 @@
     </cambios>
   </fase_9>
 
+  <fase_10 fecha="2026-06-01 al 2026-06-02" titulo="Tracking Diario · 2 cards nuevas">
+    <objetivo>Visibilizar la amplitud de cartera (variedad de SKUs y clientes activos) en el Tracking Diario.</objetivo>
+    <cambios>
+      <cambio nombre="Card Variedad de SKUs">
+        Cuántos SKUs distintos se han facturado en el mes, con comparativo al-día vs mes anterior y año anterior. Endpoint lazy `tracking-variedad`.
+      </cambio>
+      <cambio nombre="Card Clientes Activos">
+        Cuántos clientes distintos compraron en el mes (al-día). Endpoint lazy `tracking-clientes-activos`.
+      </cambio>
+      <cambio nombre="Fix crítico: contar por nombre, no por no_cliente">
+        REGLA DE NEGOCIO: un cliente se identifica por NOMBRE. Cada ERP (Susazón / Suve) numera a sus clientes por separado, así que el mismo cliente físico (ej. "20 CANCUN") tiene no_cliente distinto en cada empresa. Contar por no_cliente lo duplica (Mayo 2026: 898 por no_cliente vs 648 por nombre). Confirmado con SQL contra la DB. Commit 33d6b6a. (Ver bug #38.)
+      </cambio>
+    </cambios>
+  </fase_10>
+
+  <fase_11 fecha="2026-06-06" titulo="Tab unificado Clientes y Productos">
+    <objetivo>Fusionar los tabs Productos y Clientes en uno solo combinable, sin perder nada de Clientes y replicando todo Productos encima.</objetivo>
+    <cambios>
+      <cambio nombre="Contenedor con 3 toggles independientes">
+        Tab "Clientes y Productos" (8 → 7 tabs). `ClientesProductosTab` (render-prop) con toggles: Gráfica (Clientes|Productos), Tabla (Clientes|Productos), Volumen (Pesos|Kilos). Si gráfica=tabla → un solo DimensionTab monolítico (idéntico al Clientes histórico); si difieren → instancia solo-gráfica + instancia solo-tabla.
+      </cambio>
+      <cambio nombre="DimensionTab generalizado">
+        Se agregaron props `dimension=cliente|sku`, `controlledMode` (Pesos/Kilos externo) y `showChart`/`showTable`. Endpoints `clientes-evolution` y `clientes-ritmo-90d` generalizados con param `dim`.
+      </cambio>
+      <cambio nombre="Buscador en tabla + desglose simétrico">
+        Buscador propio en la tabla cuando es standalone. Desglose simétrico SKU→clientes (`ProductoDesglose`): en la tabla de Productos, vista "Año vs Año", expandir un SKU muestra los clientes que lo compran (espejo de cliente→grupo→SKU). Se quitó el sub-toggle redundante del buscador (bug #39).
+      </cambio>
+    </cambios>
+  </fase_11>
+
+  <fase_12 fecha="2026-06-06 al 2026-06-07" titulo="Insights · de 1 a 4 sub-análisis">
+    <objetivo>Convertir el tab Insights en una suite de inteligencia comercial.</objetivo>
+    <cambios>
+      <cambio nombre="Concentración: Pareto reemplaza Radar + Territorios">
+        La vista Radar se reemplazó por Pareto (barras de mayor a menor + línea de % acumulado en eje derecho). Nueva dimensión Territorios (3 → 4 dims; drill-down = clientes que facturaron en el territorio). Migración suave de localStorage radar→pareto. Migración 021.
+      </cambio>
+      <cambio nombre="Precio $/kg (Dispersión)">
+        Scatter precio/kg ponderado (Σventa÷Σkg) vs volumen por cliente, para un SKU/grupo/familia (selector con búsqueda, `ItemPicker`). Línea de promedio ponderado + umbral "paga barato" (−X% configurable) + piso de volumen (cubrir X% del volumen, default 95%). Tabla ordenable con "dinero en la mesa" = (promedio − precio cliente) × volumen. Maneja marca privada/1 cliente. Migración 022 (insights_precio_items) + endpoint precio-dispersion + componente PrecioAnalysis.
+      </cambio>
+      <cambio nombre="Cuadrante de cartera (BCG)">
+        Scatter tamaño (venta, eje log) vs crecimiento YoY %, burbuja = margen. 4 cuadrantes (Estrella/En riesgo/Apuesta/Marginal) con umbrales configurables (tamaño default = mediana, crecimiento = 0%). Nuevos (sin base año anterior) aparte. Eje Y acotado por p95 (outliers). Comparación YoY justa: capa el periodo actual a la última fecha con datos y compara contra el mismo tramo de fechas calendario del año anterior (no días hábiles — decisión D031). Migración 023 + endpoint cuadrante + componente CuadranteAnalysis.
+      </cambio>
+      <cambio nombre="Estacionalidad (heatmap)">
+        Heatmap mes × dimensión. Celda = índice de estacionalidad (valor del mes ÷ promedio mensual del item × 100; 100 = típico, frío<100, cálido>100) o valor absoluto (toggle). Selector de año (2024/2025/2026; año parcial marcado). Kg default (toggle Pesos). Dimensiones chicas (grupos/territorios) completas; clientes/SKUs con Top N. Migración 024 + endpoint estacionalidad + componente EstacionalidadAnalysis.
+      </cambio>
+      <cambio nombre="Popover de ayuda Cómo leer esto">
+        Hover/focus sobre el foco 💡 del header de Insights abre un popover que explica cómo interpretar el sub-análisis activo. Texto distinto por sub-análisis (cada entrada de SUB_ANALYSES tiene un campo `help`). Badge "?" para señalar interactividad.
+      </cambio>
+    </cambios>
+  </fase_12>
+
   <archivos>
     <directorio nombre="app/" descripcion="Páginas Next.js 16 (App Router)">
       <archivo path="app/layout.tsx" descripcion="Root layout con ThemeProvider + fonts" />
@@ -474,6 +551,10 @@
       <archivo path="018_force_signout_function.sql" descripcion="(Fase 7) Función force_signout_user(uuid) con SECURITY DEFINER. DELETE auth.sessions + auth.refresh_tokens" />
       <archivo path="019_insights_concentracion.sql" descripcion="(Fase 8) Función insights_concentracion(p_from, p_to, p_dim) v1 con SECURITY INVOKER" />
       <archivo path="020_insights_concentracion_territorios.sql" descripcion="(Fase 8) Recreate insights_concentracion con parámetro opcional p_territorios text[] para filtrar por sidebar" />
+      <archivo path="021_insights_concentracion_dim_territorios.sql" descripcion="(Fase 12) Agrega 'territorios' como dimensión de agrupación a insights_concentracion (WHEN territorios → territorio)" />
+      <archivo path="022_insights_precio_items.sql" descripcion="(Fase 12) insights_precio_items(p_from,p_to,p_level,p_territorios): lista items por nivel sku/grupo/familia con kg+venta, ordenados por volumen. Alimenta el selector de Precio $/kg" />
+      <archivo path="023_insights_cuadrante.sql" descripcion="(Fase 12) insights_cuadrante(p_from,p_to,p_from_prev,p_to_prev,p_dimension,p_territorios): venta/kg/margen actual + venta del mismo rango año anterior, por item. Solo items con venta_actual>0. Para el BCG" />
+      <archivo path="024_insights_estacionalidad.sql" descripcion="(Fase 12) insights_estacionalidad(p_year,p_dimension,p_metric,p_territorios,p_topn): valor mensual (kg/venta) por item del Top N, para un año. Para el heatmap" />
     </directorio>
 
     <directorio nombre="app/api/dashboard/" descripcion="API routes específicas del dashboard (post Mejora 1)">
@@ -486,7 +567,12 @@
 
     <directorio nombre="app/api/insights/" descripcion="(Fase 8) API routes del tab Insights">
       <archivo path="app/api/insights/concentracion/route.ts" descripcion="Agregación principal del análisis Pareto. Parámetros: from, to, dimension, métricas, territorios. Llama RPC insights_concentracion" />
-      <archivo path="app/api/insights/item-detail/route.ts" descripcion="Drill-down de fila expandida en tabla Pareto. Para clientes: facturas por fecha. Para grupos/productos: clientes que compraron" />
+      <archivo path="app/api/insights/item-detail/route.ts" descripcion="Drill-down de fila expandida en tabla Pareto. Para clientes: facturas por fecha. Para grupos/productos/territorios: clientes que compraron/facturaron" />
+      <archivo path="app/api/insights/precio-dispersion/route.ts" descripcion="(Fase 12) Precio $/kg. Modo lista (items por nivel) + modo detalle (desglose por cliente con precio/kg ponderado). Llama RPC insights_precio_items" />
+      <archivo path="app/api/insights/cuadrante/route.ts" descripcion="(Fase 12) Cuadrante BCG. Calcula el rango previo (−1 año, mismas fechas) y capa el actual a la última fecha con datos. Llama RPC insights_cuadrante" />
+      <archivo path="app/api/insights/estacionalidad/route.ts" descripcion="(Fase 12) Estacionalidad. Pivotea a 12 meses, marca meses con datos (año parcial), fila TOTAL. Llama RPC insights_estacionalidad" />
+      <archivo path="app/api/dashboard/tracking-variedad/route.ts" descripcion="(Fase 10) Variedad de SKUs distintos facturados en el mes (al-día vs mes/año anterior)" />
+      <archivo path="app/api/dashboard/tracking-clientes-activos/route.ts" descripcion="(Fase 10) Clientes distintos (por NOMBRE, no no_cliente) que compraron en el mes (al-día)" />
     </directorio>
 
     <directorio nombre="app/api/admin/session/" descripcion="(Fase 7) API routes de seguridad de sesión">
@@ -854,7 +940,8 @@
   </configuracion>
 
   <notas_futuras>
-    <nota tipo="acordado-prioridad-alta">**Próximo tab: "Reporteo Semanal"** — acordado con Mauricio al cierre de Fase 8 (2026-05-17). Siguiente sesión arranca con este tab.</nota>
+    <nota tipo="acordado-prioridad-alta">**Próximo tab: "Presentación Semanal"** — réplica del PPT de junta directiva (sub-tabs Asesores/Ciudades/Productos). BLOQUEADO: requiere que Mauricio defina primero las cuotas/objetivos por asesor. Spec + discovery hechos.</nota>
+    <nota tipo="acordado">**Fase 3 del tab Clientes y Productos** (acordada, no iniciada): selector global de rango de fechas donde los toggles operan sobre el rango; comparativo = mismas fechas calendario.</nota>
     <nota>Tab Insights es contenedor con sub-toggles — agregar sub-análisis futuros (Estacionalidad, Cohortes, Crecimiento YoY) cuando Mauricio lo necesite. El sub-toggle se renderiza como info-pill no clickeable en v1 (con 1 sub-análisis) y se convierte en segmented control automáticamente al agregar más.</nota>
     <nota>Considerar upgrade Vercel Pro ($20/mes) si el equipo crece o necesitan refresh largo.</nota>
     <nota>Considerar Supabase Pro ($25/mes) si se requiere sandbox via Branches o backups automáticos.</nota>

@@ -1,8 +1,8 @@
-# Session Log — Dashboard Comercial Susazón V3.0
+# Session Log — Dashboard Comercial Susazón V4.0
 
 ## Metadata
 
-- **Proyecto:** Dashboard Comercial Susazón V3.0 (Profesional)
+- **Proyecto:** Dashboard Comercial Susazón V4.0 (Profesional) — **InCom** (Inteligencia Comercial Susazón®)
 - **Empresa/Usuario:** Grupo Susazón (Susazón + Suve) — Mauricio Usabiaga, Director de Operaciones
 - **Inicio:** 2026-04-26
 - **Cierre fase 1:** 2026-04-28 (deploy a producción)
@@ -14,7 +14,10 @@
 - **Cierre fase 7:** 2026-05-15 (Seguridad de sesión: timeout configurable + logout remoto admin + smart polling)
 - **Cierre fase 8:** 2026-05-17 (Tab Insights · Análisis de Concentración: Treemap squarify + Radar + Pareto expandible + Excluir del universo)
 - **Cierre fase 9:** 2026-05-23 (Selector de día global + 4 mejoras al tab Clientes: toggle gráfica Mismo mes/Evolución, buscar por productos, tabla 3 vistas, desglose por línea de producto)
-- **Versión actual:** 3.9.0 (en producción)
+- **Cierre fase 10:** 2026-06-02 (Tracking Diario: cards Variedad de SKUs + Clientes Activos + fix conteo por nombre, no por no_cliente)
+- **Cierre fase 11:** 2026-06-06 (Tab unificado "Clientes y Productos": fusión Productos+Clientes con toggles independientes gráfica/tabla, buscador en tabla, desglose simétrico SKU→clientes)
+- **Cierre fase 12:** 2026-06-07 (Insights ampliado: Pareto reemplaza Radar + dimensión Territorios + 3 sub-análisis nuevos — Precio $/kg, Cuadrante BCG, Estacionalidad — + comparación YoY justa + popovers de ayuda)
+- **Versión actual:** 4.0.0 (en producción)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
 - **URL prod canonical:** `https://www.dashboardcomercialsusazon.com`
 - **URL prod fallback:** `https://dashboard-susazon-v3.vercel.app`
@@ -29,13 +32,14 @@
 | Carpeta / Archivo | Propósito |
 |---|---|
 | `app/` | App Router Next.js 16 (rutas, layouts, server components) |
-| `app/dashboard/` | Dashboard principal con **8 tabs** (Tracking, Ventas, Grupo Producto, Productos, Clientes, Vendedores, Perdidos, **Insights**) |
+| `app/dashboard/` | Dashboard principal con **7 tabs** (Tracking, Ventas, Grupo Producto, **Clientes y Productos**, Vendedores, Perdidos, **Insights**) — Productos+Clientes fusionados en V4.0 |
 | `app/admin/` | Panel admin (territorios, usuarios, audit, **configuración de sesión**) |
 | `app/cargar-datos/` | Refresh APIs + editor PTTO |
-| `app/api/` | API routes server-side (18 endpoints; +7 nuevos para insights/concentracion, insights/item-detail, force-signout, etc.) |
-| `app/api/insights/` | Endpoints del tab Insights (`concentracion`, `item-detail`) |
-| `components/dashboard/` | Componentes de los 8 tabs y charts |
-| `components/dashboard/insights/` | Componentes del tab Insights (ConcentracionAnalysis, ConcentracionGrid, TreemapHoverTooltip, DateRangePicker) |
+| `app/api/` | API routes server-side (**29 endpoints** totales) |
+| `app/api/insights/` | Endpoints del tab Insights (`concentracion`, `item-detail`, **`precio-dispersion`**, **`cuadrante`**, **`estacionalidad`**) |
+| `app/api/dashboard/` | Endpoints del dashboard (incluye **`tracking-variedad`**, **`tracking-clientes-activos`** nuevos en V4.0) |
+| `components/dashboard/` | Componentes de los 7 tabs y charts (incl. `ClientesProductosTab`, `DimensionTab` generalizado, `ProductoDesglose`) |
+| `components/dashboard/insights/` | Componentes del tab Insights (ConcentracionAnalysis, **PrecioAnalysis**, **CuadranteAnalysis**, **EstacionalidadAnalysis**, **ItemPicker**, ConcentracionGrid, DateRangePicker) |
 | `components/dashboard/report-pdf/` | Generador PDF "Avance Comercial" con `@react-pdf/renderer` (3 páginas) |
 | `components/session/` | Modal "¿Sigues ahí?" + hooks de seguridad de sesión |
 | `components/theme/` | 6 themes + selector modal |
@@ -47,7 +51,7 @@
 | `lib/format.ts` | Formatters (money, kilos, dates) — portado del V2.2 |
 | `lib/business-days.ts` | Cálculo de días hábiles L-S menos LFT + helpers `findCalendarDayForBizDays`, `computePrevYearAlDia` |
 | `lib/admin-guards.ts` | Guards de rol admin para API routes |
-| `supabase/migrations/` | **20 migraciones SQL aplicadas** (+4 nuevas: 017_session_security, 018_force_signout_function, 019_insights_concentracion, 020_insights_concentracion_territorios) |
+| `supabase/migrations/` | **24 migraciones SQL aplicadas** (V4.0 agregó: 021_insights_concentracion_dim_territorios, 022_insights_precio_items, 023_insights_cuadrante, 024_insights_estacionalidad) |
 | `docs/` | Esta documentación (+ `LO_NUEVO.md` con resumen ejecutivo) |
 | `proxy.ts` | Middleware de Next.js 16 (renombrado de middleware.ts) — ahora valida sesión en cada request |
 | `.env.local` | Secrets (NO commit) |
@@ -412,6 +416,53 @@ Todas respetan toggle Pesos/Kilos, filtro de territorios del sidebar y RLS por r
 **Razón:** El tab Clientes era el más usado para análisis comercial; estas mejoras lo convierten en herramienta de análisis profundo sin salir del tab.
 **Estado:** Vigente. Commits `002f551`, `fb59c1f`, `1615153`, `351ad16`, `677eb0e`, `6524a2c`, `8950245`.
 
+### D028 — 2026-06-02 | Fase 10 · Cards Variedad de SKUs + Clientes Activos en Tracking Diario
+
+**Contexto:** Mauricio quería ver en el Tracking Diario dos métricas de amplitud de cartera: cuántos SKUs distintos y cuántos clientes distintos se han facturado en el mes.
+
+**Decisión:** Dos cards nuevas con comparativo al-día (mes anterior + año anterior). Endpoints lazy `tracking-variedad` y `tracking-clientes-activos`.
+
+**Regla de negocio clave (confirmada con SQL):** un cliente se identifica por **NOMBRE**, no por `no_cliente`. Cada ERP (Susazón / Suve) numera a sus clientes por separado, así que el mismo cliente físico (ej. "20 CANCUN") tiene `no_cliente` distinto en cada empresa. Contar por `no_cliente` lo duplica. Verificado: Mayo 2026 daba 898 por `no_cliente` vs 648 por nombre (ver bug #38).
+
+**Razón:** Amplitud de cartera (SKUs y clientes activos) es un indicador de salud comercial que no estaba visible.
+**Estado:** Vigente. Commits `479289f`, `a625e47`, `33d6b6a`.
+
+### D029 — 2026-06-06 | Fase 11 · Fusión Productos + Clientes en un tab combinable
+
+**Contexto:** Los tabs Productos y Clientes compartían motor (`DimensionTab`) y el usuario quería poder combinar dimensiones (ej. gráfica de Clientes + tabla de Productos) sin duplicar tabs.
+
+**Decisión:** Tab único **"Clientes y Productos"** (8 → 7 tabs). Contenedor `ClientesProductosTab` con render-prop y 3 toggles: Gráfica (Clientes|Productos), Tabla (Clientes|Productos), Volumen (Pesos|Kilos). Estrategia para no romper Clientes: si gráfica=tabla → un solo `DimensionTab` monolítico (idéntico al histórico); si difieren → instancia solo-gráfica + instancia solo-tabla. El `DimensionTab` se generalizó con `dimension=cliente|sku`, `controlledMode`, `showChart`/`showTable`.
+
+**Mejoras encima (sin quitar nada):** buscador propio en la tabla cuando es standalone; desglose simétrico SKU→clientes (`ProductoDesglose`) en la tabla de Productos vista "Año vs Año".
+
+**Razón:** Combinabilidad de dimensiones + un tab menos en la barra, replicando TODO Productos sobre Clientes.
+**Estado:** Vigente. Commits `2a75f3c`, `434eb45`, `aaa4d39`, `9897aea`, `089f852`, `529c9c8`, `fff8992`.
+
+### D030 — 2026-06-07 | Fase 12 · Insights: Pareto reemplaza Radar + Territorios + 3 sub-análisis nuevos
+
+**Contexto:** El tab Insights tenía 1 solo sub-análisis (Concentración) con vista Radar. Mauricio pidió más análisis para resolver preguntas comerciales importantes.
+
+**Decisión:** Insights pasa a **4 sub-análisis** detrás de un toggle (cada uno componente independiente y podable):
+1. **Concentración** — la vista **Radar** se reemplaza por **Pareto** (barras + % acumulado; el Radar no comunicaba concentración). Nueva dimensión **Territorios** (3 → 4 dims).
+2. **Precio $/kg** (Dispersión) — scatter precio/kg vs volumen por cliente para un SKU/grupo/familia; umbral "paga barato" y piso de volumen configurables; tabla ordenable con "dinero en la mesa".
+3. **Cuadrante (BCG)** — scatter tamaño (log) vs crecimiento YoY, burbuja=margen; 4 cuadrantes con umbrales configurables; Nuevos aparte.
+4. **Estacionalidad** — heatmap mes × dimensión con índice de estacionalidad (100 = mes típico) o absoluto; selector de año; Kg default.
+Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisis).
+
+**Decisiones de diseño confirmadas con Mauricio vía AskUserQuestion** (vista Pareto, reemplazar Radar, umbral −10%, piso 95%, mediana como umbral de tamaño, Nuevos aparte, índice de estacionalidad, Kg default, etc.).
+
+**Razón:** Convertir Insights en una suite de inteligencia comercial (margen, foco comercial, planeación).
+**Estado:** Vigente. Commits `00b41c6`, `87f5d44`, `d93038e`, `0bb5601`, `191973c`, `65803cb`, `a4c4c68`.
+
+### D031 — 2026-06-07 | Fase 12 · Comparación YoY justa por fechas calendario (no días hábiles)
+
+**Contexto:** El Cuadrante BCG compara el periodo actual contra el año anterior. El default termina "hoy", pero los datos pueden ir más atrás (ej. hoy=07-jun, datos al 05-jun).
+
+**Decisión:** Capar el periodo actual a la **última fecha con datos** dentro del rango (`effectiveTo`) y comparar contra el **mismo tramo de fechas calendario** del año anterior (`from`/`effectiveTo` − 1 año). Se eligió **mismas fechas calendario** (no días hábiles equivalentes): Mauricio confirmó que días hábiles sería más rígido y confuso de leer, y para rangos normales la diferencia es mínima. La UI muestra la ventana de comparación real y avisa cuando se ajustó.
+
+**Razón:** Sin el cap, comparaba 5 días (2026) vs 7 días (2025) → −24% falso cuando la realidad era +12% (bug #41).
+**Estado:** Vigente. Commit `191973c`.
+
 ---
 
 ## Bugs Resueltos
@@ -456,6 +507,11 @@ Todas respetan toggle Pesos/Kilos, filtro de territorios del sidebar y RLS por r
 | 35 | 2026-05-17 | Vendedor con `allowed=['Cancún']` veía data de todos los territorios en Insights | Función SQL `insights_concentracion` v1 no respetaba RLS de `sales_rows` porque tenía SECURITY DEFINER. | Migración 020: SECURITY INVOKER + parámetro `p_territorios text[]` opcional. Hereda RLS del caller. Endpoint backend pasa territorios efectivos del sidebar. | (migración 020) |
 | 36 | 2026-05-21 | Tab Perdidos: labels YTD hardcoded a "Ene–Abr 25/26" (no se actualizaban al cambiar de mes) | `labelPrev`/`labelCurr` literales en vez de derivar de `monthShortYY` como ya hacía `dimLabel`. | Derivar ambos labels de `monthShortYY` (en mayo: "Ene–May 25/26"). | `87c2462` |
 | 37 | 2026-05-23 | `git commit` falló con "index.lock write error: Operation timed out" | iCloud Drive sincronizando archivos de `.git/` → timeout al escribir el lock. No es error de código. | Reintentar el commit (transitorio). Los `git add` previos sí quedaron staged. También afecta `rm -rf .next` (usar `mv .next /tmp/...` antes del build). | (operacional) |
+| 38 | 2026-06-02 | Card Clientes Activos contaba el doble (≈898 vs 648 real en Mayo 2026) | Contaba por `no_cliente`, pero cada ERP (Susazón/Suve) numera a sus clientes por separado → mismo cliente físico ("20 CANCUN" = CL-000364 en Sus, CL-000982 en Suve) contado dos veces. | Contar por **nombre de cliente** (`cliente`), no por `no_cliente`. Verificado con SQL contra la DB. | `33d6b6a` |
+| 39 | 2026-06-06 | Tab Clientes y Productos: sub-toggle "Clientes/Productos" del buscador redundaba con el toggle de Gráfica del contenedor | El `enableProductSearch` (Mejora 3 de Fase 9) agregaba un sub-toggle dentro del buscador que ahora duplicaba el toggle de dimensión del contenedor unificado. | Quitar `enableProductSearch`/`productOptions`/`productSearchContext` del `DimensionTab` de clientes; el buscador queda como multi-select simple que sigue la dimensión del contenedor. | `529c9c8` |
+| 40 | 2026-06-07 | Cuadrante BCG: el eje Y (crecimiento) se aplastaba por outliers extremos | Un cliente diminuto que pasó de ~$50 a ~$63K daba +126,777% de crecimiento, comprimiendo todos los demás puntos. | Acotar el dominio del eje Y con el **p95** del crecimiento (+ clamp del valor ploteado); el valor real se muestra en el tooltip. Estos casos (chico + crece muchísimo) caen correctamente en "Apuesta". | `0bb5601` |
+| 41 | 2026-06-07 | Cuadrante BCG: comparación YoY injusta (mostraba −24% falso) | El periodo actual default termina "hoy" (07-jun) pero los datos llegan al 05-jun → comparaba 5 días de 2026 contra 7 días de 2025. | Capar el periodo actual a la última fecha con datos (`effectiveTo`) y alinear la ventana del año anterior al mismo tramo de fechas calendario. Validado: pasaba de −24% (falso) a +12% (real). | `191973c` |
+| 42 | 2026-06-07 | Build local quedaba vacío / no compilaba al validar | El comando incluía `pkill -f "next build"`, que mataba el propio wrapper de shell (cuya línea de comando también contenía esa cadena) antes de que `npm run build` arrancara. | Correr el build sin `pkill` (asegurando que no haya builds concurrentes) + workaround iCloud `mv .next /tmp/...`. | (operacional) |
 
 ---
 
