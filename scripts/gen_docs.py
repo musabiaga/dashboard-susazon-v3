@@ -29,11 +29,11 @@ from docx.oxml import OxmlElement
 # ============================================================
 # Constantes del proyecto
 # ============================================================
-PROYECTO = "Dashboard Comercial Susazón V3.0 — InCom"
+PROYECTO = "Dashboard Comercial Susazón V4.0 — InCom"
 EMPRESA = "Grupo Susazón (Susazón + Suve)"
 OWNER = "Mauricio Usabiaga, Director de Operaciones"
-VERSION = "3.3.0"
-FECHA = "2026-05-10"
+VERSION = "4.0.0"
+FECHA = "2026-06-07"
 REPO = "github.com/musabiaga/dashboard-susazon-v3"
 URL_PROD = "www.dashboardcomercialsusazon.com"
 URL_FALLBACK = "dashboard-susazon-v3-44sp.vercel.app"
@@ -191,6 +191,8 @@ def gen_arquitectura():
     doc = Document()
 
     add_cover(doc, "Arquitectura Técnica", "Diseño del sistema, stack y flujo de información")
+    add_h2(doc, "Estado de este documento (V4.0)")
+    add_para(doc, "El núcleo describe la arquitectura base (Fases 0-5). Las Fases 6-12 (versiones 3.5.0 → 4.0.0) — Insights con 4 sub-análisis, tab Clientes y Productos combinado, cards de Tracking, seguridad de sesión y PDF Avance Comercial — están resumidas en el ChangeLog (doc 03) y a detalle en LO_NUEVO.md, SESSION_LOG.md e INSTRUCTIVO_AGENTE.xml. Estado actual: 7 tabs, 24 migraciones SQL, 29 endpoints.")
 
     add_h1(doc, "Resumen Ejecutivo")
     add_para(
@@ -366,6 +368,8 @@ Supabase Postgres
 def gen_diccionario():
     doc = Document()
     add_cover(doc, "Diccionario de Datos", "Schemas de DB, contratos de APIs y estructuras internas")
+    add_h2(doc, "Estado de este documento (V4.0)")
+    add_para(doc, "El núcleo describe los schemas base. En V4.0 se agregaron 4 funciones SQL de Insights (migraciones 021-024: insights_concentracion con dimensión territorios, insights_precio_items, insights_cuadrante, insights_estacionalidad) y 5 endpoints (precio-dispersion, cuadrante, estacionalidad, tracking-variedad, tracking-clientes-activos). Ver detalle en el ChangeLog (doc 03) e INSTRUCTIVO_AGENTE.xml. REGLA CLAVE: un cliente se identifica por NOMBRE, no por no_cliente (cada ERP Sus/Suve numera aparte).")
 
     add_h1(doc, "Tablas de Postgres")
 
@@ -604,7 +608,40 @@ Body:
 # ============================================================
 def gen_changelog():
     doc = Document()
-    add_cover(doc, "ChangeLog & Release Notes", "Evolución V2.2 → V3.0 + historial de commits")
+    add_cover(doc, "ChangeLog & Release Notes", "Evolución V2.2 → V4.0 + historial de commits")
+
+    # ===== V4.0 (Fases 10-12) =====
+    add_h1(doc, "Versión 4.0.0 — V4.0 (2026-06-07)")
+    add_para(doc, "Tres bloques grandes sobre la v3.9.0: el tab Insights pasó de 1 a 4 sub-análisis (suite de inteligencia comercial), los tabs Productos y Clientes se fusionaron en uno solo combinable, y Tracking Diario ganó 2 cards. 24 migraciones SQL, 29 endpoints, 337K+ filas (Ene 2024 – Jun 2026).")
+
+    add_h2(doc, "Fase 12 — Insights ampliado a 4 sub-análisis (Jun 6-7)")
+    add_bullet(doc, "Concentración: la vista Radar se reemplazó por Pareto (barras de mayor a menor + línea de % acumulado) y se agregó la dimensión Territorios (3 → 4 dimensiones).")
+    add_bullet(doc, "Precio $/kg (Dispersión): scatter de precio/kg ponderado vs volumen por cliente para un SKU/grupo/familia. Umbral 'paga barato' y piso de volumen configurables. Tabla ordenable con 'dinero en la mesa' = (promedio − precio cliente) × volumen.")
+    add_bullet(doc, "Cuadrante de cartera (BCG): scatter tamaño (venta, log) vs crecimiento YoY, burbuja = margen. 4 cuadrantes (Estrella / En riesgo / Apuesta / Marginal) con umbrales configurables; Nuevos aparte. Comparación YoY justa (capa el periodo actual a la última fecha con datos, mismas fechas calendario).")
+    add_bullet(doc, "Estacionalidad: heatmap mes × dimensión con índice de estacionalidad (100 = mes típico) o valor absoluto. Selector de año (año parcial marcado). Kg por default.")
+    add_bullet(doc, "Popovers de ayuda 'Cómo leer esto' en el foco del header de Insights (por sub-análisis).")
+    add_bullet(doc, "Migraciones 021-024; endpoints precio-dispersion / cuadrante / estacionalidad; componentes PrecioAnalysis, CuadranteAnalysis, EstacionalidadAnalysis, ItemPicker.")
+
+    add_h2(doc, "Fase 11 — Tab unificado 'Clientes y Productos' (Jun 6)")
+    add_bullet(doc, "Los tabs Productos y Clientes se fusionaron en uno solo (8 → 7 tabs).")
+    add_bullet(doc, "3 toggles independientes: Gráfica (Clientes|Productos), Tabla (Clientes|Productos), Volumen (Pesos|Kilos). Si gráfica = tabla → un solo DimensionTab monolítico; si difieren → instancia solo-gráfica + instancia solo-tabla.")
+    add_bullet(doc, "Buscador propio en la tabla standalone + desglose simétrico SKU → clientes (en la tabla de Productos, vista 'Año vs Año').")
+
+    add_h2(doc, "Fase 10 — Tracking Diario: 2 cards nuevas (Jun 1-2)")
+    add_bullet(doc, "Card Variedad de SKUs (cuántos SKUs distintos se facturaron en el mes) y card Clientes Activos (cuántos clientes distintos compraron), ambas al-día.")
+    add_bullet(doc, "Fix crítico: Clientes Activos se contaba por no_cliente (cada ERP Sus/Suve numera aparte → doble conteo). Se corrigió a contar por NOMBRE de cliente (Mayo 2026: 898 → 648 real).")
+
+    # ===== V3.5 → V3.9 (Fases 6-9) =====
+    add_h1(doc, "Versiones 3.5.0 → 3.9.0 — Fases 6-9 (2026-05-11 al 2026-05-23)")
+    add_h2(doc, "Fase 9 — Selector de día + análisis profundo de Clientes")
+    add_bullet(doc, "Selector de día libre en el header (ver el dashboard al cierre de cualquier día).")
+    add_bullet(doc, "Tab Clientes: toggle gráfica Mismo mes/Evolución, buscar por productos, tabla con 3 vistas (Año/Meses/Prom-90d), desglose por línea de producto grupo→SKU.")
+    add_h2(doc, "Fase 8 — Tab Insights · Concentración (Pareto)")
+    add_bullet(doc, "8vo tab dedicado a análisis avanzados. Sub-análisis Concentración: Treemap squarify + (en su momento) Radar, tabla Pareto expandible, excluir items del universo. Migraciones 019-020 con SECURITY INVOKER + RLS por territorio.")
+    add_h2(doc, "Fase 7 — Seguridad de sesión")
+    add_bullet(doc, "Timeout de inactividad configurable + logout remoto desde admin (force_signout_user) + smart polling de 3 capas. Migraciones 013-018.")
+    add_h2(doc, "Fase 6 — UX comercial avanzada")
+    add_bullet(doc, "Toggle Cierre/Hoy, toggle Pesos/Kilos en 6 tabs, comparativos al-día año anterior, PDF 'Avance Comercial' (3 páginas). Migraciones 011-016.")
 
     add_h1(doc, "Versión 1.0.0 — Lanzamiento producción (2026-04-28)")
     add_para(doc, "Primera versión productiva del Dashboard V3.0. Reemplaza completamente al V2.2 con una arquitectura cliente-servidor segura, sistema de permisos y panel administrativo.", bold=False)
@@ -715,8 +752,18 @@ def gen_changelog():
             ["008_kpi_dimension_views.sql", "5 vistas de dimensión (familia, grupo, sku, vendedor, cliente)"],
             ["009_vendedor_with_empresa.sql", "Recreate kpi_vendedor_summary con empresa column"],
             ["010_kpi_cliente_perdidos.sql", "Vista para tab Perdidos (mes + YTD pre-agregados)"],
+            ["011-012 (Fase 5+)", "Vistas diarias de perdidos + campos de margen al final de kpi_cliente_perdidos"],
+            ["013-014 (Fase 7)", "session_config + audit actions de sesión"],
+            ["015-016 (Fase 6)", "Helper lastDayWithSale + vista por División (Foodservice/Distribuidores/Retail)"],
+            ["017-018 (Fase 7)", "session_timeout_exempt + force_signout_user(uuid)"],
+            ["019-020 (Fase 8)", "insights_concentracion v1 + parámetro p_territorios"],
+            ["021 (Fase 12)", "Agrega 'territorios' como dimensión a insights_concentracion"],
+            ["022 (Fase 12)", "insights_precio_items (lista por nivel sku/grupo/familia) — Precio $/kg"],
+            ["023 (Fase 12)", "insights_cuadrante (venta actual + año anterior por item) — Cuadrante BCG"],
+            ["024 (Fase 12)", "insights_estacionalidad (valor mensual por item, Top N) — heatmap"],
         ],
     )
+    add_para(doc, "Total: 24 migraciones SQL aplicadas. Todas las funciones de Insights usan SECURITY INVOKER (heredan la RLS de territorio del usuario).")
 
     add_h1(doc, "Versiones futuras (planificación)")
     add_h2(doc, "v1.1.0 (propuesta)")
@@ -746,6 +793,19 @@ def gen_changelog():
 def gen_manual():
     doc = Document()
     add_cover(doc, "Manual de Usuario", "Guía no-técnica para los 15 usuarios del sistema")
+
+    add_h1(doc, "🆕 Novedades V4.0 (lo más reciente)")
+    add_para(doc, "Si ya conocías el dashboard, esto es lo nuevo de la versión 4.0:")
+    add_h2(doc, "Tab 'Clientes y Productos' (antes eran dos tabs)")
+    add_para(doc, "Los tabs Productos y Clientes ahora son uno solo. Arriba tienes 3 toggles independientes: Gráfica (Clientes|Productos), Tabla (Clientes|Productos) y Volumen (Pesos|Kilos). Así puedes ver, por ejemplo, la gráfica de Clientes junto a la tabla de Productos. Conserva todo el análisis profundo que ya tenía Clientes (evolución, buscador, 3 vistas de tabla, desglose), y ahora puedes expandir un SKU para ver qué clientes lo compran.")
+    add_h2(doc, "Insights: ahora 4 análisis (antes 1)")
+    add_bullet(doc, "Concentración (Pareto): ¿qué tan dependientes somos del top X? Ahora también por Territorios.")
+    add_bullet(doc, "Precio $/kg: ¿a qué precio/kg le vendemos el mismo producto a cada cliente? Detecta quién paga barato y el 'dinero en la mesa'.")
+    add_bullet(doc, "Cuadrante (BCG): tamaño vs crecimiento → Estrellas, En riesgo, Apuestas, Marginales.")
+    add_bullet(doc, "Estacionalidad: mapa de calor mes × producto/territorio. ¿Qué meses son pico/valle?")
+    add_para(doc, "Tip: pasa el cursor sobre el foco 💡 del header de Insights para leer cómo interpretar cada análisis.")
+    add_h2(doc, "Tracking Diario: 2 cards nuevas")
+    add_para(doc, "Variedad de SKUs (cuántos productos distintos se facturaron en el mes) y Clientes Activos (cuántos clientes distintos compraron).")
 
     add_h1(doc, "Bienvenida")
     add_para(doc, f"Bienvenido al Dashboard Comercial V3.0 de Grupo Susazón. Esta es una herramienta interna que te permite ver datos comerciales en tiempo real (ventas, márgenes, kilos, clientes, productos, vendedores) según los territorios que tu rol te permite consultar.")
@@ -884,6 +944,8 @@ def gen_manual():
 def gen_guia_ti():
     doc = Document()
     add_cover(doc, "Guía de TI y Despliegue", "Para ingenieros que mantienen, deployan o continúan el sistema")
+    add_h2(doc, "Estado de este documento (V4.0)")
+    add_para(doc, "Los procesos de despliegue (Vercel + Supabase + Resend) siguen vigentes. En V4.0 el dashboard tiene 7 tabs y 24 migraciones SQL. El respaldo profesional (Plan Z) se sincroniza con scripts/respaldar.sh; los .docx se regeneran con scripts/gen_docs.py; el PDF visual, desde public/instructivo.html. Ver ChangeLog (doc 03) para el historial completo.")
 
     add_h1(doc, "Quién debe leer esto")
     add_para(doc, "Este documento está pensado para un ingeniero de TI que necesite:")
@@ -1090,6 +1152,8 @@ git push origin main""")
 def gen_reconstruccion():
     doc = Document()
     add_cover(doc, "Guía de Reconstrucción", "Cómo rebuildear el sistema desde cero")
+    add_h2(doc, "Estado de este documento (V4.0)")
+    add_para(doc, "El procedimiento de reconstrucción base (Fases 0-5) sigue válido. Para reconstruir el estado completo V4.0 hay que aplicar las 24 migraciones SQL (incluidas 021-024 de Insights) y construir los 7 tabs (incluido Clientes y Productos combinado e Insights con 4 sub-análisis). Ver el inventario completo de archivos/componentes/endpoints en INSTRUCTIVO_AGENTE.xml (secciones fase_10/11/12) y el ChangeLog (doc 03).")
 
     add_h1(doc, "Cuándo usar esta guía")
     add_para(doc, "Esta es la guía CRÍTICA — debe permitir a un ingeniero competente reconstruir el sistema completo desde cero, asumiendo que solo tiene esta documentación + acceso a las APIs externas.")
