@@ -34,6 +34,11 @@ yarn-error.log*
 .env*
 !.env.example
 
+# secrets/ — VALORES REALES de credenciales (service_role, API keys, etc.).
+# NUNCA se commitean. Solo se versiona el README explicativo de la carpeta.
+secrets/*
+!secrets/README.md
+
 # vercel
 .vercel
 
