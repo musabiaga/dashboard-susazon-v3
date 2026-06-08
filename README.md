@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dashboard Comercial Susazón V4.0 — InCom
 
-## Getting Started
+Dashboard comercial semanal/mensual de **Grupo Susazón** (Susazón + Suve). Inteligencia
+Comercial Susazón® (**InCom**). En producción.
 
-First, run the development server:
+- **URL:** https://www.dashboardcomercialsusazon.com
+- **Owner:** Mauricio Usabiaga (Director de Operaciones)
+- **Versión:** 4.0.0
+
+## Qué hace
+
+Reemplaza al dashboard V2.2 (single-page HTML en Netlify) con una arquitectura
+cliente-servidor segura: backend que oculta credenciales, RLS por territorio en
+Postgres, panel admin, audit log y 6 themes.
+
+## Stack
+
+- **Next.js 16.2.4** (App Router + Turbopack), React 19, TypeScript 5, Tailwind CSS 4
+- **Supabase** (Postgres + RLS + Auth) · **Vercel** (hosting) · **Recharts 3.x**
+
+## Los 7 tabs
+
+Tracking Diario · Ventas · Grupo Producto · **Clientes y Productos** · Vendedores ·
+Perdidos · **Insights** (Concentración · Precio $/kg · Cuadrante BCG · Estacionalidad).
+
+## Setup local
 
 ```bash
+git clone https://github.com/musabiaga/dashboard-susazon-v3.git
+cd dashboard-susazon-v3
+npm install
+cp .env.example .env.local   # llenar con los secrets (ver SECRETS, no en repo)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Documentación
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Toda la documentación vive en [`/docs`](./docs) — empieza por
+[`00_INDICE_MAESTRO.md`](./docs/00_INDICE_MAESTRO.md). Para retomar el proyecto:
+`docs/LO_NUEVO.md` + `docs/CONTINUACION_NUEVA_CONVERSACION.md` + `AGENTS.md`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Manual de usuario visual: `docs/Instructivo_Usuario_Visual.html` (se abre desde el
+  dashboard con el botón "Instructivo") / `.pdf`.
+- ChangeLog completo: `docs/03_ChangeLog_Release_Notes.docx`.
 
-## Learn More
+## Scripts útiles
 
-To learn more about Next.js, take a look at the following resources:
+- `npm run build` — build de producción
+- `python3 scripts/gen_docs.py` — regenera los 6 `.docx`
+- `./scripts/respaldar.sh` — sincroniza el respaldo profesional (Plan Z)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Push a `main` → Vercel auto-deploya. `main` siempre debe quedar deployable.
 
-## Deploy on Vercel
+## Licencia
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Software propietario de Grupo Susazón. Uso restringido a personal autorizado.
