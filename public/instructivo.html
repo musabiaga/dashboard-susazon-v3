@@ -804,22 +804,22 @@
   <div class="cover-logo">
     <span class="cover-logo-text">S</span>
   </div>
-  <div class="cover-eyebrow">Grupo Susazón · InCom V3.9</div>
+  <div class="cover-eyebrow">Grupo Susazón · InCom V4.0</div>
   <h1>Dashboard Comercial</h1>
   <p class="cover-subtitle">
     Guía visual para entender tu dashboard.
-    Pantalla principal, KPIs, navegación, los 8 tabs, toggles avanzados,
-    selector de día, análisis profundo de Clientes, PDF descargable,
-    Tab Insights y seguridad de sesión.
+    Pantalla principal, KPIs, navegación, los 7 tabs, toggles avanzados,
+    selector de día, tab Clientes y Productos, PDF descargable,
+    Tab Insights (4 análisis) y seguridad de sesión.
   </p>
   <div class="cover-meta">
     <div class="cover-meta-item">
       <span class="cover-meta-label">Versión</span>
-      <span class="cover-meta-value">3.9.0</span>
+      <span class="cover-meta-value">4.0.0</span>
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">Actualizado</span>
-      <span class="cover-meta-value">23 Mayo 2026</span>
+      <span class="cover-meta-value">7 Junio 2026</span>
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">URL</span>
@@ -1136,6 +1136,21 @@
       <div class="kpi-card-detail">YTD 2026 — venta acumulada del 1 de enero a hoy.</div>
     </div>
   </div>
+
+  <h3 style="margin-top: 32px;">Amplitud de cartera <span class="pill green">Nuevo V4.0</span></h3>
+  <p style="color: var(--text-secondary);">Dos cards nuevas en el Tracking Diario que miden qué tan amplia es tu operación del mes (no solo cuánto vendes, sino con cuántos productos y clientes), comparadas al mismo día vs mes anterior y año anterior.</p>
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-card-label">🆕 Variedad de SKUs</div>
+      <div class="kpi-card-value" style="font-size: 22px;">Nº de SKUs distintos</div>
+      <div class="kpi-card-detail">Cuántos productos distintos se han facturado en el mes. Si baja, estás concentrando la venta en menos SKUs.</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-label">🆕 Clientes Activos</div>
+      <div class="kpi-card-value" style="font-size: 22px;">Nº de clientes distintos</div>
+      <div class="kpi-card-detail">Cuántos clientes distintos compraron en el mes. Se cuenta por <strong>nombre</strong> de cliente (no por número interno), para no duplicar al mismo cliente entre Susazón y Suve.</div>
+    </div>
+  </div>
 </section>
 
 <!-- ====================================================
@@ -1145,8 +1160,8 @@
   <div class="section-header">
     <div class="section-number">5</div>
     <div>
-      <div class="section-title">Los 8 tabs del dashboard</div>
-      <div class="section-subtitle">Cada uno una perspectiva distinta del negocio</div>
+      <div class="section-title">Los 7 tabs del dashboard <span class="pill green">Actualizado V4.0</span></div>
+      <div class="section-subtitle">Cada uno una perspectiva distinta del negocio · En V4.0 los tabs Productos y Clientes se fusionaron en "Clientes y Productos"</div>
     </div>
   </div>
 
@@ -1205,44 +1220,27 @@
     </li>
 
     <li class="tab-item">
-      <div class="tab-icon tab-productos">🥩</div>
-      <div class="tab-content">
-        <div class="tab-name">Productos · Análisis SKU por SKU</div>
-        <div class="tab-summary">
-          Chart de doble eje con los Top SKUs por venta del mes: barras en pesos (eje izquierdo)
-          y línea en kilos (eje derecho). Tabla detallada debajo con todos los SKUs activos.
-        </div>
-        <div class="tab-detail">
-          <strong>🆕 Toggle Pesos / Kilos.</strong> Cambia la perspectiva del chart entre pesos y kilos.<br>
-          <strong>Útil para:</strong> identificar qué productos crecen, cuáles están cayendo,
-          y cuál es el mix entre alto valor (\$/kg) y alto volumen.
-        </div>
-      </div>
-    </li>
-
-    <li class="tab-item">
       <div class="tab-icon tab-clientes">👥</div>
       <div class="tab-content">
-        <div class="tab-name">Clientes · Concentración de cartera <span class="pill green">Ampliado V3.9</span></div>
+        <div class="tab-name">Clientes y Productos · Cartera + SKUs combinables <span class="pill green">Nuevo V4.0</span></div>
         <div class="tab-summary">
-          Top 10 clientes por venta del mes (chart de barras agrupadas) + tabla scrollable con
-          todos los clientes. Te muestra dónde está concentrada tu cartera y quién creció o
-          decreció vs el año pasado. <strong>En V3.9 este tab recibió 4 mejoras de análisis
-          profundo</strong> (ver Sección 8.5 para el detalle).
+          <strong>Nuevo en V4.0:</strong> los antiguos tabs <em>Productos</em> y <em>Clientes</em>
+          se fusionaron en uno solo. Arriba tienes <strong>3 toggles independientes</strong>:
+          <strong>Gráfica</strong> (Clientes | Productos), <strong>Tabla</strong> (Clientes | Productos)
+          y <strong>Volumen</strong> (Pesos | Kilos). Así puedes, por ejemplo, ver la gráfica de
+          Clientes con la tabla de Productos al mismo tiempo.
         </div>
         <div class="tab-detail">
-          <strong>🆕 Toggle de gráfica "Mismo mes (3 años) / Evolución":</strong> alterna entre
-          comparar el mismo mes en 3 años, o ver la evolución mensual del año en curso
-          (barras de volumen + línea de margen %).<br>
-          <strong>🆕 Buscar por Clientes o Productos:</strong> el buscador tiene un toggle —
-          en modo "Productos" eliges SKUs y ves los clientes que más los compran.<br>
-          <strong>🆕 Tabla con 3 vistas:</strong> "Año vs Año", "Meses 2026" (mes a mes + Total
-          YTD) y "vs Prom. 90d" (ritmo actual vs últimos 90 días, detecta quién acelera/desacelera).<br>
-          <strong>🆕 Desglose por línea de producto:</strong> click en cualquier cliente para
-          expandir su facturación por grupo → SKU.<br>
-          <strong>Toggle Pesos / Kilos</strong> y <strong>Tip estratégico:</strong> si tus Top 5
-          representan +60% de la venta, tienes riesgo de concentración. <em>Para análisis Pareto
-          usa el</em> <strong>Tab Insights 💡</strong>.
+          Conserva <strong>todo</strong> el análisis profundo que tenía Clientes:<br>
+          <strong>· Toggle de gráfica "Mismo mes (3 años) / Evolución".</strong><br>
+          <strong>· Buscador</strong> para fijar clientes o productos específicos.<br>
+          <strong>· Tabla con 3 vistas:</strong> "Año vs Año", "Meses {año}" (mes a mes + Total YTD)
+          y "vs Prom. 90d" (ritmo actual vs últimos 90 días).<br>
+          <strong>· Desglose:</strong> expande un cliente → su facturación por grupo → SKU.<br>
+          <strong>🆕 Buscador en la tabla</strong> cuando gráfica y tabla tienen dimensiones distintas.<br>
+          <strong>🆕 Desglose simétrico SKU → clientes:</strong> en la tabla de Productos (vista
+          "Año vs Año") expande un SKU para ver qué clientes lo compran.<br>
+          <em>Para el análisis Pareto de concentración usa el</em> <strong>Tab Insights 💡</strong>.
         </div>
       </div>
     </li>
@@ -1283,23 +1281,23 @@
     <li class="tab-item">
       <div class="tab-icon" style="background: linear-gradient(135deg, var(--accent-yellow), var(--accent-orange)); color: #1a1a2e;">💡</div>
       <div class="tab-content">
-        <div class="tab-name">🆕 Insights · Análisis de Concentración (Pareto)</div>
+        <div class="tab-name">Insights · Suite de inteligencia comercial <span class="pill green">Ampliado V4.0</span></div>
         <div class="tab-summary">
-          <strong>Nuevo en V3.8.</strong> Tab dedicado a análisis avanzados, no operativos.
-          Responde la pregunta clásica: <em>"¿qué tan dependientes somos del top X clientes /
-          grupos / productos?"</em>. Visualización con <strong>Treemap squarify</strong>
-          (bloques cuadrados con área proporcional al valor) + <strong>Radar adaptativo</strong>.
+          Tab dedicado a análisis avanzados, no operativos. <strong>En V4.0 pasó de 1 a
+          4 sub-análisis</strong> (toggle arriba): <strong>Concentración · Precio $/kg ·
+          Cuadrante · Estacionalidad</strong>. Pasa el cursor sobre el <strong>foco 💡</strong>
+          del header para leer cómo interpretar cada uno.
         </div>
         <div class="tab-detail">
-          <strong>3 dimensiones</strong> (Grupos / Clientes / Productos) × <strong>4 métricas</strong>
-          (Pesos / Kilos / Margen $ / Margen %).
-          <strong>Date Range Picker</strong> con 7 atajos: Este mes, Mes anterior, 30d, 90d, YTD, 12m, custom.
-          <strong>Top N</strong>: 7 / 10 / 15 + "Resto del universo".
-          <strong>Tabla Pareto expandible</strong>: click en cada fila para ver facturas del cliente
-          (o clientes que compraron del grupo/producto).
-          <strong>"Excluir items":</strong> botón por fila — el 100% se recalcula sin ellos
-          (útil para ignorar intercompañías o clientes atípicos).
-          Respeta los filtros de territorio del sidebar.
+          <strong>Concentración (Pareto):</strong> ¿qué tan dependientes somos del top X?
+          Treemap + Pareto (barras + % acumulado). <strong>🆕 Ahora también por Territorios.</strong><br>
+          <strong>🆕 Precio $/kg:</strong> ¿a qué precio/kg le vendemos el mismo SKU a cada cliente?
+          Detecta quién paga barato y el "dinero en la mesa".<br>
+          <strong>🆕 Cuadrante (BCG):</strong> tamaño vs crecimiento → Estrellas, En riesgo,
+          Apuestas, Marginales. ¿A quién cuido, a quién rescato?<br>
+          <strong>🆕 Estacionalidad:</strong> heatmap mes × dimensión. ¿Qué meses son pico/valle?
+          ¿Cuándo compro/produzco/promociono?<br>
+          Todos respetan los filtros de territorio del sidebar.
         </div>
       </div>
     </li>
@@ -1565,63 +1563,58 @@
 
   <!-- B · Tab Insights · Concentración -->
   <div class="glass-card featured">
-    <h3>💡 Tab Insights · Análisis de Concentración (Pareto)</h3>
+    <h3>💡 Tab Insights · Suite de inteligencia comercial <span class="pill green">Ampliado V4.0</span></h3>
     <p>
-      <strong>El 8vo tab.</strong> Espacio dedicado a análisis avanzados, no operativos —
-      la pregunta clave es <em>"¿qué tan dependientes somos del top X clientes / grupos /
-      productos?"</em>. Útil para juntas estratégicas, revisiones trimestrales, decisiones de
-      diversificación.
+      Espacio dedicado a análisis avanzados, no operativos. <strong>En V4.0 pasó de 1 a
+      4 sub-análisis</strong>, seleccionables con el toggle de arriba. 💡 <strong>Pasa el
+      cursor sobre el foco</strong> del header (tiene un badge "?") para leer en pantalla
+      cómo interpretar el análisis activo.
     </p>
-    <h4>Cómo usarlo (paso a paso)</h4>
-    <ol class="steps" style="margin-top: 12px;">
-      <li class="step">
-        <div class="step-content">
-          <div class="step-title">Elige el periodo</div>
-          <div class="step-description">
-            <strong>Date Range Picker</strong> con 7 atajos rápidos: Este mes, Mes anterior,
-            30d, 90d, YTD, 12m, custom.
-          </div>
-        </div>
-      </li>
-      <li class="step">
-        <div class="step-content">
-          <div class="step-title">Elige la dimensión y la métrica</div>
-          <div class="step-description">
-            <strong>Dimensión:</strong> Grupos / Clientes / Productos.
-            <strong>Métrica:</strong> Pesos / Kilos / Margen $ / Margen %.
-          </div>
-        </div>
-      </li>
-      <li class="step">
-        <div class="step-content">
-          <div class="step-title">Visualiza</div>
-          <div class="step-description">
-            <strong>Treemap squarify</strong> (bloques cuadrados con área proporcional al valor)
-            o <strong>Radar adaptativo</strong>. Top N (7 / 10 / 15) + "Resto del universo"
-            (octágono perfecto cuando es Top 7).
-          </div>
-        </div>
-      </li>
-      <li class="step">
-        <div class="step-content">
-          <div class="step-title">Profundiza con la Tabla Pareto</div>
-          <div class="step-description">
-            Cada fila se expande con click para mostrar las <strong>facturas del cliente</strong>
-            (o clientes que compraron del grupo/producto). Columnas: Venta, Kilos, Margen $,
-            Margen %, % Universo, Acumulado, Δ pp.
-          </div>
-        </div>
-      </li>
-      <li class="step">
-        <div class="step-content">
-          <div class="step-title">Excluye items atípicos</div>
-          <div class="step-description">
-            Botón <span class="pill">Excluir</span> por fila — el 100% se recalcula sin ellos.
-            Útil para ignorar intercompañías o clientes one-off que sesgan el análisis.
-          </div>
-        </div>
-      </li>
-    </ol>
+
+    <h4>1 · Concentración (Pareto) <span class="pill blue">Actualizado</span></h4>
+    <p>
+      ¿Qué tan dependientes somos del top X? Elige periodo (Date Range Picker),
+      <strong>dimensión</strong> (Grupos / Clientes / Productos / <strong>🆕 Territorios</strong>)
+      y métrica (Pesos / Kilos / Margen $ / Margen %). Visualiza con <strong>Treemap</strong>
+      o <strong>🆕 Pareto</strong> (barras de mayor a menor + línea de <strong>% acumulado</strong>
+      → lees "el top N cubre X% del total"; reemplaza al Radar). Tabla expandible por fila +
+      botón <span class="pill">Excluir</span> para recalcular el 100% sin items atípicos.
+    </p>
+
+    <h4>2 · Precio $/kg — Dispersión <span class="pill green">Nuevo V4.0</span></h4>
+    <p>
+      ¿A qué precio/kg le vendemos el <strong>mismo producto</strong> a cada cliente? Eliges
+      un SKU (o grupo/familia). Cada punto del scatter es un cliente: <strong>X = precio/kg</strong>,
+      <strong>Y = volumen</strong>. La línea marca el <strong>promedio ponderado</strong> y el
+      umbral "paga barato" (configurable). La tabla se ordena por <strong>"dinero en la mesa"</strong>
+      = (promedio − su precio) × su volumen — lo que ganarías subiéndolo al promedio.
+    </p>
+
+    <h4>3 · Cuadrante de cartera (BCG) <span class="pill green">Nuevo V4.0</span></h4>
+    <p>
+      ¿A quién cuido, a quién rescato, en quién apuesto, a quién suelto? Cada item se ubica por
+      <strong>tamaño</strong> (venta) vs <strong>crecimiento</strong> (vs mismo periodo del año
+      anterior), con la burbuja = margen. Cuatro cuadrantes: ⭐ <strong>Estrella</strong> (grande+crece),
+      🟥 <strong>En riesgo</strong> (grande+cae), 🔷 <strong>Apuesta</strong> (chico+crece),
+      ⬜ <strong>Marginal</strong>. Los umbrales se ajustan en vivo; los <strong>Nuevos</strong> van aparte.
+    </p>
+
+    <h4>4 · Estacionalidad — heatmap <span class="pill green">Nuevo V4.0</span></h4>
+    <p>
+      ¿Qué meses son pico/valle? Mapa de calor mes × dimensión. La celda muestra el
+      <strong>índice de estacionalidad</strong> (100 = mes típico de ese item; 🟧 arriba = pico,
+      🔵 abajo = valle) o el valor absoluto. Eliges <strong>año</strong> y métrica
+      (<strong>Kg</strong> por default, para planear producción/compra). Sirve para decidir
+      cuándo comprar, producir y promocionar.
+    </p>
+
+    <div class="annotation" style="margin-top: 16px;">
+      <span class="annotation-icon">💡</span>
+      <div class="annotation-text">
+        <strong>¿No recuerdas cómo se lee uno?</strong> Pasa el cursor por el foco 💡 del
+        header de Insights — el popover "Cómo leer esto" cambia según el análisis activo.
+      </div>
+    </div>
     <div class="annotation" style="margin-top: 16px;">
       <span class="annotation-icon">🔐</span>
       <div class="annotation-text">
@@ -1685,7 +1678,7 @@
 
   <!-- E · Análisis profundo de Clientes (V3.9) -->
   <div class="glass-card featured">
-    <h3>👥 Análisis profundo del tab Clientes <span class="pill green">Nuevo V3.9</span></h3>
+    <h3>👥 Análisis profundo de Clientes (dentro del tab "Clientes y Productos") <span class="pill green">V3.9 · sigue en V4.0</span></h3>
     <p>
       El tab Clientes recibió 4 mejoras para analizar tu cartera a profundidad. Todas respetan
       el toggle Pesos/Kilos, el filtro de territorios del sidebar y tu rol (RLS).
@@ -1859,10 +1852,10 @@
      ==================================================== -->
 <div class="footer">
   <p style="margin: 0;">
-    Dashboard Comercial Susazón · InCom · Versión 3.9.0 · Mayo 2026<br>
+    Dashboard Comercial Susazón · InCom · Versión 4.0.0 · Junio 2026<br>
     Plataforma de uso restringido — solo para personal autorizado de Grupo Susazón.<br>
     Toda actividad queda registrada en el audit log.<br>
-    <span style="opacity: 0.5; font-size: 11px;">Última actualización del instructivo: 23 mayo 2026 · Cubre Fases 1-9 (incluye Tab Insights, Selector de día, análisis profundo del tab Clientes, PDF Avance Comercial y Seguridad de sesión)</span>
+    <span style="opacity: 0.5; font-size: 11px;">Última actualización del instructivo: 7 junio 2026 · Cubre Fases 1-12 (incluye tab Clientes y Productos combinado, Insights con 4 sub-análisis, cards de Tracking, PDF Avance Comercial y Seguridad de sesión)</span>
   </p>
 </div>
 
