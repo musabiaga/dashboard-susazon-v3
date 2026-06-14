@@ -52,7 +52,7 @@
 | `lib/format.ts` | Formatters (money, kilos, dates) — portado del V2.2 |
 | `lib/business-days.ts` | Cálculo de días hábiles L-S menos LFT + helpers `findCalendarDayForBizDays`, `computePrevYearAlDia` |
 | `lib/admin-guards.ts` | Guards de rol admin para API routes |
-| `supabase/migrations/` | **25 migraciones SQL aplicadas** (V4.0: 021-024 de Insights; 025_audit_action_session_user_values arregla el enum audit_action) |
+| `supabase/migrations/` | **26 migraciones SQL aplicadas** (V4.0: 021-024 de Insights; 025_audit_action_session_user_values arregla el enum audit_action; 026_kpi_cliente_perdidos_por_nombre agrupa Perdidos por nombre) |
 | `docs/` | Esta documentación (+ `LO_NUEVO.md` con resumen ejecutivo) |
 | `proxy.ts` | Middleware de Next.js 16 (renombrado de middleware.ts) — ahora valida sesión en cada request |
 | `.env.local` | Secrets (NO commit) |
@@ -482,6 +482,25 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 
 ---
 
+### D033 — 2026-06-14 | Tab Perdidos: agrupar por NOMBRE de cliente (mergear casing + cuentas Sus/Suve)
+
+**Contexto:** En la parte inferior del tab Perdidos, el mismo cliente aparecía repetido varias filas. Diagnóstico verificado contra la DB:
+- **(Capa 1) Casing inconsistente de `no_cliente`:** la vista `kpi_cliente_perdidos` agrupaba por `no_cliente` *case-sensitive*. El mismo número con distinta capitalización (`CL-001087` / `cl-001087` / `Cl-001087`) salía como clientes distintos. Esto venía del ERP/API de origen: el import (`lib/susazon-api.ts`) guardaba `no_cliente` verbatim (solo `.trim()`, sin `.toUpperCase()`). Afectaba datos VIEJOS (≤ sep-2025): 1,520 filas / ~40 clientes (0.43% de 355,030). Las variantes en minúscula no tenían venta 2026 → se contaban como PERDIDO falso.
+- **(Capa 2) Cuentas Susazón + Suve del mismo cliente:** el mismo cliente físico en ambos ERPs (con `no_cliente` distinto por cada uno) salía 2 veces — legítimo en el dato, pero ruidoso para "Perdidos".
+
+**Decisión:** Agrupar Perdidos por **NOMBRE** de cliente (regla ya usada en "Clientes Activos", bug #38), no por `no_cliente`:
+1. **Migración 026:** la vista `kpi_cliente_perdidos` agrupa por `(anio, cliente, vendedor, territorio)`; `no_cliente = MIN(UPPER(no_cliente))` como representativo canónico. Mergea casing + cuentas Sus/Suve del mismo cliente+vendedor en una sola fila.
+2. **`app/dashboard/page.tsx`:** el pivot de los 3 años se keyea por `cliente|vendedor` (no por `no_cliente`, que podía variar entre años); `first_purchase` normalizado a UPPER y al más antiguo.
+3. **`PerdidosTab.tsx`:** keys de React + join del Excel por `cliente|vendedor`.
+4. **`lib/susazon-api.ts`:** `no_cliente` se normaliza a `.toUpperCase()` en el import → la inconsistencia **no reincide** con datos nuevos.
+
+**Verificado (SQL post-migración):** VICTORIA HANUN SALUM pasó de ~3-5 filas (PERDIDO falsos) a **1 fila/año, activa y creciendo** ($8.25M→$8.64M→$9.05M). HECTOR MANUEL VEGA VILLANUEVA mantiene **2 filas legítimas** (2 vendedores distintos). Merge UPPER seguro: 27/35 mergean limpio; los 8 con colisión número↔nombre no se mezclan mal porque la vista también agrupa por nombre.
+
+**Razón:** El usuario gestiona Perdidos por cliente (nombre), no por número de ERP. La duplicación era artefacto de datos, no negocio.
+**Estado:** Vigente. Commit `6625f20` + migración 026.
+
+---
+
 ## Bugs Resueltos
 
 | # | Fecha | Descripción | Causa | Fix | Commit |
@@ -531,6 +550,7 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 | 42 | 2026-06-07 | Build local quedaba vacío / no compilaba al validar | El comando incluía `pkill -f "next build"`, que mataba el propio wrapper de shell (cuya línea de comando también contenía esa cadena) antes de que `npm run build` arrancara. | Correr el build sin `pkill` (asegurando que no haya builds concurrentes) + workaround iCloud `mv .next /tmp/...`. | (operacional) |
 | 43 | 2026-06-07 | `respaldar.sh` abortaba en la sección 4 (backup de sesiones JSONL) | `existing=$(ls ...sessions...*_session_${hash}.jsonl 2>/dev/null \| head -1)` bajo `set -o pipefail` + `errexit`: cuando NO existía una sesión previa de ese hash (primera vez), `ls` retornaba ≠0 y abortaba el script. | Agregar `\|\| true` a la sustitución para que el pipeline retorne 0 cuando no hay match. Re-corrido: 7 sesiones (115MB) respaldadas a ambas carpetas. | (scripts/respaldar.sh) |
 | 44 | 2026-06-08 | Tab AuditLog "te sacaba de la página por error" (días sin funcionar) + escrituras de sesión/usuario fallaban con 500 | (1) `AuditClient.ACTION_CONFIG` no mapeaba `settings_toggle` (que SÍ está en el enum y en la tabla) → `config` undefined → `config.icon` reventaba el render de React (crash → "te saca"). (2) El enum `audit_action` no tenía 6 valores que el código inserta (`force_signout`, `force_signout_all`, `invite`, `reset`, `session_timeout_changed`, `session_timeout_exemption_changed`) → "invalid input value for enum audit_action" en cada uno (visto en logs de Postgres). La "migración 014_audit_actions_session" que el INSTRUCTIVO decía existir nunca se creó; solo 015 agregó `settings_toggle`. Detonante: el usuario activó el timeout de sesión y togglear ajustes generó filas que crasheaban la lectura. | Migración **025** (`ADD VALUE IF NOT EXISTS` ×6, aplicada) + completar `ACTION_CONFIG`/`ACTION_ORDER`/`VALID_ACTIONS` + **fallback defensivo** en el render (acción no mapeada muestra el string crudo, no crashea). | `0b44448` + migración 025 |
+| 45 | 2026-06-14 | Tab Perdidos: el mismo cliente aparecía repetido en varias filas | La vista `kpi_cliente_perdidos` agrupaba por `no_cliente` *case-sensitive*: (1) mismo número con distinto casing (`CL-`/`cl-`/`Cl-`, datos viejos ≤sep-2025 — 1,520 filas / ~40 clientes; el import guardaba `no_cliente` sin `.toUpperCase()`) salía como clientes distintos → variante minúscula sin venta 2026 = PERDIDO falso; (2) mismo cliente en cuentas Sus + Suve (`no_cliente` distinto) salía 2 veces. | Migración **026**: la vista agrupa por NOMBRE `(anio, cliente, vendedor, territorio)` con `no_cliente = MIN(UPPER(...))`. Pivot de `page.tsx` + keys de `PerdidosTab` keyean por `cliente\|vendedor`. `susazon-api.ts` normaliza `no_cliente` a `.toUpperCase()` en el import (no reincide). Verificado: VICTORIA HANUN SALUM → 1 fila/año activa; HECTOR VEGA → 2 filas legítimas (2 vendedores). | `6625f20` + migración 026 |
 
 ---
 
