@@ -140,7 +140,9 @@ function normalizeRow(raw: SusazonApiRow, fallbackEmpresa: 0 | 1): NormalizedRow
 
   return {
     empresa,
-    no_cliente: String(raw.no_cliente ?? "").trim(),
+    // toUpperCase: el ERP histórico tenía no_cliente con casing inconsistente
+    // (mismo número como CL-/cl-/Cl-) → normalizar evita clientes "duplicados".
+    no_cliente: String(raw.no_cliente ?? "").trim().toUpperCase(),
     cliente: trimNull(raw.cliente),
     territorio: String(raw.territorio ?? "Sin territorio").trim(),
     vendedor: trimNull(raw.vendedor),

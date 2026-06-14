@@ -580,11 +580,18 @@ export default async function DashboardPage({
       .select("no_cliente, first_purchase_date, last_purchase_date"),
   ]);
 
-  // Map no_cliente → first_purchase_date para merge rápido en PerdidoRow.
+  // Map UPPER(no_cliente) → first_purchase_date (la más temprana). Se normaliza
+  // a mayúsculas porque no_cliente trae casing inconsistente en datos viejos
+  // (mismo número como CL-/cl-/Cl-) y la vista de perdidos usa el canónico
+  // MIN(UPPER(no_cliente)) como representativo.
   const firstPurchaseByClient = new Map<string, string>();
   for (const r of clienteLifecycleRows ?? []) {
     if (r.no_cliente && r.first_purchase_date) {
-      firstPurchaseByClient.set(r.no_cliente, r.first_purchase_date);
+      const k = r.no_cliente.toUpperCase();
+      const existing = firstPurchaseByClient.get(k);
+      if (!existing || r.first_purchase_date < existing) {
+        firstPurchaseByClient.set(k, r.first_purchase_date);
+      }
     }
   }
 
@@ -658,6 +665,7 @@ export default async function DashboardPage({
   type ClienteAcc = {
     cliente: string;
     vendedor: string;
+    no_cliente: string;
     mes_venta_2024: number;
     mes_venta_2025: number;
     mes_venta_2026: number;
@@ -681,6 +689,7 @@ export default async function DashboardPage({
   const emptyAcc = (cliente: string, vendedor: string): ClienteAcc => ({
     cliente,
     vendedor,
+    no_cliente: "",
     mes_venta_2024: 0,
     mes_venta_2025: 0,
     mes_venta_2026: 0,
@@ -709,9 +718,14 @@ export default async function DashboardPage({
       terrMap = new Map();
       perdidosByTerrCliente.set(row.territorio, terrMap);
     }
+    // Clave de pivot por NOMBRE (cliente|vendedor), NO por no_cliente: así los
+    // 3 años se unen aunque el no_cliente representativo varíe entre años, y se
+    // mergean variantes de casing + cuentas Sus/Suve del mismo cliente+vendedor.
+    const cliKey = `${row.cliente ?? row.no_cliente}|${row.vendedor ?? "(sin vendedor)"}`;
     const cur =
-      terrMap.get(row.no_cliente) ??
+      terrMap.get(cliKey) ??
       emptyAcc(row.cliente ?? row.no_cliente, row.vendedor ?? "(sin vendedor)");
+    cur.no_cliente = row.no_cliente; // representativo (MIN(UPPER) de la vista)
     const mv = Number(row.mes_venta) || 0;
     const mk = Number(row.mes_kg) || 0;
     const mm = Number(row.mes_margen ?? 0) || 0;
@@ -740,11 +754,11 @@ export default async function DashboardPage({
       cur.ytd_kg_2026 = yk;
       cur.ytd_margen_2026 = ym;
     }
-    terrMap.set(row.no_cliente, cur);
+    terrMap.set(cliKey, cur);
   }
 
-  const accToRow = (id: string, c: ClienteAcc): PerdidoRow => ({
-    no_cliente: id,
+  const accToRow = (c: ClienteAcc): PerdidoRow => ({
+    no_cliente: c.no_cliente,
     cliente: c.cliente,
     vendedor: c.vendedor,
     // 2024 (informativo)
@@ -770,17 +784,18 @@ export default async function DashboardPage({
     ytd_margen_2026: c.ytd_margen_2026,
     // Lifecycle: primera fecha de compra histórica (cualquier territorio,
     // cualquier empresa). Usado para distinguir "Nuevo" vs "Recuperado".
-    first_purchase_date: firstPurchaseByClient.get(id) ?? null,
+    first_purchase_date: firstPurchaseByClient.get(c.no_cliente) ?? null,
   });
 
   const perdidosByTerritory: Record<string, PerdidoRow[]> = {};
   const totalCliente = new Map<string, ClienteAcc>();
   for (const [terr, clienteMap] of perdidosByTerrCliente) {
-    perdidosByTerritory[terr] = Array.from(clienteMap.entries()).map(
-      ([id, c]) => accToRow(id, c)
+    perdidosByTerritory[terr] = Array.from(clienteMap.values()).map((c) =>
+      accToRow(c)
     );
     for (const [id, c] of clienteMap) {
       const cur = totalCliente.get(id) ?? emptyAcc(c.cliente, c.vendedor);
+      cur.no_cliente = c.no_cliente;
       // 2024
       cur.mes_venta_2024 += c.mes_venta_2024;
       cur.mes_kg_2024 += c.mes_kg_2024;
@@ -805,8 +820,8 @@ export default async function DashboardPage({
       totalCliente.set(id, cur);
     }
   }
-  const perdidosTotal: PerdidoRow[] = Array.from(totalCliente.entries()).map(
-    ([id, c]) => accToRow(id, c)
+  const perdidosTotal: PerdidoRow[] = Array.from(totalCliente.values()).map(
+    (c) => accToRow(c)
   );
   const perdidos: PerdidosDataset = {
     byTerritory: perdidosByTerritory,

@@ -544,8 +544,10 @@ export function PerdidosTab({
 
     // Map original PerdidoRow por no_cliente (para sacar campos cierre completos
     // que `computed` no carga, ej. mes_venta_2025 cierre).
+    // Key por (cliente|vendedor) — identidad del grupo tras agrupar por nombre.
+    // (no_cliente es solo representativo y puede colisionar entre clientes.)
     const fullRowByClient = new Map<string, PerdidoRow>();
-    for (const r of rows) fullRowByClient.set(r.no_cliente, r);
+    for (const r of rows) fullRowByClient.set(`${r.cliente}|${r.vendedor}`, r);
 
     // Etiqueta de territorios — viene del sidebar global ya formateada.
     const territorioLabel =
@@ -724,7 +726,7 @@ export function PerdidosTab({
 
     // Filas de datos
     const xlsxRows = tableRows.map((t) => {
-      const full = fullRowByClient.get(t.no_cliente);
+      const full = fullRowByClient.get(`${t.cliente}|${t.vendedor}`);
       // Mejora 7: el territorio viene del sidebar global ya agregado.
       const territorio = currentTerritory || "";
 
@@ -1127,7 +1129,7 @@ export function PerdidosTab({
                   const fmt = metric === "pesos" ? formatMoney : formatKilos;
                   return (
                     <tr
-                      key={r.no_cliente}
+                      key={`${r.cliente}|${r.vendedor}`}
                       style={{
                         background:
                           i % 2 === 0
