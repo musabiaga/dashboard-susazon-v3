@@ -140,9 +140,13 @@ function normalizeRow(raw: SusazonApiRow, fallbackEmpresa: 0 | 1): NormalizedRow
 
   return {
     empresa,
-    // toUpperCase: el ERP histórico tenía no_cliente con casing inconsistente
-    // (mismo número como CL-/cl-/Cl-) → normalizar evita clientes "duplicados".
-    no_cliente: String(raw.no_cliente ?? "").trim().toUpperCase(),
+    // no_cliente se guarda TAL CUAL lo manda el ERP (fuente de verdad): NO se
+    // transforma el casing aquí. La de-duplicación de clientes en Perdidos /
+    // Activos se resuelve agrupando por NOMBRE en las vistas (migración 026),
+    // no alterando el identificador de origen. Así, si el ERP volviera a emitir
+    // casing inconsistente (artefacto histórico que cesó el 2025-09-08), queda
+    // VISIBLE para escalarlo al dueño del dato — no enmascarado en el import.
+    no_cliente: String(raw.no_cliente ?? "").trim(),
     cliente: trimNull(raw.cliente),
     territorio: String(raw.territorio ?? "Sin territorio").trim(),
     vendedor: trimNull(raw.vendedor),
