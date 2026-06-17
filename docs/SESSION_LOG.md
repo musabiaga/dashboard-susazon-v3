@@ -36,7 +36,7 @@
 | `app/dashboard/` | Dashboard principal con **7 tabs** (Tracking, Ventas, Grupo Producto, **Clientes y Productos**, Vendedores, Perdidos, **Insights**) — Productos+Clientes fusionados en V4.0 |
 | `app/admin/` | Panel admin (territorios, usuarios, audit, **configuración de sesión**) |
 | `app/cargar-datos/` | Refresh APIs + editor PTTO |
-| `app/api/` | API routes server-side (**29 endpoints** totales) |
+| `app/api/` | API routes server-side (**31 endpoints** totales; +penetracion y penetracion-detalle del Insight Penetración/Canasta) |
 | `app/api/insights/` | Endpoints del tab Insights (`concentracion`, `item-detail`, **`precio-dispersion`**, **`cuadrante`**, **`estacionalidad`**) |
 | `app/api/dashboard/` | Endpoints del dashboard (incluye **`tracking-variedad`**, **`tracking-clientes-activos`** nuevos en V4.0) |
 | `components/dashboard/` | Componentes de los 7 tabs y charts (incl. `ClientesProductosTab`, `DimensionTab` generalizado, `ProductoDesglose`) |
@@ -52,7 +52,7 @@
 | `lib/format.ts` | Formatters (money, kilos, dates) — portado del V2.2 |
 | `lib/business-days.ts` | Cálculo de días hábiles L-S menos LFT + helpers `findCalendarDayForBizDays`, `computePrevYearAlDia` |
 | `lib/admin-guards.ts` | Guards de rol admin para API routes |
-| `supabase/migrations/` | **27 migraciones SQL aplicadas** (V4.0: 021-024 de Insights; 025_audit_action_session_user_values arregla el enum audit_action; 026_kpi_cliente_perdidos_por_nombre agrupa Perdidos por nombre; 027_rls_perf_wrap_functions_in_subquery arregla timeout de RLS por evaluación por-fila) |
+| `supabase/migrations/` | **28 migraciones SQL aplicadas** (V4.0: 021-024 de Insights; 025_audit_action_session_user_values arregla el enum audit_action; 026_kpi_cliente_perdidos_por_nombre agrupa Perdidos por nombre; 027_rls_perf_wrap_functions_in_subquery arregla timeout de RLS por evaluación por-fila; 028_insights_penetracion funciones del Insight Penetración/Canasta) |
 | `docs/` | Esta documentación (+ `LO_NUEVO.md` con resumen ejecutivo) |
 | `proxy.ts` | Middleware de Next.js 16 (renombrado de middleware.ts) — ahora valida sesión en cada request |
 | `.env.local` | Secrets (NO commit) |
@@ -535,6 +535,24 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 
 **Razón:** El componente usaba un valor de PRESENTACIÓN (etiqueta) como valor de CONSULTA (nombre de territorio). El fix separa ambos: `territorio` queda solo para el label de exports; `territoriosEfectivos` es el filtro real.
 **Estado:** Vigente. Commit `1f28847`. Sin migración (solo código de app).
+
+---
+
+### D036 — 2026-06-16 | Nuevo Insight "Penetración / Canasta" (5º sub-análisis)
+
+**Contexto:** Mauricio compartió un Excel (hoja "Hoja7"): pivote por cliente con # de SKUs distintos, venta, margen 2025 vs 2026 y sus deltas. Pidió que interpretara el documento antes de construir. Acordado: análisis bidireccional (por cliente = # SKUs; por SKU = # clientes), ventana alineada día-vs-día (como BCG), drill-down COMPLETO (sin truncar) con flag nuevo/perdido, scatter Δconteo vs Δventa, export Excel de 2 hojas (Por Cliente / Por SKU) estilo Hoja7. El valor es el **contexto/visibilidad** (cross-sell + rescate), no un KPI fijo.
+
+**Decisión / Implementación (5 chunks, commits intermedios):**
+1. **Backend** (migración **028**): `insights_penetracion` (resumen) + `insights_penetracion_detalle` (drill-down). `p_dimension` 'clientes'|'productos' alterna la dimensión agregada y la contada (`COUNT(DISTINCT ...) FILTER`). SECURITY INVOKER; rendimiento **392ms** bajo RLS (el fix 027 lo sostiene). Commit `d70ffc8`.
+2. **API**: `/api/insights/penetracion` (+ `-detalle`), calcan `cuadrante/route.ts` (effectiveTo + shiftYear + territorios). Commit `30c3c87`.
+3. **Frontend**: `PenetracionAnalysis.tsx` (toggle clientes/SKU + Pesos/Kilos, KPIs, scatter, tabla ordenable con drill-down lazy completo marcando nuevos/perdidos) + registro en `InsightsTab` con popover de ayuda. Commit `30c3c87`.
+4. **Export**: `lib/export-excel` refactor → `exportToExcelMultiSheet`; botón en el Insight genera 2 hojas estilo Hoja7. `canExportExcel` hilado DashboardClient→InsightsTab→componente. Commit `b5aeaf6`.
+5. **Docs + sync** (esta entrada).
+
+**Verificación:** CLUB CAMPESTRE DE SAN LUIS = 14 SKUs 2026 vs 7 2025, venta $182,805 vs $52,772 → **idéntico a la Hoja7 del Excel**. Prom SKUs/cliente 6.40→5.81; 207 altas / 202 bajas. build + tsc verdes en cada chunk.
+
+**Nota:** la ventana es YTD alineada (1-ene→hoy, mismo tramo año anterior), por eso los totales no replican el snapshot del Excel del usuario (que estaba filtrado a otra cosa); el Insight usa el dato vivo con los filtros del sidebar.
+**Estado:** Vigente. Commits `d70ffc8`, `30c3c87`, `b5aeaf6` + migración 028.
 
 ---
 
