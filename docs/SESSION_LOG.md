@@ -52,7 +52,7 @@
 | `lib/format.ts` | Formatters (money, kilos, dates) — portado del V2.2 |
 | `lib/business-days.ts` | Cálculo de días hábiles L-S menos LFT + helpers `findCalendarDayForBizDays`, `computePrevYearAlDia` |
 | `lib/admin-guards.ts` | Guards de rol admin para API routes |
-| `supabase/migrations/` | **26 migraciones SQL aplicadas** (V4.0: 021-024 de Insights; 025_audit_action_session_user_values arregla el enum audit_action; 026_kpi_cliente_perdidos_por_nombre agrupa Perdidos por nombre) |
+| `supabase/migrations/` | **27 migraciones SQL aplicadas** (V4.0: 021-024 de Insights; 025_audit_action_session_user_values arregla el enum audit_action; 026_kpi_cliente_perdidos_por_nombre agrupa Perdidos por nombre; 027_rls_perf_wrap_functions_in_subquery arregla timeout de RLS por evaluación por-fila) |
 | `docs/` | Esta documentación (+ `LO_NUEVO.md` con resumen ejecutivo) |
 | `proxy.ts` | Middleware de Next.js 16 (renombrado de middleware.ts) — ahora valida sesión en cada request |
 | `.env.local` | Secrets (NO commit) |
@@ -506,6 +506,25 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 
 ---
 
+### D034 — 2026-06-16 | Tabs vacíos: timeout RLS por función evaluada por-fila
+
+**Contexto:** Mauricio reportó que de "Grupo Producto" a "Perdidos" (e Insights) los tabs dejaron de mostrar datos — las gráficas salían con los NOMBRES de grupos/vendedores/productos pero con venta/margen en **0**. Pidió diagnóstico a detalle ANTES de tocar nada.
+
+**Diagnóstico (con prueba dura, sin alucinar):**
+- DB, vistas, consultas y RLS: **todo sano** (jun-2026 = $73.2M). Yo consulto vía service-role (salto RLS) → por eso a mí me respondía rápido.
+- `pg_stat_statements` (stats REALES de producción): `kpi_grupo_summary` media **3,423ms / máx 7,987ms**; `kpi_cliente_summary` máx 7,976ms; `kpi_sku_summary` 7,976ms; `kpi_vendedor_summary` 7,894ms; `kpi_cliente_perdidos` 7,766ms. **Todos los máximos clavados justo abajo de 8,000ms** = huella de timeout (`statement_timeout` de `authenticated` = 8s).
+- Causa: la política RLS de `sales_rows` (`territorio = ANY(visible_territories_for_current_user())`) hacía que Postgres **re-evaluara la función SECURITY DEFINER por cada fila** (28,939×/consulta). Aislado: misma agregación **1,612ms por-fila vs 37ms una-vez = 43×**.
+- Al hacer timeout (8s) → la app recibe null → el tab se dibuja con los nombres (de la consulta ligera al-día) pero con valores en 0. Intermitente (concurrencia/caché). **NO causado por nuestros cambios** — las vistas `_summary` nunca se tocaron; es un cuello preexistente que cruzó el umbral de 8s al crecer el dato.
+
+**Decisión / Fix (de raíz, no parche):** Migración **027** — forzar evaluación ÚNICA de la función envolviéndola en subconsulta. Como devuelve `text[]`, el patrón es `territorio IN (SELECT unnest(func()))` (la función corre 1× en un SubPlan hasheado). Mismo trato a `current_user_is_admin()`. NO se subió el `statement_timeout` (eso sería tapar el síntoma).
+
+**Verificado post-fix:** `kpi_grupo_summary` **1,612ms → 29ms** (56×); seguridad **intacta** (usuario con 5 territorios permitidos sigue viendo exactamente 5); datos idénticos. Es fix de DB (no requiere deploy de código; ya activo en prod).
+
+**Razón:** El timeout era el síntoma; la evaluación por-fila era la enfermedad. Subir el timeout habría dejado el dashboard lento y frágil. El patrón `IN (SELECT unnest(...))` es la recomendación oficial de Supabase para funciones en políticas RLS.
+**Estado:** Vigente. Migración 027 aplicada en prod 2026-06-16. Ver [[feedback_no_parchar_origen]] (mismo principio: arreglar la causa, no el síntoma).
+
+---
+
 ## Bugs Resueltos
 
 | # | Fecha | Descripción | Causa | Fix | Commit |
@@ -555,6 +574,7 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 | 42 | 2026-06-07 | Build local quedaba vacío / no compilaba al validar | El comando incluía `pkill -f "next build"`, que mataba el propio wrapper de shell (cuya línea de comando también contenía esa cadena) antes de que `npm run build` arrancara. | Correr el build sin `pkill` (asegurando que no haya builds concurrentes) + workaround iCloud `mv .next /tmp/...`. | (operacional) |
 | 43 | 2026-06-07 | `respaldar.sh` abortaba en la sección 4 (backup de sesiones JSONL) | `existing=$(ls ...sessions...*_session_${hash}.jsonl 2>/dev/null \| head -1)` bajo `set -o pipefail` + `errexit`: cuando NO existía una sesión previa de ese hash (primera vez), `ls` retornaba ≠0 y abortaba el script. | Agregar `\|\| true` a la sustitución para que el pipeline retorne 0 cuando no hay match. Re-corrido: 7 sesiones (115MB) respaldadas a ambas carpetas. | (scripts/respaldar.sh) |
 | 44 | 2026-06-08 | Tab AuditLog "te sacaba de la página por error" (días sin funcionar) + escrituras de sesión/usuario fallaban con 500 | (1) `AuditClient.ACTION_CONFIG` no mapeaba `settings_toggle` (que SÍ está en el enum y en la tabla) → `config` undefined → `config.icon` reventaba el render de React (crash → "te saca"). (2) El enum `audit_action` no tenía 6 valores que el código inserta (`force_signout`, `force_signout_all`, `invite`, `reset`, `session_timeout_changed`, `session_timeout_exemption_changed`) → "invalid input value for enum audit_action" en cada uno (visto en logs de Postgres). La "migración 014_audit_actions_session" que el INSTRUCTIVO decía existir nunca se creó; solo 015 agregó `settings_toggle`. Detonante: el usuario activó el timeout de sesión y togglear ajustes generó filas que crasheaban la lectura. | Migración **025** (`ADD VALUE IF NOT EXISTS` ×6, aplicada) + completar `ACTION_CONFIG`/`ACTION_ORDER`/`VALID_ACTIONS` + **fallback defensivo** en el render (acción no mapeada muestra el string crudo, no crashea). | `0b44448` + migración 025 |
+| 46 | 2026-06-16 | Tabs Grupo/Vendedores/Productos/Perdidos/Insights vacíos: gráficas con nombres pero venta/margen en 0 (intermitente) | La política RLS de `sales_rows` (`territorio = ANY(visible_territories_for_current_user())`) evaluaba la función SECURITY DEFINER **por fila** (28,939×/consulta). Las vistas `_summary` y `kpi_cliente_perdidos` promediaban 2.7–3.4s con picos de 7.9s → cruzaban el `statement_timeout` de `authenticated` (8s) → la app recibía null → tabs en 0. Confirmado con `pg_stat_statements` (máximos clavados en ~7.9s). Preexistente, agravado por crecimiento de datos; NO por cambios de código. | Migración **027**: envolver la función en subconsulta `territorio IN (SELECT unnest(func()))` → evaluación única (1× vs 28,939×). Verificado: 1,612ms → 29ms (56×); seguridad intacta; datos idénticos. No se subió el timeout (sería parche). | migración 027 |
 | 45 | 2026-06-14 | Tab Perdidos: el mismo cliente aparecía repetido en varias filas | La vista `kpi_cliente_perdidos` agrupaba por `no_cliente` *case-sensitive*: (1) mismo ID con distinto casing (`CL-`/`cl-`/`Cl-`, **artefacto histórico** del export del ERP — 1,520 filas / 40 clientes, solo 2024-01→2025-09, 0 desde oct-2025) salía como clientes distintos → variante minúscula sin venta 2026 = PERDIDO falso; (2) mismo cliente en cuentas Sus + Suve (`no_cliente` distinto) salía 2 veces. | Migración **026**: la vista agrupa por NOMBRE `(anio, cliente, vendedor, territorio)` con `no_cliente = MIN(UPPER(...))` (UPPER solo al leer). Pivot de `page.tsx` + keys de `PerdidosTab` por `cliente\|vendedor`. **Decisión de gobernanza:** NO se transforma el dato de origen (se revirtió el `.toUpperCase()` del import, `8a0f48c`) ni se mutan las filas históricas; la unificación por nombre resuelve el síntoma. Verificado: VICTORIA HANUN SALUM → 1 fila/año activa; HECTOR VEGA → 2 filas legítimas (2 vendedores). | `6625f20` + `8a0f48c` + migr. 026 |
 
 ---
