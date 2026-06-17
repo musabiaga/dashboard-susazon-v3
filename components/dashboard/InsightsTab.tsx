@@ -18,8 +18,9 @@ import { ConcentracionAnalysis } from "@/components/dashboard/insights/Concentra
 import { PrecioAnalysis } from "@/components/dashboard/insights/PrecioAnalysis";
 import { CuadranteAnalysis } from "@/components/dashboard/insights/CuadranteAnalysis";
 import { EstacionalidadAnalysis } from "@/components/dashboard/insights/EstacionalidadAnalysis";
+import { PenetracionAnalysis } from "@/components/dashboard/insights/PenetracionAnalysis";
 
-type SubAnalysis = "concentracion" | "precio" | "cuadrante" | "estacionalidad";
+type SubAnalysis = "concentracion" | "precio" | "cuadrante" | "estacionalidad" | "penetracion";
 
 const STORAGE_KEY = "insights-sub-analysis";
 
@@ -141,6 +142,35 @@ const SUB_ANALYSES: SubAnalysisDef[] = [
         </p>
         <p>
           En el año parcial (2026) el 100 se calcula sobre los meses con datos.
+        </p>
+      </div>
+    ),
+  },
+  {
+    key: "penetracion",
+    label: "Penetración / Canasta",
+    description:
+      "¿Qué tan amplia es la canasta? Por cliente: cuántos SKUs compra. Por SKU: cuántos clientes lo compran. Todo vs el año anterior.",
+    help: (
+      <div className="space-y-1.5">
+        <p>
+          Bidireccional: <strong>Por cliente</strong> = # de SKUs distintos que
+          compra · <strong>Por SKU</strong> = # de clientes distintos que lo
+          compran. Compara contra el <strong>mismo tramo de fechas</strong> del
+          año anterior.
+        </p>
+        <p>
+          • <strong>Scatter</strong>: X = Δ del conteo, Y = Δ venta. 🟢 amplía y
+          crece · 🔴 angosta y cae · 🟡 mixto.
+        </p>
+        <p>
+          • <strong>Tabla</strong>: cada fila se abre y muestra{" "}
+          <strong>todos</strong> los SKUs (o clientes), marcando{" "}
+          <strong>nuevos</strong> y los que <strong>dejó de comprar</strong>.
+        </p>
+        <p>
+          Sirve para <strong>cross-sell</strong> (ampliar canasta) y para
+          rescatar a quien la está angostando.
         </p>
       </div>
     ),
@@ -316,6 +346,13 @@ export function InsightsTab({ today, territorios, contextLabel }: Props) {
       )}
       {active === "estacionalidad" && (
         <EstacionalidadAnalysis
+          today={today}
+          territorios={territorios}
+          contextLabel={contextLabel}
+        />
+      )}
+      {active === "penetracion" && (
+        <PenetracionAnalysis
           today={today}
           territorios={territorios}
           contextLabel={contextLabel}
