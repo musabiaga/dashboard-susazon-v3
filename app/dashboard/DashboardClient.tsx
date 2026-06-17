@@ -623,7 +623,7 @@ export function DashboardClient({
                     elapsedBizDays={elapsedBizDays}
                     totalBizDays={totalBizDays}
                     daysCurrent={daysCurrent}
-                    variedadTerritorios={trackingTerritorios}
+                    territoriosEfectivos={trackingTerritorios}
                     territorio={exportTerritoryLabel}
                     canExportExcel={canExportExcel}
                     reportInput={reportInput}

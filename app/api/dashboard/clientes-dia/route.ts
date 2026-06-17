@@ -13,8 +13,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  *   - year: YYYY (ej. 2026)
  *   - month: 1-12
  *   - day: 1-31
- *   - territorio: nombre del territorio (opcional). Vacío o ausente = todos
- *     los territorios visibles para el usuario (RLS filtra automáticamente).
+ *   - territorio: nombre(s) de territorio (REPETIBLE). Se puede pasar varias
+ *     veces (?territorio=A&territorio=B) para filtrar a un subset, o una vez
+ *     para un territorio individual. Ausente = todos los territorios visibles
+ *     para el usuario (RLS filtra automáticamente).
  *
  * Auth: requiere sesión activa. RLS de Supabase filtra automáticamente
  * los territorios visibles para el usuario consultando.
@@ -38,7 +40,12 @@ export async function GET(request: NextRequest) {
   const year = parseInt(url.searchParams.get("year") ?? "", 10);
   const month = parseInt(url.searchParams.get("month") ?? "", 10);
   const day = parseInt(url.searchParams.get("day") ?? "", 10);
-  const territorio = url.searchParams.get("territorio") || ""; // "" = todos
+  // Puede venir repetido (?territorio=A&territorio=B) para un subset, una vez
+  // para individual, o ausente = todos los visibles (RLS limita).
+  const territorios = url.searchParams
+    .getAll("territorio")
+    .map((t) => t.trim())
+    .filter((t) => t !== "");
 
   // Validación de rangos
   if (
@@ -76,8 +83,9 @@ export async function GET(request: NextRequest) {
     .eq("mes", month)
     .eq("dia", day);
 
-  if (territorio) {
-    query = query.eq("territorio", territorio);
+  if (territorios.length > 0) {
+    // .in() = OR de los territorios del subset (o el único individual).
+    query = query.in("territorio", territorios);
   }
 
   const { data, error } = await query;
@@ -88,9 +96,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Agregar por no_cliente (suma todos los territorios que el RLS dejó ver).
-  // Cuando territorio != "" (filtro específico) ya viene 1 row por cliente,
-  // pero el agregar es idempotente.
+  // Agregar por no_cliente: un mismo cliente puede facturar en varios
+  // territorios el mismo día (vista por territorio×cliente×día), así que se
+  // suman. Para un solo territorio ya viene 1 row por cliente (idempotente).
   type Acc = {
     no_cliente: string;
     cliente: string;

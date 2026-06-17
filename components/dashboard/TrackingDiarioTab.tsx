@@ -63,9 +63,10 @@ interface Props {
   totalBizDays: number;
   /** Día calendario de corte del mes (al-día) — para el card de Variedad. */
   daysCurrent: number;
-  /** Territorios efectivos del sidebar (null=todos, []=ninguno, [...]=subset),
-   *  para el fetch lazy del card de Variedad (Fase 10). */
-  variedadTerritorios: string[] | null;
+  /** Selección efectiva de territorios del sidebar (null=todos, []=ninguno,
+   *  [...]=subset). Usado por el card de Variedad (Fase 10) Y por el desglose
+   *  de clientes por día (filtro REAL — NO la etiqueta `territorio`). */
+  territoriosEfectivos: string[] | null;
   /** Territorio activo del dashboard. "" = todos los territorios visibles
    *  (el RLS de Supabase filtra automáticamente por permisos del usuario). */
   territorio?: string;
@@ -85,7 +86,7 @@ export function TrackingDiarioTab({
   elapsedBizDays,
   totalBizDays,
   daysCurrent,
-  variedadTerritorios,
+  territoriosEfectivos,
   territorio = "",
   canExportExcel = false,
   reportInput = null,
@@ -132,6 +133,19 @@ export function TrackingDiarioTab({
     if (dayCache.has(day)) return; // ya cacheado
     if (loadingDays.has(day)) return; // ya en flight
 
+    // "Todos (sin territorios incluidos)" → no hay nada que consultar.
+    if (territoriosEfectivos && territoriosEfectivos.length === 0) {
+      setDayCache((prev) => {
+        const next = new Map(prev);
+        next.set(day, {
+          items: [],
+          total: { venta: 0, margen: 0, kg: 0, marginPct: 0 },
+        });
+        return next;
+      });
+      return;
+    }
+
     setLoadingDays((prev) => {
       const next = new Set(prev);
       next.add(day);
@@ -148,7 +162,13 @@ export function TrackingDiarioTab({
         month: String(currentMonth),
         day: String(day),
       });
-      if (territorio) params.set("territorio", territorio);
+      // Filtro REAL de territorios (no la etiqueta `territorio`): null = todos
+      // los visibles (sin param → el RLS limita); [...] = individual o subset →
+      // 1 param por territorio (?territorio=A&territorio=B). El caso [] (ninguno)
+      // ya se cortó arriba.
+      if (territoriosEfectivos) {
+        for (const t of territoriosEfectivos) params.append("territorio", t);
+      }
       const resp = await fetch(`/api/dashboard/clientes-dia?${params}`);
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({}));
@@ -775,13 +795,13 @@ export function TrackingDiarioTab({
           year={currentYear}
           month={currentMonth}
           daysCurrent={daysCurrent}
-          territorios={variedadTerritorios}
+          territorios={territoriosEfectivos}
         />
         <ClientesActivosCard
           year={currentYear}
           month={currentMonth}
           daysCurrent={daysCurrent}
-          territorios={variedadTerritorios}
+          territorios={territoriosEfectivos}
         />
       </div>
 
