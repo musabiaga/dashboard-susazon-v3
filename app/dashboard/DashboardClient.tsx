@@ -837,6 +837,7 @@ export function DashboardClient({
                     }}
                     territorios={insightsTerritorios}
                     contextLabel={contextLabel}
+                    canExportExcel={canExportExcel}
                   />
                 );
               }

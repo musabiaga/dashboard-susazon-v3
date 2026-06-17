@@ -32,6 +32,13 @@ import {
   DateRangePicker,
   type DateRange,
 } from "@/components/dashboard/DateRangePicker";
+import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
+import {
+  exportToExcelMultiSheet,
+  sanitizeFileName,
+  todayISO,
+  type ExcelExportOptions,
+} from "@/lib/export-excel";
 
 type Dim = "clientes" | "productos";
 type Vol = "pesos" | "kilos";
@@ -53,6 +60,7 @@ interface Props {
   today: { year: number; month: number; day: number };
   territorios: string[] | null;
   contextLabel: string;
+  canExportExcel?: boolean;
 }
 
 interface ApiItem {
@@ -130,7 +138,7 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
-export function PenetracionAnalysis({ today, territorios, contextLabel }: Props) {
+export function PenetracionAnalysis({ today, territorios, contextLabel, canExportExcel = false }: Props) {
   // Default: YTD (1-ene → hoy). La comparación contra el año anterior es del
   // mismo tramo; el server capa al último día con datos.
   const initialRange: DateRange = useMemo(
@@ -406,11 +414,94 @@ export function PenetracionAnalysis({ today, territorios, contextLabel }: Props)
   const dl = DIM[dimension];
   const magLabel = isKg ? "Volumen" : "Venta";
 
+  // ===== Export Excel: 2 hojas (Por Cliente / Por SKU) estilo Hoja7 =====
+  const handleExport = async () => {
+    const fetchDim = async (dim: Dim): Promise<ApiItem[]> => {
+      const params = new URLSearchParams();
+      params.set("from", range.from);
+      params.set("to", range.to);
+      params.set("dimension", dim);
+      if (territorios !== null) params.set("territorios", territorios.join(","));
+      const r = await fetch(`/api/insights/penetracion?${params.toString()}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = (await r.json()) as { items?: ApiItem[] };
+      return j.items ?? [];
+    };
+    const [cli, prod] = await Promise.all([fetchDim("clientes"), fetchDim("productos")]);
+
+    const yA = Number(range.to.slice(0, 4));
+    const yP = yA - 1;
+    const winLabel = `${fmtDate(range.from)} → ${fmtDate(meta?.effectiveTo ?? range.to)}`;
+
+    const sheetSpec = (
+      rows: ApiItem[],
+      sheetName: string,
+      entityHeader: string,
+      countHeader: string
+    ): Omit<ExcelExportOptions, "fileName"> => {
+      const sorted = [...rows].sort((a, b) => b.ventaActual - a.ventaActual);
+      const sum = (f: (r: ApiItem) => number) => rows.reduce((s, r) => s + f(r), 0);
+      return {
+        sheetName,
+        title: `Penetración / Canasta — ${sheetName}`,
+        subtitle: `Mismo tramo ${winLabel} · ${yA} vs ${yP} · ${contextLabel}`,
+        summary: [
+          { label: entityHeader + "s", value: rows.length },
+          { label: `${countHeader} ${yP} (total)`, value: sum((r) => r.nPrev), numFmt: "#,##0" },
+          { label: `${countHeader} ${yA} (total)`, value: sum((r) => r.nActual), numFmt: "#,##0" },
+          { label: `Venta ${yP}`, value: sum((r) => r.ventaPrev), numFmt: "$#,##0" },
+          { label: `Venta ${yA}`, value: sum((r) => r.ventaActual), numFmt: "$#,##0" },
+        ],
+        columns: [
+          { header: entityHeader, key: "name", width: 38 },
+          { header: `${countHeader} ${yP}`, key: "nPrev", numFmt: "#,##0", width: 12 },
+          { header: `${countHeader} ${yA}`, key: "nActual", numFmt: "#,##0", width: 12 },
+          { header: `Margen ${yP}`, key: "margenPrev", numFmt: "$#,##0", width: 14 },
+          { header: `Venta ${yP}`, key: "ventaPrev", numFmt: "$#,##0", width: 14 },
+          { header: `Margen ${yA}`, key: "margenActual", numFmt: "$#,##0", width: 14 },
+          { header: `Venta ${yA}`, key: "ventaActual", numFmt: "$#,##0", width: 14 },
+          { header: `% Margen ${yP}`, key: "mpPrev", numFmt: "0.0%", width: 13 },
+          { header: `% Margen ${yA}`, key: "mpActual", numFmt: "0.0%", width: 13 },
+          { header: `Dif ${countHeader}`, key: "deltaN", numFmt: "#,##0", width: 11 },
+          { header: "Dif Venta", key: "deltaVenta", numFmt: "$#,##0", width: 14 },
+          { header: "Dif % Margen", key: "deltaMpp", numFmt: "0.0%", width: 13 },
+        ],
+        rows: sorted.map((r) => ({
+          name: r.name,
+          nPrev: r.nPrev,
+          nActual: r.nActual,
+          margenPrev: r.margenPrev,
+          ventaPrev: r.ventaPrev,
+          margenActual: r.margenActual,
+          ventaActual: r.ventaActual,
+          mpPrev: r.margenPctPrev / 100,
+          mpActual: r.margenPctActual / 100,
+          deltaN: r.deltaN,
+          deltaVenta: r.deltaVenta,
+          deltaMpp: r.deltaMargenPct / 100,
+        })),
+      };
+    };
+
+    const sheets = [
+      sheetSpec(cli, "Por Cliente", "Cliente", "SKUs"),
+      sheetSpec(prod, "Por SKU", "Producto", "Clientes"),
+    ];
+    const fileName = `Penetracion_${sanitizeFileName(contextLabel).slice(0, 28)}_${yA}_${todayISO()}`;
+    await exportToExcelMultiSheet(fileName, sheets);
+  };
+
   return (
     <div className="space-y-4">
-      {/* Fechas */}
+      {/* Fechas + export */}
       <div className="flex flex-wrap items-center justify-end gap-2">
         <DateRangePicker value={range} onChange={setRange} today={today} />
+        <ExportExcelButton
+          onExport={handleExport}
+          canExport={canExportExcel}
+          disabled={loading || items.length === 0}
+          title="Descarga un Excel con 2 hojas: Por Cliente y Por SKU"
+        />
       </div>
 
       {/* Controles */}

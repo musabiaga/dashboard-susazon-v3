@@ -37,6 +37,8 @@ interface Props {
   /** Etiqueta del contexto actual ("Todos", "Cancún", "3 territorios…")
    *  para mostrar al usuario claramente qué está viendo. */
   contextLabel: string;
+  /** Permiso para descargar Excel (lo usa el Insight Penetración). */
+  canExportExcel?: boolean;
 }
 
 interface SubAnalysisDef {
@@ -177,7 +179,7 @@ const SUB_ANALYSES: SubAnalysisDef[] = [
   },
 ];
 
-export function InsightsTab({ today, territorios, contextLabel }: Props) {
+export function InsightsTab({ today, territorios, contextLabel, canExportExcel = false }: Props) {
   const [active, setActive] = useState<SubAnalysis>("concentracion");
 
   // Recordar último sub-análisis usado
@@ -356,6 +358,7 @@ export function InsightsTab({ today, territorios, contextLabel }: Props) {
           today={today}
           territorios={territorios}
           contextLabel={contextLabel}
+          canExportExcel={canExportExcel}
         />
       )}
     </div>

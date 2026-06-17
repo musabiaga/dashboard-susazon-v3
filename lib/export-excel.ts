@@ -72,12 +72,10 @@ const BORDER_DARK = "FF111827";
  * Genera y dispara la descarga de un archivo .xlsx con la estructura
  * descrita en `opts`. Usa Blob + a.download (no requiere navegador especial).
  */
-export async function exportToExcel(opts: ExcelExportOptions): Promise<void> {
-  const wb = new ExcelJS.Workbook();
-  wb.creator = "Dashboard Comercial Susazón";
-  wb.created = new Date();
-  wb.lastModifiedBy = "Dashboard Comercial Susazón";
-
+function buildSheet(
+  wb: ExcelJS.Workbook,
+  opts: Omit<ExcelExportOptions, "fileName">
+): void {
   // exceljs limita el sheetName a 31 chars (regla de Excel)
   const safeSheetName = opts.sheetName.slice(0, 31);
   const ws = wb.addWorksheet(safeSheetName, {
@@ -222,8 +220,20 @@ export async function exportToExcel(opts: ExcelExportOptions): Promise<void> {
 
   // ===== Freeze panes en el header de la tabla =====
   ws.views = [{ state: "frozen", ySplit: headerRowIdx }];
+}
 
-  // ===== Generar buffer y disparar descarga =====
+function newWorkbook(): ExcelJS.Workbook {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Dashboard Comercial Susazón";
+  wb.created = new Date();
+  wb.lastModifiedBy = "Dashboard Comercial Susazón";
+  return wb;
+}
+
+async function downloadWorkbook(
+  wb: ExcelJS.Workbook,
+  fileName: string
+): Promise<void> {
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -231,11 +241,34 @@ export async function exportToExcel(opts: ExcelExportOptions): Promise<void> {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${opts.fileName}.xlsx`;
+  a.download = `${fileName}.xlsx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/**
+ * Exporta UNA tabla a un .xlsx de una sola hoja.
+ */
+export async function exportToExcel(opts: ExcelExportOptions): Promise<void> {
+  const wb = newWorkbook();
+  buildSheet(wb, opts);
+  await downloadWorkbook(wb, opts.fileName);
+}
+
+/**
+ * Exporta VARIAS tablas a un .xlsx con UNA HOJA por cada una (ej. el Insight
+ * Penetración: hoja "Por Cliente" + hoja "Por SKU"). Cada elemento de `sheets`
+ * tiene la misma forma que `exportToExcel` pero sin `fileName`.
+ */
+export async function exportToExcelMultiSheet(
+  fileName: string,
+  sheets: Array<Omit<ExcelExportOptions, "fileName">>
+): Promise<void> {
+  const wb = newWorkbook();
+  for (const s of sheets) buildSheet(wb, s);
+  await downloadWorkbook(wb, fileName);
 }
 
 /**
