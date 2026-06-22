@@ -126,6 +126,43 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Hacer cumplir is_active a nivel auth (antes era solo cosmético):
+  //   - Desactivar → BANEAR al usuario (no puede iniciar sesión) + cerrar sus
+  //     sesiones activas (el ban solo frena tokens nuevos; los vigentes se
+  //     invalidan con force_signout_user).
+  //   - Reactivar → des-banear (puede volver a entrar de inmediato).
+  if (typeof body.is_active === "boolean") {
+    if (body.is_active === false) {
+      const { error: banErr } = await admin.auth.admin.updateUserById(
+        body.user_id,
+        { ban_duration: "876000h" } // ~100 años
+      );
+      if (banErr) {
+        return NextResponse.json(
+          {
+            error: `Se actualizó el perfil pero NO se pudo bloquear el acceso: ${banErr.message}`,
+          },
+          { status: 500 }
+        );
+      }
+      // Cerrar sesiones activas inmediatamente.
+      await admin.rpc("force_signout_user", { target_user_id: body.user_id });
+    } else {
+      const { error: unbanErr } = await admin.auth.admin.updateUserById(
+        body.user_id,
+        { ban_duration: "none" }
+      );
+      if (unbanErr) {
+        return NextResponse.json(
+          {
+            error: `Se reactivó el perfil pero NO se pudo restaurar el acceso: ${unbanErr.message}`,
+          },
+          { status: 500 }
+        );
+      }
+    }
+  }
+
   // Audit log
   await admin.from("audit_log").insert({
     user_id: guard.user.id,

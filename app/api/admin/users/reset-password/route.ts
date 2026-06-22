@@ -64,9 +64,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (method === "password") {
-    // Update directo de password + flag must_change_password
+    // Update directo de password + flag must_change_password.
+    // email_confirm:true es CLAVE: si el usuario fue invitado por email y nunca
+    // confirmó (email_confirmed_at = NULL), no podría iniciar sesión aunque le
+    // pongamos contraseña. Al fijar password directo, el admin "avala" el email
+    // → lo confirmamos (igual que el alta por contraseña en invite/route.ts).
     const { error: updErr } = await admin.auth.admin.updateUserById(body.user_id, {
       password: body.new_password!,
+      email_confirm: true,
       user_metadata: {
         must_change_password: forceChange,
       },
