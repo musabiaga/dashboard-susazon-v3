@@ -7,6 +7,7 @@ interface UpdateBody {
   full_name?: string;
   role?: "admin" | "director" | "gerente_regional" | "vendedor";
   allowed_territories?: string[] | null;
+  allowed_agrupadores?: string[] | null;
   can_edit_ptto?: boolean;
   can_export_excel?: boolean;
   is_active?: boolean;
@@ -75,6 +76,24 @@ export async function POST(request: NextRequest) {
             new Set(body.allowed_territories.map((t) => t.trim()))
           );
   }
+  if (body.allowed_agrupadores !== undefined) {
+    if (
+      !(
+        body.allowed_agrupadores === null ||
+        (Array.isArray(body.allowed_agrupadores) &&
+          body.allowed_agrupadores.every((x) => typeof x === "string"))
+      )
+    ) {
+      return NextResponse.json(
+        { error: "allowed_agrupadores inválido" },
+        { status: 400 }
+      );
+    }
+    update.allowed_agrupadores =
+      body.allowed_agrupadores === null
+        ? null
+        : Array.from(new Set(body.allowed_agrupadores));
+  }
   if (typeof body.can_edit_ptto === "boolean") {
     update.can_edit_ptto = body.can_edit_ptto;
   }
@@ -98,7 +117,7 @@ export async function POST(request: NextRequest) {
   const { data: before } = await admin
     .from("users_permissions")
     .select(
-      "email, role, allowed_territories, can_edit_ptto, can_export_excel, is_active, full_name"
+      "email, role, allowed_territories, allowed_agrupadores, can_edit_ptto, can_export_excel, is_active, full_name"
     )
     .eq("user_id", body.user_id)
     .single();
@@ -115,7 +134,7 @@ export async function POST(request: NextRequest) {
     .update(update)
     .eq("user_id", body.user_id)
     .select(
-      "user_id, email, full_name, role, allowed_territories, can_edit_ptto, can_export_excel, is_active, last_login, created_at"
+      "user_id, email, full_name, role, allowed_territories, allowed_agrupadores, can_edit_ptto, can_export_excel, is_active, last_login, created_at"
     )
     .single();
 
