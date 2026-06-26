@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TerritoriesClient, type TerritoryState } from "./TerritoriesClient";
+import { AgrupadoresManager } from "./AgrupadoresManager";
 
 export const dynamic = "force-dynamic";
 
@@ -40,5 +41,10 @@ export default async function TerritoriosAdminPage() {
       : null,
   }));
 
-  return <TerritoriesClient initial={territories} />;
+  return (
+    <div className="space-y-8">
+      <TerritoriesClient initial={territories} />
+      <AgrupadoresManager />
+    </div>
+  );
 }
