@@ -42,6 +42,11 @@ interface DimensionDataset {
 
 interface DashboardClientProps {
   territories: Territory[];
+  /** Agrupadores asignados al usuario actual (sección del sidebar, contexto). */
+  agrupadores?: { id: string; nombre: string; icono: string | null }[];
+  /** True = acceso restringido (no ve todos los territorios) → el sidebar
+   *  oculta los territorios en $0 (vista limpia para KAM/vendedor). */
+  restrictedView?: boolean;
   totalKpi: TerritoryKpi;
   totalVentaBudget: number;
   // Nombre del mes actual ya formateado en el server, para evitar timezone issues
@@ -146,6 +151,8 @@ export function DashboardClient({
   sessionIdleTimeoutMinutes,
   sessionTimeoutExempt,
   newCustomerCutoffDate,
+  agrupadores = [],
+  restrictedView = false,
 }: DashboardClientProps) {
   // Selección uni-select del sidebar: "" = modo "Todos", o nombre = single.
   // No persiste — cada sesión arranca en "Todos" para mantener UX previa.
@@ -455,6 +462,8 @@ export function DashboardClient({
       />
       <Sidebar
         territories={territories}
+        agrupadores={agrupadores}
+        restrictedView={restrictedView}
         selected={effectiveSelected}
         onSelect={setSelectedTerritory}
         totalKpi={

@@ -9,8 +9,30 @@ import {
   PanelLeftOpen,
   Settings2,
   Check,
+  Megaphone,
+  UserRound,
+  Target,
+  Tag,
+  Star,
+  Boxes,
+  Flame,
+  type LucideIcon,
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
+
+/** Resuelve el ícono (key string del agrupador) a un componente lucide. */
+function agrupadorIcon(key: string | null): LucideIcon {
+  switch (key) {
+    case "megaphone": return Megaphone;
+    case "user": return UserRound;
+    case "target": return Target;
+    case "tag": return Tag;
+    case "star": return Star;
+    case "boxes": return Boxes;
+    case "flame": return Flame;
+    default: return Layers;
+  }
+}
 
 export interface DailyPoint {
   d: number; // día del mes 1-31
@@ -68,6 +90,10 @@ export interface Territory {
 
 interface SidebarProps {
   territories: Territory[];
+  /** Agrupadores asignados al usuario actual (sección de contexto, Fase 1). */
+  agrupadores?: { id: string; nombre: string; icono: string | null }[];
+  /** Si true, oculta los territorios en $0 (vista limpia para KAM/restringido). */
+  restrictedView?: boolean;
   /** Selección uni-select. "" = modo "Todos" (agregado). */
   selected: string;
   onSelect: (name: string) => void;
@@ -102,6 +128,8 @@ interface SidebarProps {
  */
 export function Sidebar({
   territories,
+  agrupadores = [],
+  restrictedView = false,
   selected,
   onSelect,
   totalKpi,
@@ -111,10 +139,15 @@ export function Sidebar({
   collapsed,
   onToggleCollapsed,
 }: SidebarProps) {
-  const total = territories.length;
-  const activeTerritories = territories.filter((t) => t.isActive);
+  // Vista restringida (KAM/vendedor con acceso acotado): ocultar territorios
+  // sin datos ($0) para que vea solo lo suyo. Los $0 no suman al total igual.
+  const shown = restrictedView
+    ? territories.filter((t) => t.kpi.venta > 0)
+    : territories;
+  const total = shown.length;
+  const activeTerritories = shown.filter((t) => t.isActive);
   const activeCount = activeTerritories.length;
-  const disabledCount = territories.filter((t) => !t.isActive).length;
+  const disabledCount = shown.filter((t) => !t.isActive).length;
   const aggregatedCount = activeTerritories.filter((t) =>
     aggregatedTerritories.has(t.name)
   ).length;
@@ -206,16 +239,17 @@ export function Sidebar({
           className="my-2 border-t"
           style={{ borderColor: "var(--border)" }}
         />
-        {territories.length === 0 && (
+        {shown.length === 0 && (
           <div
             className="px-3 py-2 text-xs italic"
             style={{ color: "var(--text-muted)" }}
           >
-            Sin territorios visibles. Carga datos primero o pide permisos al
-            admin.
+            {agrupadores.length > 0
+              ? "Sin venta en el periodo para tu(s) agrupador(es)."
+              : "Sin territorios visibles. Carga datos primero o pide permisos al admin."}
           </div>
         )}
-        {territories.map((t) => (
+        {shown.map((t) => (
           <SidebarItem
             key={t.name}
             label={t.name}
@@ -230,6 +264,51 @@ export function Sidebar({
             kpi={t.kpi}
           />
         ))}
+
+        {/* Sección Agrupadores (contexto). La vista enfocada por agrupador
+            para usuarios con acceso amplio llega en Fase 2. */}
+        {agrupadores.length > 0 && (
+          <>
+            <div
+              className="my-2 border-t"
+              style={{ borderColor: "var(--border)" }}
+            />
+            <div className="flex items-center gap-1.5 px-3 pb-1 pt-1">
+              <Layers size={12} style={{ color: "var(--accent)" }} />
+              <span
+                className="text-[10px] font-semibold uppercase tracking-wider"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Agrupadores
+              </span>
+            </div>
+            {agrupadores.map((a) => {
+              const Icon = agrupadorIcon(a.icono);
+              return (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-sm"
+                  style={{ color: "var(--text-primary)" }}
+                  title="Vista enfocada del agrupador — próximamente"
+                >
+                  <span
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                    style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                  >
+                    <Icon size={13} />
+                  </span>
+                  <span className="flex-1 truncate">{a.nombre}</span>
+                </div>
+              );
+            })}
+            <div
+              className="px-3 pt-0.5 text-[10px]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Tu vista ya está acotada a {agrupadores.length === 1 ? "este agrupador" : "tus agrupadores"}.
+            </div>
+          </>
+        )}
       </nav>
     </aside>
   );

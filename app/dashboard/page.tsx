@@ -288,6 +288,14 @@ export default async function DashboardPage({
     getAppSettings(),
   ]);
 
+  // Agrupadores asignados al usuario (para la sección del sidebar) +
+  // bandera de vista restringida (no ve todos los territorios → sidebar limpio).
+  const { data: myAgrupadores } = await supabase.rpc("my_agrupadores");
+  const agrupadores = (
+    (myAgrupadores ?? []) as { id: string; nombre: string; icono: string | null }[]
+  ).map((a) => ({ id: a.id, nombre: a.nombre, icono: a.icono ?? null }));
+  const restrictedView = permissions?.allowed_territories != null;
+
   // "Hoy" en zona horaria CDMX (UTC-6). Vercel corre en UTC, entonces si
   // usamos `new Date()` directo, después de las 6pm CDMX el server ya cree
   // que es el día siguiente y rompe los KPIs. Ver lib/business-days.ts.
@@ -1233,6 +1241,8 @@ export default async function DashboardPage({
 
       <DashboardClient
         territories={territories}
+        agrupadores={agrupadores}
+        restrictedView={restrictedView}
         totalKpi={totalKpi}
         totalVentaBudget={totalVentaBudget}
         currentMonthLabel={currentMonthLabel}
