@@ -14,6 +14,7 @@ interface InviteBody {
   full_name: string;
   role: "admin" | "director" | "gerente_regional" | "vendedor";
   allowed_territories: string[] | null;
+  allowed_agrupadores?: string[] | null;
   can_edit_ptto: boolean;
   can_export_excel?: boolean;
   /** Método de auth (default "email" para back-compat). */
@@ -81,6 +82,10 @@ export async function POST(request: NextRequest) {
     body.allowed_territories === null
       ? null
       : Array.from(new Set(body.allowed_territories.map((t) => t.trim())));
+  const allowedAgrupadores =
+    Array.isArray(body.allowed_agrupadores) && body.allowed_agrupadores.length > 0
+      ? Array.from(new Set(body.allowed_agrupadores))
+      : null;
   const canEditPtto = body.can_edit_ptto;
   const canExportExcel =
     typeof body.can_export_excel === "boolean"
@@ -140,6 +145,7 @@ export async function POST(request: NextRequest) {
         full_name: fullName,
         role,
         allowed_territories: allowedTerritories,
+        allowed_agrupadores: allowedAgrupadores,
         can_edit_ptto: canEditPtto,
         can_export_excel: canExportExcel,
         is_active: true,
@@ -147,7 +153,7 @@ export async function POST(request: NextRequest) {
       { onConflict: "user_id" }
     )
     .select(
-      "user_id, email, full_name, role, allowed_territories, can_edit_ptto, can_export_excel, is_active, last_login, created_at"
+      "user_id, email, full_name, role, allowed_territories, allowed_agrupadores, can_edit_ptto, can_export_excel, is_active, last_login, created_at"
     )
     .single();
 

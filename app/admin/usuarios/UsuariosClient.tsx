@@ -40,6 +40,8 @@ export interface UserRow {
   role: RoleKey;
   // null = todos
   allowed_territories: string[] | null;
+  /** IDs de agrupadores asignados (acceso aditivo a territorios). */
+  allowed_agrupadores: string[] | null;
   can_edit_ptto: boolean;
   can_export_excel: boolean;
   /** Si true, este usuario NO está sujeto al timeout global de inactividad. */
@@ -49,12 +51,20 @@ export interface UserRow {
   created_at: string;
 }
 
+export interface AgrupadorLite {
+  id: string;
+  nombre: string;
+  icono: string | null;
+  is_active: boolean;
+}
+
 interface Props {
   initial: UserRow[];
   territories: string[];
+  agrupadores: AgrupadorLite[];
 }
 
-export function UsuariosClient({ initial, territories }: Props) {
+export function UsuariosClient({ initial, territories, agrupadores }: Props) {
   const router = useRouter();
   const [users, setUsers] = useState(initial);
   const [error, setError] = useState<string | null>(null);
@@ -610,6 +620,7 @@ export function UsuariosClient({ initial, territories }: Props) {
           kind={modal.kind}
           user={modal.kind === "edit" ? modal.user : null}
           territories={territories}
+          agrupadores={agrupadores}
           submitting={pendingId !== null}
           onClose={() => setModal(null)}
           onSubmit={(form) => {
@@ -653,6 +664,7 @@ interface FormPayload {
   full_name: string;
   role: RoleKey;
   allowed_territories: string[] | null; // null = todos
+  allowed_agrupadores: string[] | null; // ids de agrupadores asignados
   can_edit_ptto: boolean;
   can_export_excel: boolean;
   /** Solo aplica en modo "invite" — define cómo se da de alta el usuario.
@@ -669,6 +681,7 @@ function UserFormModal({
   kind,
   user,
   territories,
+  agrupadores,
   submitting,
   onClose,
   onSubmit,
@@ -676,6 +689,7 @@ function UserFormModal({
   kind: "invite" | "edit";
   user: UserRow | null;
   territories: string[];
+  agrupadores: AgrupadorLite[];
   submitting: boolean;
   onClose: () => void;
   onSubmit: (form: FormPayload) => void;
@@ -688,6 +702,9 @@ function UserFormModal({
   );
   const [selected, setSelected] = useState<string[]>(
     user?.allowed_territories ?? []
+  );
+  const [selectedAgrupadores, setSelectedAgrupadores] = useState<string[]>(
+    user?.allowed_agrupadores ?? []
   );
   const [canEditPtto, setCanEditPtto] = useState(
     user?.can_edit_ptto ?? false
@@ -712,6 +729,11 @@ function UserFormModal({
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
     );
   }
+  function toggleAgrupador(id: string) {
+    setSelectedAgrupadores((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
   function submit() {
     setLocalError(null);
@@ -723,9 +745,9 @@ function UserFormModal({
       setLocalError("Nombre completo es requerido");
       return;
     }
-    if (!allTerritories && selected.length === 0) {
+    if (!allTerritories && selected.length === 0 && selectedAgrupadores.length === 0) {
       setLocalError(
-        "Debe seleccionar al menos un territorio (o marcar 'Todos')"
+        "Selecciona al menos un territorio, marca 'Todos', o asigna un agrupador (caso KAM: solo agrupador, sin territorios)."
       );
       return;
     }
@@ -743,6 +765,7 @@ function UserFormModal({
       full_name: fullName.trim(),
       role,
       allowed_territories: allTerritories ? null : selected,
+      allowed_agrupadores: selectedAgrupadores.length ? selectedAgrupadores : null,
       can_edit_ptto: canEditPtto,
       can_export_excel: canExportExcel,
       ...(kind === "invite"
@@ -938,6 +961,47 @@ function UserFormModal({
                   );
                 })}
               </div>
+            )}
+          </Field>
+
+          <Field label="Agrupadores asignados (opcional)">
+            {agrupadores.filter((a) => a.is_active).length === 0 ? (
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                No hay agrupadores. Créalos en Territorios → Agrupadores.
+              </p>
+            ) : (
+              <div
+                className="grid max-h-44 grid-cols-2 gap-1 overflow-y-auto rounded-[var(--radius-sm)] border p-2"
+                style={{ background: "var(--bg-surface-muted)", borderColor: "var(--border)" }}
+              >
+                {agrupadores
+                  .filter((a) => a.is_active)
+                  .map((a) => {
+                    const checked = selectedAgrupadores.includes(a.id);
+                    return (
+                      <label
+                        key={a.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1 text-xs"
+                        style={{
+                          background: checked ? "var(--accent-soft)" : "transparent",
+                          color: checked ? "var(--accent)" : "var(--text-secondary)",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleAgrupador(a.id)}
+                        />
+                        <span className="truncate">{a.nombre}</span>
+                      </label>
+                    );
+                  })}
+              </div>
+            )}
+            {selectedAgrupadores.length > 0 && !allTerritories && selected.length === 0 && (
+              <p className="mt-1.5 text-[11px]" style={{ color: "var(--accent)" }}>
+                Acceso solo-agrupador (caso KAM): verá únicamente lo de su(s) agrupador(es).
+              </p>
             )}
           </Field>
 
