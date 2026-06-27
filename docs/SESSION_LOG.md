@@ -36,7 +36,7 @@
 | `app/dashboard/` | Dashboard principal con **7 tabs** (Tracking, Ventas, Grupo Producto, **Clientes y Productos**, Vendedores, Perdidos, **Insights**) — Productos+Clientes fusionados en V4.0 |
 | `app/admin/` | Panel admin (territorios, usuarios, audit, **configuración de sesión**) |
 | `app/cargar-datos/` | Refresh APIs + editor PTTO |
-| `app/api/` | API routes server-side (**31 endpoints** totales; +penetracion y penetracion-detalle del Insight Penetración/Canasta) |
+| `app/api/` | API routes server-side (**34 endpoints** totales; +penetracion/-detalle del Insight; +admin/agrupadores (CRUD), /delete, /options) |
 | `app/api/insights/` | Endpoints del tab Insights (`concentracion`, `item-detail`, **`precio-dispersion`**, **`cuadrante`**, **`estacionalidad`**) |
 | `app/api/dashboard/` | Endpoints del dashboard (incluye **`tracking-variedad`**, **`tracking-clientes-activos`** nuevos en V4.0) |
 | `components/dashboard/` | Componentes de los 7 tabs y charts (incl. `ClientesProductosTab`, `DimensionTab` generalizado, `ProductoDesglose`) |
@@ -52,7 +52,7 @@
 | `lib/format.ts` | Formatters (money, kilos, dates) — portado del V2.2 |
 | `lib/business-days.ts` | Cálculo de días hábiles L-S menos LFT + helpers `findCalendarDayForBizDays`, `computePrevYearAlDia` |
 | `lib/admin-guards.ts` | Guards de rol admin para API routes |
-| `supabase/migrations/` | **28 migraciones SQL aplicadas** (V4.0: 021-024 de Insights; 025_audit_action_session_user_values arregla el enum audit_action; 026_kpi_cliente_perdidos_por_nombre agrupa Perdidos por nombre; 027_rls_perf_wrap_functions_in_subquery arregla timeout de RLS por evaluación por-fila; 028_insights_penetracion funciones del Insight Penetración/Canasta) |
+| `supabase/migrations/` | **32 migraciones SQL aplicadas** (021-024 Insights; 025 enum audit_action; 026 Perdidos por nombre; 027 fix RLS timeout; 028 Insight Penetración; **029-032 Agrupadores**: 029 modelo, 030 RLS extendida, 031 opciones del picker, 032 my_agrupadores) |
 | `docs/` | Esta documentación (+ `LO_NUEVO.md` con resumen ejecutivo) |
 | `proxy.ts` | Middleware de Next.js 16 (renombrado de middleware.ts) — ahora valida sesión en cada request |
 | `.env.local` | Secrets (NO commit) |
@@ -567,6 +567,27 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 **Razón:** El bloqueo/acceso del usuario debe ser real y a nivel auth, no un flag que nadie lee. Confirmar el email al fijar password cierra el caso de "le pongo contraseña y no entra".
 **Nota / pendiente:** los usuarios YA desactivados antes de este fix **no quedaron baneados retroactivamente** (se banean la próxima vez que se les togglee). Si se quiere bloqueo inmediato de los inactivos actuales, banearlos de una vez (decisión de Mauricio).
 **Estado:** Vigente. Commit `1fff49c`.
+
+---
+
+### D038 — 2026-06-26 | Agrupadores (territorios virtuales) — Fase 1: modelo + admin + seguridad
+
+**Contexto:** Mauricio pidió un "agrupador" que cree un territorio virtual (unión configurable de territorio/grupo/familia/SKU/cliente) que aparezca en el sidebar como un territorio más, se administre como tal y se asigne a usuarios — para campañas por producto y para KAMs por cartera de clientes. Se hicieron 3 rondas de preguntas (AskUserQuestion) hasta cerrar requisitos.
+
+**Requisitos LOCKED:** agrupador = nombre + lista FIJA de miembros tipados; datos = UNIÓN de miembros; lente que se traslapa (no suma a "Todos"); frontera de seguridad real (RLS); puede ser el único acceso de un KAM; cliente por nombre; meta manual opcional; sidebar en sección aparte con ícono; admin en /admin/territorios; solo admin crea/asigna.
+
+**Decisión / Implementación (Fase 1, 6 chunks + commits):**
+1. **Modelo** (migr **029**): tablas `agrupadores` + `agrupador_members` (tipo+valor) + `users_permissions.allowed_agrupadores uuid[]`. Commit `b808bda`.
+2. **RLS** (migr **030**): `current_user_agrupador_scope()` / `current_user_scope_arrays()` (SECURITY DEFINER) + política de `sales_rows` extendida (territorio visible OR casa con agrupadores). Las `kpi_*` (security_invoker) propagan la RLS a TODO el dashboard. Validado: KAM ve solo su scope, 143ms barrido completo, funciones 1×/query. Commit `b808bda`.
+3. **Admin API** (migr 031 + endpoints): `/api/admin/agrupadores` (GET/POST), `/delete`, `/options`; `users/update` + `invite` aceptan `allowed_agrupadores`. Commit `8b9668c`.
+4. **Admin UI**: `AgrupadoresManager` en /admin/territorios (crear/editar + picker de miembros con buscador, ícono, meta). Commit `a5a406c`.
+5. **Asignación**: multi-select de agrupadores en el modal de /admin/usuarios; caso KAM (solo agrupador, sin territorios). Commit `c8ab045`.
+6. **Sidebar** (migr **032** `my_agrupadores`): sección "Agrupadores" (ícono+nombre) como contexto; para usuarios restringidos oculta territorios en $0 (vista limpia). Commit `48f6d82`.
+
+**Verificación end-to-end:** agrupador real "Chef Leo" (11 clientes). Un usuario restringido solo a él ve exactamente 11 clientes / 6 territorios / $141.98M y nada más (RLS). `my_agrupadores()` lo devuelve para el sidebar. Cada chunk con build+tsc verde.
+
+**Pendiente (Fase 2):** "vista enfocada" — que un usuario con acceso amplio (director) haga clic en un agrupador y el dashboard ENTERO se re-filtre a su scope. Requiere re-agregación por criterios no-territorio (el header y Tracking se agregan solo por territorio). Fase 3: meta manual (PTTO) + export/PDF.
+**Estado:** Vigente (Fase 1 completa). Commits `b808bda`, `8b9668c`, `a5a406c`, `c8ab045`, `48f6d82` + migraciones 029-032.
 
 ---
 
