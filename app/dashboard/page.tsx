@@ -258,7 +258,7 @@ function buildDimDataset<
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string; asOf?: string }>;
+  searchParams: Promise<{ year?: string; month?: string; asOf?: string; agrupador?: string }>;
 }) {
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -318,6 +318,18 @@ export default async function DashboardPage({
   const currentYear = isValidYearMonth ? yearParam : today.year;
   const currentMonth = isValidYearMonth ? monthParam : today.month;
 
+  // ===== Modo "vista enfocada de agrupador" (Fase 2) =====
+  // ?agrupador=<id>. Solo activo si el usuario tiene ESE agrupador asignado
+  // (si no, se ignora → modo normal). En este modo, los datasets CORE se cargan
+  // de las funciones agrupador_* (territorio = nombre del agrupador, 1 bucket).
+  const agrupadorParam =
+    typeof sp.agrupador === "string" && sp.agrupador !== "" ? sp.agrupador : null;
+  const activeAgrupador = agrupadorParam
+    ? agrupadores.find((a) => a.id === agrupadorParam) ?? null
+    : null;
+  const agrupadorId = activeAgrupador?.id ?? null;
+  const agrupadorNombre = activeAgrupador?.nombre ?? null;
+
   // ¿Estamos viendo el mes actual o un histórico?
   const isHistorical =
     currentYear !== today.year || currentMonth !== today.month;
@@ -374,6 +386,20 @@ export default async function DashboardPage({
   const elapsedBizDays = countBizDays(currentYear, currentMonth, daysCurrent);
   const totalBizDays = countBizDays(currentYear, currentMonth, null);
 
+  // En modo agrupador, los datasets CORE se cargan de las funciones agrupador_*
+  // (mismas columnas, territorio = nombre del agrupador) en vez de las vistas
+  // kpi_*. En modo normal (agrupadorId === null) queda IDÉNTICO a antes.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const coreSrc = (view: string, rpc: string, cols: string): any =>
+    agrupadorId
+      ? supabase.rpc(rpc, { p_id: agrupadorId })
+      : supabase.from(view).select(cols);
+  // Datasets NO-core (vendedor/perdidos/lifecycle/budgets): vacíos en modo
+  // agrupador (Fase 2 = core; esos tabs se ocultan).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const emptyIfAgrupador = (builder: any): any =>
+    agrupadorId ? Promise.resolve({ data: [] }) : builder;
+
   // Pull en paralelo: vista mensual agregada + estados + presupuestos +
   // vista diaria (current month + prev year same month, para Tracking Diario).
   // Las vistas evitan el limite default de 1000 filas que aplica a sales_rows.
@@ -385,35 +411,45 @@ export default async function DashboardPage({
     { data: dailyPrevYear },
     { data: dailyPrev2Year },
   ] = await Promise.all([
-    supabase
-      .from("kpi_monthly_summary")
-      .select("anio, mes, territorio, total_venta, total_margen, total_kg"),
+    coreSrc(
+      "kpi_monthly_summary",
+      "agrupador_monthly",
+      "anio, mes, territorio, total_venta, total_margen, total_kg"
+    ),
     supabase
       .from("territories_state")
       .select("territory_name, is_active, reason")
       .order("territory_name"),
-    supabase
-      .from("territory_budgets")
-      .select("territorio, venta_budget")
-      .eq("anio", currentYear)
-      .eq("mes", currentMonth),
-    supabase
-      .from("kpi_daily_summary")
-      .select("fecha, territorio, total_venta, total_margen, total_kg")
+    emptyIfAgrupador(
+      supabase
+        .from("territory_budgets")
+        .select("territorio, venta_budget")
+        .eq("anio", currentYear)
+        .eq("mes", currentMonth)
+    ),
+    coreSrc(
+      "kpi_daily_summary",
+      "agrupador_daily",
+      "fecha, territorio, total_venta, total_margen, total_kg"
+    )
       .eq("anio", currentYear)
       .eq("mes", currentMonth)
       .order("fecha"),
-    supabase
-      .from("kpi_daily_summary")
-      .select("fecha, territorio, total_venta, total_margen, total_kg")
+    coreSrc(
+      "kpi_daily_summary",
+      "agrupador_daily",
+      "fecha, territorio, total_venta, total_margen, total_kg"
+    )
       .eq("anio", currentYear - 1)
       .eq("mes", currentMonth)
       .order("fecha"),
     // Daily 2024 del mes actual — para sombreado al-día del slot del mes
     // actual del chart Ventas (Commit B Mejora 2)
-    supabase
-      .from("kpi_daily_summary")
-      .select("fecha, territorio, total_venta, total_margen, total_kg")
+    coreSrc(
+      "kpi_daily_summary",
+      "agrupador_daily",
+      "fecha, territorio, total_venta, total_margen, total_kg"
+    )
       .eq("anio", currentYear - 2)
       .eq("mes", currentMonth)
       .order("fecha"),
@@ -454,26 +490,34 @@ export default async function DashboardPage({
     { data: clienteRowsRaw },
     { data: vendedorRowsRaw },
   ] = await Promise.all([
-    supabase
-      .from("kpi_grupo_summary")
-      .select("territorio, grupo, anio, total_venta, total_kg, total_margen")
+    coreSrc(
+      "kpi_grupo_summary",
+      "agrupador_grupo_summary",
+      "territorio, grupo, anio, total_venta, total_kg, total_margen"
+    )
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
-    supabase
-      .from("kpi_sku_summary")
-      .select("territorio, sku, anio, total_venta, total_kg, total_margen")
+    coreSrc(
+      "kpi_sku_summary",
+      "agrupador_sku_summary",
+      "territorio, sku, anio, total_venta, total_kg, total_margen"
+    )
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
-    supabase
-      .from("kpi_cliente_summary")
-      .select("territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
+    coreSrc(
+      "kpi_cliente_summary",
+      "agrupador_cliente_summary",
+      "territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen"
+    )
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
-    supabase
-      .from("kpi_vendedor_summary")
-      .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
-      .in("anio", [currentYear - 2, currentYear - 1, currentYear])
-      .eq("mes", currentMonth),
+    emptyIfAgrupador(
+      supabase
+        .from("kpi_vendedor_summary")
+        .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
+        .in("anio", [currentYear - 2, currentYear - 1, currentYear])
+        .eq("mes", currentMonth)
+    ),
   ]);
 
   // ============ Queries "al día N" (Mejora 2: comparativos día-vs-día) ============
@@ -501,47 +545,38 @@ export default async function DashboardPage({
     { data: vendedorAlDia24 }, { data: vendedorAlDia25 }, { data: vendedorAlDia26 },
   ] = await Promise.all([
     // Grupo
-    supabase.from("kpi_grupo_diario")
-      .select("territorio, grupo, anio, total_venta, total_kg, total_margen")
+    coreSrc("kpi_grupo_diario", "agrupador_grupo_diario", "territorio, grupo, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24),
-    supabase.from("kpi_grupo_diario")
-      .select("territorio, grupo, anio, total_venta, total_kg, total_margen")
+    coreSrc("kpi_grupo_diario", "agrupador_grupo_diario", "territorio, grupo, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
-    supabase.from("kpi_grupo_diario")
-      .select("territorio, grupo, anio, total_venta, total_kg, total_margen")
+    coreSrc("kpi_grupo_diario", "agrupador_grupo_diario", "territorio, grupo, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
     // SKU
-    supabase.from("kpi_sku_diario")
-      .select("territorio, sku, anio, total_venta, total_kg, total_margen")
+    coreSrc("kpi_sku_diario", "agrupador_sku_diario", "territorio, sku, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24),
-    supabase.from("kpi_sku_diario")
-      .select("territorio, sku, anio, total_venta, total_kg, total_margen")
+    coreSrc("kpi_sku_diario", "agrupador_sku_diario", "territorio, sku, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
-    supabase.from("kpi_sku_diario")
-      .select("territorio, sku, anio, total_venta, total_kg, total_margen")
+    coreSrc("kpi_sku_diario", "agrupador_sku_diario", "territorio, sku, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
     // Cliente — incluye no_cliente para que el tab Perdidos pueda mergear
     // los acumulados al-día N por cliente único (no por nombre, que puede
     // colisionar entre clientes distintos con el mismo nombre).
-    supabase.from("kpi_cliente_diario")
-      .select("territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
+    coreSrc("kpi_cliente_diario", "agrupador_cliente_diario", "territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24),
-    supabase.from("kpi_cliente_diario")
-      .select("territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
+    coreSrc("kpi_cliente_diario", "agrupador_cliente_diario", "territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
-    supabase.from("kpi_cliente_diario")
-      .select("territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
+    coreSrc("kpi_cliente_diario", "agrupador_cliente_diario", "territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
-    // Vendedor
-    supabase.from("kpi_vendedor_diario")
+    // Vendedor (no-core: vacío en modo agrupador)
+    emptyIfAgrupador(supabase.from("kpi_vendedor_diario")
       .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
-      .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24),
-    supabase.from("kpi_vendedor_diario")
+      .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24)),
+    emptyIfAgrupador(supabase.from("kpi_vendedor_diario")
       .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
-      .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
-    supabase.from("kpi_vendedor_diario")
+      .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25)),
+    emptyIfAgrupador(supabase.from("kpi_vendedor_diario")
       .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
-      .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
+      .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26)),
   ]);
 
   // Combinar las 3 queries de cada dimensión en 1 array para mergeAlDia
@@ -577,15 +612,19 @@ export default async function DashboardPage({
     { data: clientePerdidosRows },
     { data: clienteLifecycleRows },
   ] = await Promise.all([
-    supabase
-      .from("kpi_cliente_perdidos")
-      .select(
-        "anio, no_cliente, cliente, vendedor, territorio, mes_venta, mes_kg, mes_margen, ytd_venta, ytd_kg, ytd_margen"
-      )
-      .in("anio", [currentYear - 2, currentYear - 1, currentYear]),
-    supabase
-      .from("kpi_cliente_lifecycle")
-      .select("no_cliente, first_purchase_date, last_purchase_date"),
+    emptyIfAgrupador(
+      supabase
+        .from("kpi_cliente_perdidos")
+        .select(
+          "anio, no_cliente, cliente, vendedor, territorio, mes_venta, mes_kg, mes_margen, ytd_venta, ytd_kg, ytd_margen"
+        )
+        .in("anio", [currentYear - 2, currentYear - 1, currentYear])
+    ),
+    emptyIfAgrupador(
+      supabase
+        .from("kpi_cliente_lifecycle")
+        .select("no_cliente, first_purchase_date, last_purchase_date")
+    ),
   ]);
 
   // Map UPPER(no_cliente) → first_purchase_date (la más temprana). Se normaliza
@@ -606,8 +645,19 @@ export default async function DashboardPage({
   // Build datasets para grupos, clientes y vendedores via helper genérico.
   // Después mergeamos los acumulados "al día N" para los charts con
   // sombreado YoY día-vs-día (Mejora 2).
+  // En modo agrupador, las fuentes vienen de funciones (tipadas any), así que
+  // casteamos a la forma de fila que espera el helper (con su dimensión).
+  type DimRow<K extends string> = {
+    territorio: string;
+    anio: number;
+    total_venta: number | string | null;
+    total_kg: number | string | null;
+    total_margen: number | string | null;
+    empresa?: number;
+  } & Record<K, string>;
+
   const gruposBase = buildDimDataset(
-    grupoRowsRaw,
+    grupoRowsRaw as DimRow<"grupo">[],
     (r) => r.grupo,
     currentYear
   );
@@ -619,7 +669,7 @@ export default async function DashboardPage({
   );
 
   const clientesBase = buildDimDataset(
-    clienteRowsRaw,
+    clienteRowsRaw as DimRow<"cliente">[],
     (r) => r.cliente,
     currentYear
   );
@@ -632,7 +682,7 @@ export default async function DashboardPage({
   // Vendedores: 2 datasets para soportar toggle Sus/Suve
   // Separados (con sufijo): replica V2.2, una fila por (vendedor, empresa)
   const vendedoresSeparadosBase = buildDimDataset(
-    vendedorRowsRaw,
+    vendedorRowsRaw as DimRow<"vendedor">[],
     (r) => `${r.vendedor} (${r.empresa === 0 ? "Sus" : "Suve"})`,
     currentYear
   );
@@ -645,7 +695,7 @@ export default async function DashboardPage({
   );
   // Unidos (sin sufijo): aggrega ambas empresas por persona
   const vendedoresUnidosBase = buildDimDataset(
-    vendedorRowsRaw,
+    vendedorRowsRaw as DimRow<"vendedor">[],
     (r) => r.vendedor,
     currentYear
   );
@@ -982,7 +1032,11 @@ export default async function DashboardPage({
   );
 
   // states es la fuente de verdad para la lista completa de territorios.
-  const uniqueNames = (states ?? []).map((s) => s.territory_name);
+  // En modo agrupador, la lista es un único bucket sintético = el agrupador.
+  const uniqueNames =
+    agrupadorId && agrupadorNombre
+      ? [agrupadorNombre]
+      : (states ?? []).map((s) => s.territory_name);
 
   // Agrega del summary: current month + prev year same month + acum por año
   const kpiByTerritory = new Map<string, TerritoryKpi>();
