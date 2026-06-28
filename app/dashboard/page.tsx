@@ -1297,6 +1297,7 @@ export default async function DashboardPage({
         territories={territories}
         agrupadores={agrupadores}
         restrictedView={restrictedView}
+        currentAgrupadorId={agrupadorId}
         totalKpi={totalKpi}
         totalVentaBudget={totalVentaBudget}
         currentMonthLabel={currentMonthLabel}

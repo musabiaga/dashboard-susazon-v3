@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Layers,
   AlertTriangle,
@@ -94,6 +95,8 @@ interface SidebarProps {
   agrupadores?: { id: string; nombre: string; icono: string | null }[];
   /** Si true, oculta los territorios en $0 (vista limpia para KAM/restringido). */
   restrictedView?: boolean;
+  /** Id del agrupador activo (modo "vista enfocada", Fase 2). null = normal. */
+  currentAgrupadorId?: string | null;
   /** Selección uni-select. "" = modo "Todos" (agregado). */
   selected: string;
   onSelect: (name: string) => void;
@@ -130,6 +133,7 @@ export function Sidebar({
   territories,
   agrupadores = [],
   restrictedView = false,
+  currentAgrupadorId = null,
   selected,
   onSelect,
   totalKpi,
@@ -139,6 +143,7 @@ export function Sidebar({
   collapsed,
   onToggleCollapsed,
 }: SidebarProps) {
+  const router = useRouter();
   // Vista restringida (KAM/vendedor con acceso acotado): ocultar territorios
   // sin datos ($0) para que vea solo lo suyo. Los $0 no suman al total igual.
   const shown = restrictedView
@@ -222,6 +227,18 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
+        {/* Modo agrupador: salida a la vista normal de territorios */}
+        {currentAgrupadorId && (
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard")}
+            className="mb-2 flex w-full items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-sm font-medium transition-colors hover:opacity-90"
+            style={{ color: "var(--accent)", background: "var(--accent-soft)" }}
+            title="Salir de la vista de agrupador"
+          >
+            <span aria-hidden="true">←</span> Volver a Territorios
+          </button>
+        )}
         {/* "Todos" — modo agregado, con ⚙️ al lado para configurar el set */}
         <AggregatedItem
           selected={selected === ""}
@@ -284,12 +301,19 @@ export function Sidebar({
             </div>
             {agrupadores.map((a) => {
               const Icon = agrupadorIcon(a.icono);
+              const isActive = a.id === currentAgrupadorId;
               return (
-                <div
+                <button
                   key={a.id}
-                  className="flex items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-sm"
-                  style={{ color: "var(--text-primary)" }}
-                  title="Vista enfocada del agrupador — próximamente"
+                  type="button"
+                  onClick={() => router.push(`/dashboard?agrupador=${a.id}`)}
+                  className="flex w-full items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-surface-muted)]"
+                  style={{
+                    background: isActive ? "var(--accent-soft)" : "transparent",
+                    color: isActive ? "var(--accent)" : "var(--text-primary)",
+                    fontWeight: isActive ? 600 : 400,
+                  }}
+                  title="Ver el dashboard enfocado a este agrupador"
                 >
                   <span
                     className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
@@ -298,15 +322,9 @@ export function Sidebar({
                     <Icon size={13} />
                   </span>
                   <span className="flex-1 truncate">{a.nombre}</span>
-                </div>
+                </button>
               );
             })}
-            <div
-              className="px-3 pt-0.5 text-[10px]"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Tu vista ya está acotada a {agrupadores.length === 1 ? "este agrupador" : "tus agrupadores"}.
-            </div>
           </>
         )}
       </nav>

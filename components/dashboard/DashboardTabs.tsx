@@ -40,6 +40,8 @@ interface DashboardTabsProps {
   active: TabKey;
   onChange: (key: TabKey) => void;
   children: ReactNode;
+  /** Tabs a ocultar (ej. en modo agrupador: los no-core). */
+  hiddenTabs?: TabKey[];
 }
 
 /**
@@ -51,7 +53,9 @@ export function DashboardTabs({
   active,
   onChange,
   children,
+  hiddenTabs = [],
 }: DashboardTabsProps) {
+  const visibleTabs = TABS.filter((t) => !hiddenTabs.includes(t.key));
   return (
     <div className="flex flex-col">
       <div
@@ -59,7 +63,7 @@ export function DashboardTabs({
         style={{ borderColor: "var(--border)" }}
         role="tablist"
       >
-        {TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const isActive = tab.key === active;
           return (
             <button

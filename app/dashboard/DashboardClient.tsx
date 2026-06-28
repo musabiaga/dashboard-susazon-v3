@@ -47,6 +47,8 @@ interface DashboardClientProps {
   /** True = acceso restringido (no ve todos los territorios) → el sidebar
    *  oculta los territorios en $0 (vista limpia para KAM/vendedor). */
   restrictedView?: boolean;
+  /** Id del agrupador activo (modo "vista enfocada", Fase 2). null = normal. */
+  currentAgrupadorId?: string | null;
   totalKpi: TerritoryKpi;
   totalVentaBudget: number;
   // Nombre del mes actual ya formateado en el server, para evitar timezone issues
@@ -153,6 +155,7 @@ export function DashboardClient({
   newCustomerCutoffDate,
   agrupadores = [],
   restrictedView = false,
+  currentAgrupadorId = null,
 }: DashboardClientProps) {
   // Selección uni-select del sidebar: "" = modo "Todos", o nombre = single.
   // No persiste — cada sesión arranca en "Todos" para mantener UX previa.
@@ -238,6 +241,17 @@ export function DashboardClient({
   };
 
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
+  // ===== Modo "vista enfocada de agrupador" (Fase 2) =====
+  const agrupadorMode = !!currentAgrupadorId;
+  // Tabs no disponibles en modo agrupador (Fase 2 = core). Si entras estando en
+  // uno de esos, vuelve a un tab core.
+  const NONCORE_TABS: TabKey[] = ["vendedores", "perdidos", "insights"];
+  useEffect(() => {
+    if (agrupadorMode && NONCORE_TABS.includes(activeTab)) {
+      setActiveTab("tracking");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agrupadorMode]);
 
   // Estado de sidebar collapsible. Default = abierto.
   // Se persiste en localStorage para que recuerde la preferencia del usuario
@@ -464,6 +478,7 @@ export function DashboardClient({
         territories={territories}
         agrupadores={agrupadores}
         restrictedView={restrictedView}
+        currentAgrupadorId={currentAgrupadorId}
         selected={effectiveSelected}
         onSelect={setSelectedTerritory}
         totalKpi={
@@ -582,7 +597,11 @@ export function DashboardClient({
           <KpiCardsRow data={activeKpiData} loading={false} />
 
           {/* Tabs */}
-          <DashboardTabs active={activeTab} onChange={setActiveTab}>
+          <DashboardTabs
+            active={activeTab}
+            onChange={setActiveTab}
+            hiddenTabs={agrupadorMode ? NONCORE_TABS : undefined}
+          >
             {(() => {
               // Resolución de rows según el modo de selección.
               //   single             → ese territorio directo
