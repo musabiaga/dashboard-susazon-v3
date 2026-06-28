@@ -52,7 +52,7 @@
 | `lib/format.ts` | Formatters (money, kilos, dates) — portado del V2.2 |
 | `lib/business-days.ts` | Cálculo de días hábiles L-S menos LFT + helpers `findCalendarDayForBizDays`, `computePrevYearAlDia` |
 | `lib/admin-guards.ts` | Guards de rol admin para API routes |
-| `supabase/migrations/` | **32 migraciones SQL aplicadas** (021-024 Insights; 025 enum audit_action; 026 Perdidos por nombre; 027 fix RLS timeout; 028 Insight Penetración; **029-032 Agrupadores**: 029 modelo, 030 RLS extendida, 031 opciones del picker, 032 my_agrupadores) |
+| `supabase/migrations/` | **33 migraciones SQL aplicadas** (021-024 Insights; 025 enum audit_action; 026 Perdidos por nombre; 027 fix RLS timeout; 028 Insight Penetración; **029-033 Agrupadores**: 029 modelo, 030 RLS extendida, 031 opciones picker, 032 my_agrupadores, 033 agregaciones de la vista enfocada Fase 2) |
 | `docs/` | Esta documentación (+ `LO_NUEVO.md` con resumen ejecutivo) |
 | `proxy.ts` | Middleware de Next.js 16 (renombrado de middleware.ts) — ahora valida sesión en cada request |
 | `.env.local` | Secrets (NO commit) |
@@ -588,6 +588,23 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 
 **Pendiente (Fase 2):** "vista enfocada" — que un usuario con acceso amplio (director) haga clic en un agrupador y el dashboard ENTERO se re-filtre a su scope. Requiere re-agregación por criterios no-territorio (el header y Tracking se agregan solo por territorio). Fase 3: meta manual (PTTO) + export/PDF.
 **Estado:** Vigente (Fase 1 completa). Commits `b808bda`, `8b9668c`, `a5a406c`, `c8ab045`, `48f6d82` + migraciones 029-032.
+
+---
+
+### D039 — 2026-06-28 | Agrupadores Fase 2: vista enfocada (clic en agrupador → dashboard re-filtrado)
+
+**Contexto:** Cerrada la Fase 1 (seguridad/KAM), Mauricio pidió la "vista enfocada": que al hacer clic en un agrupador (director/admin con acceso amplio) el dashboard ENTERO se re-filtre a ese scope. Alcance acordado (AskUserQuestion): **core primero** (header + Ventas + Grupo + Clientes/Productos + Tracking; Perdidos/Vendedores/Insights después) y **same-page** vía `?agrupador=<id>`.
+
+**Reto:** las ~13 vistas `kpi_*` están agregadas por `territorio`; no se pueden sub-filtrar por cliente/SKU. Solución: **agrupador como "territorio sintético"** — funciones que agregan sobre la unión de miembros y devuelven `territorio = nombre del agrupador` → el render client-side se reutiliza entero.
+
+**Implementación (3 chunks):**
+1. **Backend** (migr **033**): 9 funciones `agrupador_*` (member_arrays helper SECURITY DEFINER gateado + monthly/daily/grupo/sku/cliente summary+diario, SECURITY INVOKER). Validado: Chef Leo = $142,051,042 idéntico a la consulta directa; monthly=grupo=daily. Commit `56b8e6d`.
+2. **page.tsx** (chunk 2): helpers `coreSrc()`/`emptyIfAgrupador()` — cuando `?agrupador=<id>` (validado vía my_agrupadores) cargan de las funciones; **modo normal queda IDÉNTICO** (riesgo cero). uniqueNames=[nombre]. Commit `6b58cb3`.
+3. **Frontend** (chunk 3): sidebar agrupadores clickeables → `?agrupador=<id>` (resalta activo) + "← Volver a Territorios"; `DashboardTabs.hiddenTabs` oculta los no-core en modo agrupador. Commit `c0e2563`.
+
+**Decisión clave:** disciplina `agrupadorId ? <nuevo> : <original exacto>` en page.tsx → el dashboard de territorios de todos los usuarios queda intacto; el modo agrupador es opt-in por URL.
+**Pendiente (Fase 2b/3):** Perdidos/Vendedores/Insights en modo agrupador; meta manual (PTTO sintético) por agrupador; export.
+**Estado:** Vigente (Fase 2 core completa). Commits `56b8e6d`, `6b58cb3`, `c0e2563` + migración 033.
 
 ---
 
