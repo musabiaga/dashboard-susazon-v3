@@ -511,13 +511,13 @@ export default async function DashboardPage({
     )
       .in("anio", [currentYear - 2, currentYear - 1, currentYear])
       .eq("mes", currentMonth),
-    emptyIfAgrupador(
-      supabase
-        .from("kpi_vendedor_summary")
-        .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
-        .in("anio", [currentYear - 2, currentYear - 1, currentYear])
-        .eq("mes", currentMonth)
-    ),
+    coreSrc(
+      "kpi_vendedor_summary",
+      "agrupador_vendedor_summary",
+      "territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen"
+    )
+      .in("anio", [currentYear - 2, currentYear - 1, currentYear])
+      .eq("mes", currentMonth),
   ]);
 
   // ============ Queries "al día N" (Mejora 2: comparativos día-vs-día) ============
@@ -567,16 +567,13 @@ export default async function DashboardPage({
       .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
     coreSrc("kpi_cliente_diario", "agrupador_cliente_diario", "territorio, no_cliente, cliente, anio, total_venta, total_kg, total_margen")
       .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
-    // Vendedor (no-core: vacío en modo agrupador)
-    emptyIfAgrupador(supabase.from("kpi_vendedor_diario")
-      .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
-      .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24)),
-    emptyIfAgrupador(supabase.from("kpi_vendedor_diario")
-      .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
-      .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25)),
-    emptyIfAgrupador(supabase.from("kpi_vendedor_diario")
-      .select("territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
-      .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26)),
+    // Vendedor
+    coreSrc("kpi_vendedor_diario", "agrupador_vendedor_diario", "territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear - 2).eq("mes", currentMonth).lte("dia", cutoff24),
+    coreSrc("kpi_vendedor_diario", "agrupador_vendedor_diario", "territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear - 1).eq("mes", currentMonth).lte("dia", cutoff25),
+    coreSrc("kpi_vendedor_diario", "agrupador_vendedor_diario", "territorio, vendedor, empresa, anio, total_venta, total_kg, total_margen")
+      .eq("anio", currentYear).eq("mes", currentMonth).lte("dia", cutoff26),
   ]);
 
   // Combinar las 3 queries de cada dimensión en 1 array para mergeAlDia

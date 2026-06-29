@@ -245,7 +245,7 @@ export function DashboardClient({
   const agrupadorMode = !!currentAgrupadorId;
   // Tabs no disponibles en modo agrupador (Fase 2 = core). Si entras estando en
   // uno de esos, vuelve a un tab core.
-  const NONCORE_TABS: TabKey[] = ["vendedores", "perdidos", "insights"];
+  const NONCORE_TABS: TabKey[] = ["perdidos", "insights"];
   useEffect(() => {
     if (agrupadorMode && NONCORE_TABS.includes(activeTab)) {
       setActiveTab("tracking");
