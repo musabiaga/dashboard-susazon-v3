@@ -609,18 +609,16 @@ export default async function DashboardPage({
     { data: clientePerdidosRows },
     { data: clienteLifecycleRows },
   ] = await Promise.all([
-    emptyIfAgrupador(
-      supabase
-        .from("kpi_cliente_perdidos")
-        .select(
-          "anio, no_cliente, cliente, vendedor, territorio, mes_venta, mes_kg, mes_margen, ytd_venta, ytd_kg, ytd_margen"
-        )
-        .in("anio", [currentYear - 2, currentYear - 1, currentYear])
-    ),
-    emptyIfAgrupador(
-      supabase
-        .from("kpi_cliente_lifecycle")
-        .select("no_cliente, first_purchase_date, last_purchase_date")
+    coreSrc(
+      "kpi_cliente_perdidos",
+      "agrupador_cliente_perdidos",
+      "anio, no_cliente, cliente, vendedor, territorio, mes_venta, mes_kg, mes_margen, ytd_venta, ytd_kg, ytd_margen"
+    )
+      .in("anio", [currentYear - 2, currentYear - 1, currentYear]),
+    coreSrc(
+      "kpi_cliente_lifecycle",
+      "agrupador_cliente_lifecycle",
+      "no_cliente, first_purchase_date, last_purchase_date"
     ),
   ]);
 
