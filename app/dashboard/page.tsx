@@ -292,8 +292,8 @@ export default async function DashboardPage({
   // bandera de vista restringida (no ve todos los territorios → sidebar limpio).
   const { data: myAgrupadores } = await supabase.rpc("my_agrupadores");
   const agrupadores = (
-    (myAgrupadores ?? []) as { id: string; nombre: string; icono: string | null }[]
-  ).map((a) => ({ id: a.id, nombre: a.nombre, icono: a.icono ?? null }));
+    (myAgrupadores ?? []) as { id: string; nombre: string; icono: string | null; meta_mensual: number | null }[]
+  ).map((a) => ({ id: a.id, nombre: a.nombre, icono: a.icono ?? null, meta_mensual: a.meta_mensual ?? null }));
   const restrictedView = permissions?.allowed_territories != null;
 
   // "Hoy" en zona horaria CDMX (UTC-6). Vercel corre en UTC, entonces si
@@ -1156,6 +1156,13 @@ export default async function DashboardPage({
       row.territorio,
       Number(row.venta_budget) || 0
     );
+  }
+  // Modo agrupador (Fase 3): el PTTO del header = meta_mensual manual del
+  // agrupador (venta), inyectada como budget del territorio sintético. Alimenta
+  // ventaBudget + totalVentaBudget → el cumplimiento del header sale igual que
+  // para un territorio. Si no hay meta capturada, queda 0 (cumplimiento oculto).
+  if (agrupadorId && agrupadorNombre) {
+    budgetByTerritory.set(agrupadorNombre, Number(activeAgrupador?.meta_mensual) || 0);
   }
 
   const territories: Territory[] = uniqueNames.map((name) => {

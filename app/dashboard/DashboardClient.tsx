@@ -369,6 +369,26 @@ export function DashboardClient({
   // Null cuando no hay nada que reportar (aggregated-none).
   const reportInput: BuildReportInput | null = useMemo(() => {
     if (selectionMode === "aggregated-none") return null;
+    // Modo agrupador (Fase 3): reporte del territorio sintético (nombre del
+    // agrupador). Se salta el filtro REPORT_TERRITORIES (que es para el universo
+    // de territorios reales); usa el kpi + meta ya agregados. El PDF sale
+    // titulado con el nombre del agrupador y su cumplimiento vs meta_mensual.
+    if (agrupadorMode) {
+      const nombre = territories[0]?.name;
+      if (!nombre) return null;
+      return {
+        territories,
+        selectedKpi: activeKpi,
+        selectedBudget: activeBudget,
+        mode: { kind: "single", territory: nombre },
+        currentYear,
+        currentMonth,
+        daysCurrent,
+        elapsedBizDays,
+        totalBizDays,
+        clientes,
+      };
+    }
     const reportSet = new Set<string>(REPORT_TERRITORIES);
     let mode: ReportMode;
     if (selectionMode === "single") {
@@ -403,6 +423,7 @@ export function DashboardClient({
       clientes,
     };
   }, [
+    agrupadorMode,
     selectionMode,
     effectiveSelected,
     activeTerritoryNames,
