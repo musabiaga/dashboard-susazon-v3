@@ -65,6 +65,8 @@ interface Props {
   today: { year: number; month: number; day: number };
   territorios: string[] | null;
   contextLabel: string;
+  /** Modo agrupador (Fase 2b): acota el scope a los miembros del agrupador. */
+  agrupadorId?: string | null;
 }
 
 interface ClienteRow {
@@ -115,7 +117,7 @@ function territoriosKeyOf(t: string[] | null): string {
   return t === null ? "__ALL__" : t.length === 0 ? "__NONE__" : t.slice().sort().join("|");
 }
 
-export function PrecioAnalysis({ today, territorios, contextLabel }: Props) {
+export function PrecioAnalysis({ today, territorios, contextLabel, agrupadorId = null }: Props) {
   const initialRange: DateRange = useMemo(
     () => ({
       from: `${today.year}-${String(today.month).padStart(2, "0")}-01`,
@@ -186,7 +188,7 @@ export function PrecioAnalysis({ today, territorios, contextLabel }: Props) {
   // Fetch lista de items (selector)
   useEffect(() => {
     let cancelled = false;
-    if (tKey === "__NONE__") {
+    if (!agrupadorId && tKey === "__NONE__") {
       setItems([]);
       return;
     }
@@ -196,6 +198,7 @@ export function PrecioAnalysis({ today, territorios, contextLabel }: Props) {
     params.set("to", range.to);
     params.set("level", level);
     if (territorios !== null) params.set("territorios", territorios.join(","));
+    if (agrupadorId) params.set("agrupador", agrupadorId);
     fetch(`/api/insights/precio-dispersion?${params.toString()}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -221,12 +224,12 @@ export function PrecioAnalysis({ today, territorios, contextLabel }: Props) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range.from, range.to, level, tKey]);
+  }, [range.from, range.to, level, tKey, agrupadorId]);
 
   // Fetch detalle del item seleccionado
   useEffect(() => {
     let cancelled = false;
-    if (!item || tKey === "__NONE__") {
+    if (!item || (!agrupadorId && tKey === "__NONE__")) {
       setDetail(null);
       return;
     }
@@ -238,6 +241,7 @@ export function PrecioAnalysis({ today, territorios, contextLabel }: Props) {
     params.set("level", level);
     params.set("item", item);
     if (territorios !== null) params.set("territorios", territorios.join(","));
+    if (agrupadorId) params.set("agrupador", agrupadorId);
     fetch(`/api/insights/precio-dispersion?${params.toString()}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -256,7 +260,7 @@ export function PrecioAnalysis({ today, territorios, contextLabel }: Props) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range.from, range.to, level, item, tKey]);
+  }, [range.from, range.to, level, item, tKey, agrupadorId]);
 
   // ===== Derivados: piso de volumen + umbral + oportunidad =====
   const avg = detail?.universe?.precioKg ?? 0;

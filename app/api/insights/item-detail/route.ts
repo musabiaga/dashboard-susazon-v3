@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { agrupadorOrFilter } from "@/lib/insightsAgrupador";
 
 /**
  * GET /api/insights/item-detail
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
   const toParam = sp.get("to") ?? "";
   const dimension = (sp.get("dimension") ?? "").toLowerCase();
   const name = sp.get("name") ?? "";
+  const agrupadorId = sp.get("agrupador") || null;
   // Mismo patrón que /concentracion: null = todos visibles por RLS,
   // "" = array vacío (cero), CSV = filtrar a esos territorios.
   const territoriosParamRaw = sp.get("territorios");
@@ -89,14 +91,19 @@ export async function GET(request: NextRequest) {
   // Para grupos y productos: agrupar por cliente (resume cuáles clientes
   // compraron ese grupo/producto). Para clientes: agrupar por fecha
   // (= facturas individuales del cliente).
-  // Si territoriosFilter es array vacío → no hay nada que mostrar
-  if (territoriosFilter !== null && territoriosFilter.length === 0) {
+  // Si territoriosFilter es array vacío → no hay nada que mostrar (no aplica en
+  // modo agrupador, donde el scope lo define la unión de miembros)
+  if (!agrupadorId && territoriosFilter !== null && territoriosFilter.length === 0) {
     return NextResponse.json({
       kind: dimension === "clientes" ? "facturas_por_fecha" : "clientes_por_dim",
       total_records: 0,
       items: [],
     });
   }
+
+  // Modo agrupador: filtro .or() por miembros (se computa una vez, se aplica a
+  // ambas ramas). En modo normal es null → cada query usa territorios.
+  const orFilter = await agrupadorOrFilter(supabase, agrupadorId);
 
   if (dimension === "clientes") {
     // Para clientes: devolver filas por fecha (agregadas si hay múltiples
@@ -108,7 +115,9 @@ export async function GET(request: NextRequest) {
       .eq(column, name)
       .gte("fecha", fromParam)
       .lte("fecha", toParam);
-    if (territoriosFilter !== null) {
+    if (orFilter) {
+      query = query.or(orFilter);
+    } else if (territoriosFilter !== null) {
       query = query.in("territorio", territoriosFilter);
     }
     const { data, error } = await query
@@ -185,7 +194,9 @@ export async function GET(request: NextRequest) {
     .eq(column, name)
     .gte("fecha", fromParam)
     .lte("fecha", toParam);
-  if (territoriosFilter !== null) {
+  if (orFilter) {
+    query2 = query2.or(orFilter);
+  } else if (territoriosFilter !== null) {
     query2 = query2.in("territorio", territoriosFilter);
   }
   const { data, error } = await query2.limit(50000); // hasta 50k filas; el GROUP BY queda client-side

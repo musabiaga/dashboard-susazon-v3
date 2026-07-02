@@ -145,12 +145,15 @@ interface Props {
   territorios: string[] | null;
   /** Etiqueta del contexto para mostrar al usuario qué está viendo. */
   contextLabel: string;
+  /** Modo agrupador (Fase 2b): acota el scope a los miembros del agrupador. */
+  agrupadorId?: string | null;
 }
 
 export function ConcentracionAnalysis({
   today,
   territorios,
   contextLabel,
+  agrupadorId = null,
 }: Props) {
   // ============== Estado de controles ==============
   const initialRange: DateRange = useMemo(
@@ -284,9 +287,12 @@ export function ConcentracionAnalysis({
       to: range.to,
       dimension,
     });
-    // Filtro de territorios: null = no param (todos visibles via RLS),
-    // [] = param vacío ("") = 0 resultados, [X,Y] = CSV
-    if (territoriosKey === "__NONE__") {
+    // Modo agrupador: solo mandamos &agrupador (el backend acota por miembros
+    // e ignora territorios). Modo normal: null = no param (todos visibles via
+    // RLS), [] = param vacío ("") = 0 resultados, [X,Y] = CSV.
+    if (agrupadorId) {
+      params.set("agrupador", agrupadorId);
+    } else if (territoriosKey === "__NONE__") {
       params.set("territorios", "");
     } else if (territoriosKey !== "__ALL__") {
       params.set("territorios", territoriosKey.split("|").join(","));
@@ -317,7 +323,7 @@ export function ConcentracionAnalysis({
     return () => {
       cancelled = true;
     };
-  }, [range.from, range.to, dimension, territoriosKey]);
+  }, [range.from, range.to, dimension, territoriosKey, agrupadorId]);
 
   // ============== Items EXCLUIDOS del universo ==============
   // Set de los excluidos para la dimensión actual. Estos items NO se
@@ -674,8 +680,10 @@ export function ConcentracionAnalysis({
         dimension,
         name: itemName,
       });
-      // Mismo filtro de territorios que el endpoint principal
-      if (territoriosKey === "__NONE__") {
+      // Mismo filtro que el endpoint principal (agrupador tiene prioridad)
+      if (agrupadorId) {
+        params.set("agrupador", agrupadorId);
+      } else if (territoriosKey === "__NONE__") {
         params.set("territorios", "");
       } else if (territoriosKey !== "__ALL__") {
         params.set("territorios", territoriosKey.split("|").join(","));

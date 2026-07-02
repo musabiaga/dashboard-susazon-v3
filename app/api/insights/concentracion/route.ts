@@ -94,12 +94,13 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Llamar la función RPC
+  // Llamar la función RPC (p_agrupador_id: modo agrupador Fase 2b)
   const { data, error } = await supabase.rpc("insights_concentracion", {
     p_from: fromParam,
     p_to: toParam,
     p_dimension: dimensionParam,
     p_territorios: territoriosFilter,
+    p_agrupador_id: sp.get("agrupador") || null,
   });
 
   if (error) {

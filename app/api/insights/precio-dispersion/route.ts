@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { agrupadorOrFilter } from "@/lib/insightsAgrupador";
 
 /**
  * GET /api/insights/precio-dispersion
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
   const toParam = sp.get("to") ?? "";
   const level = (sp.get("level") ?? "sku").toLowerCase();
   const item = sp.get("item");
+  const agrupadorId = sp.get("agrupador") || null;
 
   const territoriosParamRaw = sp.get("territorios");
   let territoriosFilter: string[] | null;
@@ -88,8 +90,9 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
-  // territorios vacío explícito → universo vacío
-  if (territoriosFilter !== null && territoriosFilter.length === 0) {
+  // territorios vacío explícito → universo vacío (no aplica en modo agrupador,
+  // donde el scope lo define la unión de miembros, no los territorios)
+  if (!agrupadorId && territoriosFilter !== null && territoriosFilter.length === 0) {
     return item
       ? NextResponse.json({ level, item, universe: null, clientes: [] })
       : NextResponse.json({ level, items: [] });
@@ -102,6 +105,7 @@ export async function GET(request: NextRequest) {
       p_to: toParam,
       p_level: level,
       p_territorios: territoriosFilter,
+      p_agrupador_id: agrupadorId,
     });
     if (error) {
       return NextResponse.json(
@@ -132,7 +136,11 @@ export async function GET(request: NextRequest) {
     .gte("fecha", fromParam)
     .lte("fecha", toParam)
     .gt("kg", 0);
-  if (territoriosFilter !== null) {
+  // Modo agrupador: acota a la unión de miembros vía .or(); si no, territorios.
+  const orFilter = await agrupadorOrFilter(supabase, agrupadorId);
+  if (orFilter) {
+    query = query.or(orFilter);
+  } else if (territoriosFilter !== null) {
     query = query.in("territorio", territoriosFilter);
   }
   const { data, error } = await query.limit(50000);

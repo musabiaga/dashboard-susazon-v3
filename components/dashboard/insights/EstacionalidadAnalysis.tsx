@@ -42,6 +42,8 @@ interface Props {
   today: { year: number; month: number; day: number };
   territorios: string[] | null;
   contextLabel: string;
+  /** Modo agrupador (Fase 2b): acota el scope a los miembros del agrupador. */
+  agrupadorId?: string | null;
 }
 
 interface Item {
@@ -89,7 +91,7 @@ function absColor(v: number, max: number): { bg: string; color: string } {
   return { bg: `rgba(217,119,87,${(a * 0.9).toFixed(2)})`, color: a > 0.55 ? "#fff" : "var(--text-primary)" };
 }
 
-export function EstacionalidadAnalysis({ today, territorios, contextLabel }: Props) {
+export function EstacionalidadAnalysis({ today, territorios, contextLabel, agrupadorId = null }: Props) {
   const years = useMemo(
     () => [today.year - 2, today.year - 1, today.year],
     [today.year]
@@ -134,7 +136,7 @@ export function EstacionalidadAnalysis({ today, territorios, contextLabel }: Pro
 
   useEffect(() => {
     let cancelled = false;
-    if (tKey === "__NONE__") {
+    if (!agrupadorId && tKey === "__NONE__") {
       setData(null);
       return;
     }
@@ -146,6 +148,7 @@ export function EstacionalidadAnalysis({ today, territorios, contextLabel }: Pro
     params.set("metric", metric);
     params.set("topN", String(topN));
     if (territorios !== null) params.set("territorios", territorios.join(","));
+    if (agrupadorId) params.set("agrupador", agrupadorId);
     fetch(`/api/insights/estacionalidad?${params.toString()}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -164,7 +167,7 @@ export function EstacionalidadAnalysis({ today, territorios, contextLabel }: Pro
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, dimension, metric, topN, tKey]);
+  }, [year, dimension, metric, topN, tKey, agrupadorId]);
 
   const presentSet = useMemo(() => new Set(data?.monthsPresent ?? []), [data]);
   const nPresent = data?.monthsPresent.length ?? 0;

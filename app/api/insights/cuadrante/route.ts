@@ -47,6 +47,9 @@ export async function GET(request: NextRequest) {
   const fromParam = sp.get("from") ?? "";
   const toParam = sp.get("to") ?? "";
   const dimension = (sp.get("dimension") ?? "clientes").toLowerCase();
+  // Modo agrupador (Fase 2b): si viene, la función filtra por miembros y el
+  // territorios pasa a ignorarse. agrupador_member_arrays gatea al usuario.
+  const agrupadorId = sp.get("agrupador") || null;
 
   const territoriosParamRaw = sp.get("territorios");
   let territoriosFilter: string[] | null;
@@ -84,7 +87,7 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (territoriosFilter !== null && territoriosFilter.length === 0) {
+  if (!agrupadorId && territoriosFilter !== null && territoriosFilter.length === 0) {
     return NextResponse.json({
       dimension,
       from: fromParam,
@@ -122,6 +125,7 @@ export async function GET(request: NextRequest) {
     p_to_prev: prevTo,
     p_dimension: dimension,
     p_territorios: territoriosFilter,
+    p_agrupador_id: agrupadorId,
   });
 
   if (error) {

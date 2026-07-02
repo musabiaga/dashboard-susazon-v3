@@ -66,6 +66,8 @@ interface Props {
   today: { year: number; month: number; day: number };
   territorios: string[] | null;
   contextLabel: string;
+  /** Modo agrupador (Fase 2b): acota el scope a los miembros del agrupador. */
+  agrupadorId?: string | null;
 }
 
 interface ApiItem {
@@ -119,7 +121,7 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
-export function CuadranteAnalysis({ today, territorios, contextLabel }: Props) {
+export function CuadranteAnalysis({ today, territorios, contextLabel, agrupadorId = null }: Props) {
   const initialRange: DateRange = useMemo(
     () => ({
       from: `${today.year}-${String(today.month).padStart(2, "0")}-01`,
@@ -178,7 +180,7 @@ export function CuadranteAnalysis({ today, territorios, contextLabel }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    if (tKey === "__NONE__") {
+    if (!agrupadorId && tKey === "__NONE__") {
       setItems([]);
       setMeta(null);
       return;
@@ -190,6 +192,7 @@ export function CuadranteAnalysis({ today, territorios, contextLabel }: Props) {
     params.set("to", range.to);
     params.set("dimension", dimension);
     if (territorios !== null) params.set("territorios", territorios.join(","));
+    if (agrupadorId) params.set("agrupador", agrupadorId);
     fetch(`/api/insights/cuadrante?${params.toString()}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -221,7 +224,7 @@ export function CuadranteAnalysis({ today, territorios, contextLabel }: Props) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range.from, range.to, dimension, tKey]);
+  }, [range.from, range.to, dimension, tKey, agrupadorId]);
 
   // Separar comparables (con crecimiento) de nuevos (sin base).
   const comparables = useMemo(

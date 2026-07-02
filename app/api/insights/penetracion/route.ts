@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (territoriosFilter !== null && territoriosFilter.length === 0) {
+  if (!sp.get("agrupador") && territoriosFilter !== null && territoriosFilter.length === 0) {
     return NextResponse.json({ dimension, from: fromParam, to: toParam, items: [] });
   }
 
@@ -106,6 +106,7 @@ export async function GET(request: NextRequest) {
     p_to_prev: prevTo,
     p_dimension: dimension,
     p_territorios: territoriosFilter,
+    p_agrupador_id: sp.get("agrupador") || null,
   });
 
   if (error) {

@@ -61,6 +61,8 @@ interface Props {
   territorios: string[] | null;
   contextLabel: string;
   canExportExcel?: boolean;
+  /** Modo agrupador (Fase 2b): acota el scope a los miembros del agrupador. */
+  agrupadorId?: string | null;
 }
 
 interface ApiItem {
@@ -138,7 +140,7 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
-export function PenetracionAnalysis({ today, territorios, contextLabel, canExportExcel = false }: Props) {
+export function PenetracionAnalysis({ today, territorios, contextLabel, canExportExcel = false, agrupadorId = null }: Props) {
   // Default: YTD (1-ene → hoy). La comparación contra el año anterior es del
   // mismo tramo; el server capa al último día con datos.
   const initialRange: DateRange = useMemo(
@@ -208,7 +210,7 @@ export function PenetracionAnalysis({ today, territorios, contextLabel, canExpor
 
   useEffect(() => {
     let cancelled = false;
-    if (tKey === "__NONE__") {
+    if (!agrupadorId && tKey === "__NONE__") {
       setItems([]);
       setMeta(null);
       return;
@@ -220,6 +222,7 @@ export function PenetracionAnalysis({ today, territorios, contextLabel, canExpor
     params.set("to", range.to);
     params.set("dimension", dimension);
     if (territorios !== null) params.set("territorios", territorios.join(","));
+    if (agrupadorId) params.set("agrupador", agrupadorId);
     fetch(`/api/insights/penetracion?${params.toString()}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -251,7 +254,7 @@ export function PenetracionAnalysis({ today, territorios, contextLabel, canExpor
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range.from, range.to, dimension, tKey]);
+  }, [range.from, range.to, dimension, tKey, agrupadorId]);
 
   // Magnitud activa (pesos vs kilos) por item.
   const magOf = (i: ApiItem) => (isKg ? i.kgActual : i.ventaActual);
@@ -391,6 +394,7 @@ export function PenetracionAnalysis({ today, territorios, contextLabel, canExpor
     params.set("dimension", dimension);
     params.set("key", name);
     if (territorios !== null) params.set("territorios", territorios.join(","));
+    if (agrupadorId) params.set("agrupador", agrupadorId);
     fetch(`/api/insights/penetracion-detalle?${params.toString()}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -422,6 +426,7 @@ export function PenetracionAnalysis({ today, territorios, contextLabel, canExpor
       params.set("to", range.to);
       params.set("dimension", dim);
       if (territorios !== null) params.set("territorios", territorios.join(","));
+      if (agrupadorId) params.set("agrupador", agrupadorId);
       const r = await fetch(`/api/insights/penetracion?${params.toString()}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = (await r.json()) as { items?: ApiItem[] };

@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
   if (!key) {
     return NextResponse.json({ error: "Falta el parámetro key" }, { status: 400 });
   }
-  if (territoriosFilter !== null && territoriosFilter.length === 0) {
+  if (!sp.get("agrupador") && territoriosFilter !== null && territoriosFilter.length === 0) {
     return NextResponse.json({ dimension, key, items: [] });
   }
 
@@ -88,6 +88,7 @@ export async function GET(request: NextRequest) {
     p_dimension: dimension,
     p_key: key,
     p_territorios: territoriosFilter,
+    p_agrupador_id: sp.get("agrupador") || null,
   });
 
   if (error) {

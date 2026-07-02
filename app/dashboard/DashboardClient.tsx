@@ -243,9 +243,10 @@ export function DashboardClient({
   const [activeTab, setActiveTab] = useState<TabKey>("tracking");
   // ===== Modo "vista enfocada de agrupador" (Fase 2) =====
   const agrupadorMode = !!currentAgrupadorId;
-  // Tabs no disponibles en modo agrupador (Fase 2 = core). Si entras estando en
-  // uno de esos, vuelve a un tab core.
-  const NONCORE_TABS: TabKey[] = ["insights"];
+  // Tabs no disponibles en modo agrupador. Con Fase 2b (Vendedores, Perdidos e
+  // Insights ya soportan el modo agrupador) TODOS los tabs están disponibles →
+  // arreglo vacío. Se conserva el mecanismo por si algún tab futuro no aplica.
+  const NONCORE_TABS: TabKey[] = [];
   useEffect(() => {
     if (agrupadorMode && NONCORE_TABS.includes(activeTab)) {
       setActiveTab("tracking");
@@ -866,6 +867,7 @@ export function DashboardClient({
                     territorios={insightsTerritorios}
                     contextLabel={contextLabel}
                     canExportExcel={canExportExcel}
+                    agrupadorId={currentAgrupadorId}
                   />
                 );
               }

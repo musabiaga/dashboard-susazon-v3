@@ -39,6 +39,9 @@ interface Props {
   contextLabel: string;
   /** Permiso para descargar Excel (lo usa el Insight Penetración). */
   canExportExcel?: boolean;
+  /** Modo agrupador (Fase 2b): si viene, los sub-análisis acotan su scope a la
+   *  unión de miembros del agrupador (vía &agrupador=id) e ignoran territorios. */
+  agrupadorId?: string | null;
 }
 
 interface SubAnalysisDef {
@@ -179,7 +182,7 @@ const SUB_ANALYSES: SubAnalysisDef[] = [
   },
 ];
 
-export function InsightsTab({ today, territorios, contextLabel, canExportExcel = false }: Props) {
+export function InsightsTab({ today, territorios, contextLabel, canExportExcel = false, agrupadorId = null }: Props) {
   const [active, setActive] = useState<SubAnalysis>("concentracion");
 
   // Recordar último sub-análisis usado
@@ -330,6 +333,7 @@ export function InsightsTab({ today, territorios, contextLabel, canExportExcel =
           today={today}
           territorios={territorios}
           contextLabel={contextLabel}
+          agrupadorId={agrupadorId}
         />
       )}
       {active === "precio" && (
@@ -337,6 +341,7 @@ export function InsightsTab({ today, territorios, contextLabel, canExportExcel =
           today={today}
           territorios={territorios}
           contextLabel={contextLabel}
+          agrupadorId={agrupadorId}
         />
       )}
       {active === "cuadrante" && (
@@ -344,6 +349,7 @@ export function InsightsTab({ today, territorios, contextLabel, canExportExcel =
           today={today}
           territorios={territorios}
           contextLabel={contextLabel}
+          agrupadorId={agrupadorId}
         />
       )}
       {active === "estacionalidad" && (
@@ -351,6 +357,7 @@ export function InsightsTab({ today, territorios, contextLabel, canExportExcel =
           today={today}
           territorios={territorios}
           contextLabel={contextLabel}
+          agrupadorId={agrupadorId}
         />
       )}
       {active === "penetracion" && (
@@ -358,6 +365,7 @@ export function InsightsTab({ today, territorios, contextLabel, canExportExcel =
           today={today}
           territorios={territorios}
           contextLabel={contextLabel}
+          agrupadorId={agrupadorId}
           canExportExcel={canExportExcel}
         />
       )}

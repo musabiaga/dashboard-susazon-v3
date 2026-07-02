@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (territoriosFilter !== null && territoriosFilter.length === 0) {
+  if (!sp.get("agrupador") && territoriosFilter !== null && territoriosFilter.length === 0) {
     return NextResponse.json({ year, dimension, metric, monthsPresent: [], items: [], universe: null });
   }
 
@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
     p_metric: metric,
     p_territorios: territoriosFilter,
     p_topn: topN,
+    p_agrupador_id: sp.get("agrupador") || null,
   });
   if (error) {
     return NextResponse.json({ error: `Error al consultar: ${error.message}` }, { status: 500 });
