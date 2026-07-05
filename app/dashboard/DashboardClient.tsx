@@ -616,7 +616,7 @@ export function DashboardClient({
           </div>
 
           {/* KPIs del mes actual — Todos o del territorio seleccionado */}
-          <KpiCardsRow data={activeKpiData} loading={false} />
+          <KpiCardsRow data={activeKpiData} loading={false} monthly={activeKpi.monthly} />
 
           {/* Tabs */}
           <DashboardTabs

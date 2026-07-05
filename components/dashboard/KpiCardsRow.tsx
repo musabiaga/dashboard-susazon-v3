@@ -2,6 +2,7 @@
 
 import { DollarSign, TrendingUp, Package, Zap, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { formatMoney } from "@/lib/format";
+import { KpiHistogramPopover } from "@/components/dashboard/KpiHistogramPopover";
 
 export interface KpiData {
   venta: number;
@@ -31,6 +32,9 @@ export interface KpiData {
 interface KpiCardsRowProps {
   data: KpiData | null;
   loading?: boolean;
+  /** Serie mensual (venta/margen/kg) de la selección activa para el histograma
+   *  de las pastillas. Ya viene scoped por territorio/agrupador. */
+  monthly?: { anio: number; mes: number; venta: number; margen: number; kg: number }[];
 }
 
 /**
@@ -77,7 +81,7 @@ function yoyDelta(current: number, prev: number): { pct: number; tone: "success"
   return { pct, tone: pct >= 0 ? "success" : "danger" };
 }
 
-export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
+export function KpiCardsRow({ data, loading = false, monthly }: KpiCardsRowProps) {
   const rr = data?.runRate ?? null;
   const ventaBudget = data?.ventaBudget ?? 0;
   const vsPttoVenta =
@@ -98,6 +102,7 @@ export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-9">
       {/* 3 Main cards (col-span-2 on lg → 6 cols total) */}
       <div className="lg:col-span-2">
+        <KpiHistogramPopover monthly={monthly} metric="venta" accent="accent" metricLabel="Venta" align="left">
         <KpiCard
           label={`Venta ${data?.monthShortYY ?? ""}`.trim()}
           value={data ? formatMoney(data.venta) : "—"}
@@ -112,8 +117,10 @@ export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
           runRate={rr ? { value: formatMoney(rr.venta), days: rr } : null}
           vsPtto={vsPttoVenta}
         />
+        </KpiHistogramPopover>
       </div>
       <div className="lg:col-span-2">
+        <KpiHistogramPopover monthly={monthly} metric="margen" accent="success" metricLabel="Margen" align="left">
         <KpiCard
           label={`Margen ${data?.monthShortYY ?? ""}`.trim()}
           value={data ? formatMoney(data.margen) : "—"}
@@ -138,8 +145,10 @@ export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
           loading={loading}
           runRate={rr ? { value: formatMoney(rr.margen), days: rr } : null}
         />
+        </KpiHistogramPopover>
       </div>
       <div className="lg:col-span-2">
+        <KpiHistogramPopover monthly={monthly} metric="kg" accent="warning" metricLabel="KG" align="right">
         <KpiCard
           label={`KG ${data?.monthShortYY ?? ""}`.trim()}
           value={data ? formatKg(data.kg) : "—"}
@@ -158,6 +167,7 @@ export function KpiCardsRow({ data, loading = false }: KpiCardsRowProps) {
           loading={loading}
           runRate={rr ? { value: formatKg(rr.kg), days: rr } : null}
         />
+        </KpiHistogramPopover>
       </div>
 
       {/* 3 Acum cards (col-span-1 on lg → 3 cols total) */}
