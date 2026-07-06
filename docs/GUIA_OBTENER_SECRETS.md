@@ -1,4 +1,4 @@
-# Guía para obtener TODAS las credenciales — Dashboard Comercial Susazón V4.0
+# Guía para obtener TODAS las credenciales — Dashboard Comercial Susazón V4.1
 
 > **Propósito:** que cualquier developer o agente pueda **reconstruir el sistema desde
 > cero** obteniendo cada credencial de su servicio de origen. **Este documento NO contiene
@@ -39,7 +39,7 @@ Entra a **https://supabase.com/dashboard** con la cuenta del proyecto → selecc
 | **DB password / connection string** | Settings → Database → *Connection string* (o *Reset database password* si se perdió) | `DATABASE_URL` (para correr migraciones / `pg_dump` / `respaldar.sh --con-db`) |
 | **Site URL + Redirect URLs** (auth) | Authentication → URL Configuration | (config en Supabase, no en env) |
 
-**Para aplicar las 24 migraciones a una DB fresca:** Dashboard → SQL Editor (pega cada
+**Para aplicar las 37 migraciones a una DB fresca:** Dashboard → SQL Editor (pega cada
 migración 001→024 en orden), o `supabase db push` con la CLI + el connection string, o
 `psql "$DATABASE_URL" -f supabase/migrations/0XX_*.sql`.
 
