@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<instructivo version="4.0" fecha="2026-06-07" idioma="es-MX">
+<instructivo version="4.1" fecha="2026-07-05" idioma="es-MX">
 
   <contexto>
-    <proyecto>Dashboard Comercial Susazón V4.0 — InCom (versión 4.0.0)</proyecto>
+    <proyecto>Dashboard Comercial Susazón V4.1 — InCom (versión 4.1.0)</proyecto>
     <propietario>Mauricio Usabiaga, Director de Operaciones, Grupo Susazón</propietario>
     <empresa>Grupo Susazón (incluye marca Susazón y marca Suve)</empresa>
     <usuarios_finales>15 personas internas (admin, director, gerente regional, vendedor)</usuarios_finales>
@@ -18,11 +18,11 @@
       el V3.0 esté siendo evaluado. Útil como referencia de fórmulas y lógica de negocio.
     </predecesor>
     <estado_actual>
-      EN PRODUCCIÓN versión 4.0.0. Deploy live en Vercel desde repo privado
+      EN PRODUCCIÓN versión 4.1.0. Deploy live en Vercel desde repo privado
       github.com/musabiaga/dashboard-susazon-v3. URL canonical:
       https://www.dashboardcomercialsusazon.com (custom domain GoDaddy → Vercel).
 
-      24 migraciones Supabase, 337K+ filas de datos comerciales (Ene 2024 - Jun 2026;
+      37 migraciones Supabase, 337K+ filas de datos comerciales (Ene 2024 - Jun 2026;
       última fecha con datos 2026-06-05). 15/15 usuarios autorizados en prod.
 
       === V4.0 (Fases 10-12 · 2026-06-01 al 2026-06-07) ===
@@ -464,6 +464,35 @@
       </cambio>
     </cambios>
   </fase_12>
+
+  <fase_13 fecha="2026-06-16" titulo="Insights · 5º sub-análisis: Penetración / Canasta">
+    <resumen>
+      Nuevo sub-análisis bidireccional. Por cliente = # de SKUs distintos que compra; por SKU = # de clientes distintos que lo compran; todo vs el mismo tramo de fechas del año anterior. Scatter (Δ conteo vs Δ venta: 🟢 amplía y crece, 🔴 angosta y cae) + tabla con drill-down (marca nuevos y los que dejó de comprar). Export Excel 2 hojas (Por Cliente / Por SKU) estilo Hoja7.
+    </resumen>
+    <backend>Migración 028: insights_penetracion(p_from,p_to,p_from_prev,p_to_prev,p_dimension,p_territorios) e insights_penetracion_detalle(...,p_key,...). Endpoints /api/insights/penetracion y /penetracion-detalle.</backend>
+    <frontend>components/dashboard/insights/PenetracionAnalysis.tsx; registrado en SUB_ANALYSES de InsightsTab (5º).</frontend>
+  </fase_13>
+
+  <fase_14 fecha="2026-06-26 al 2026-07-05" titulo="Módulo Agrupadores — territorios virtuales (Fase 1 → 3)">
+    <resumen>
+      Un Agrupador = "territorio virtual" configurable por UNIÓN de miembros tipados (territorio / grupo / familia / sku / cliente). Casos: campañas/incentivos por producto, KAMs por cartera. Aparece en el sidebar como sección aparte y, al hacer clic, re-filtra TODO el dashboard a su scope. Se administra como un territorio (admin-only) y se asigna a usuarios; puede ser el ÚNICO acceso de un KAM (frontera de seguridad real vía RLS). Se completó en 3 fases.
+    </resumen>
+    <patron_clave>
+      "Agrupador como territorio sintético": como las vistas kpi_* están agregadas por territorio, se crearon funciones SQL agrupador_* que agregan la UNIÓN de los miembros y devuelven territorio = nombre del agrupador (1 bucket) → el render client-side se reutiliza entero. Disciplina de riesgo cero: en page.tsx «agrupadorId ? nuevo : original exacto» y en las funciones insights_* un branch `CASE WHEN p_agrupador_id IS NULL THEN filtro-territorios ELSE filtro-union-miembros END` (cortocircuita → cero overhead en modo normal). El modo territorios queda byte-idéntico; el modo agrupador es opt-in por ?agrupador / p_agrupador_id.
+    </patron_clave>
+    <fase_1>Seguridad/KAM. Migraciones 029-032: tablas agrupadores + agrupador_members + users_permissions.allowed_agrupadores + agrupadores.meta_mensual. RLS de sales_rows extendida (territorio visible OR casa con agrupadores asignados; propaga vía security_invoker). Admin: AgrupadoresManager en /admin/territorios + asignación en /admin/usuarios. Sidebar con sección Agrupadores + vista limpia (oculta territorios $0) para restringidos.</fase_1>
+    <fase_2>Vista enfocada. Migración 033: 9 funciones agrupador_* (member_arrays SECURITY DEFINER gateado + monthly/daily/grupo/sku/cliente summary+diario, SECURITY INVOKER). page.tsx: helpers coreSrc()/emptyIfAgrupador(); sidebar clickeable → ?agrupador=<id> + "← Volver a Territorios"; DashboardTabs.hiddenTabs.</fase_2>
+    <fase_2b>Todos los tabs. Migr 034 (agrupador_vendedor_summary/diario, incluye empresa para toggle Sus/Suve), 035 (agrupador_cliente_perdidos + lifecycle), 036 (las 6 insights_* reciben p_agrupador_id con branch CASE; 2 rutas que leen sales_rows directo — precio-dispersion, item-detail — usan lib/insightsAgrupador.agrupadorOrFilter = filtro PostgREST .or() por miembros). InsightsTab + 5 componentes mandan &agrupador. NONCORE_TABS=[] → todos los tabs disponibles.</fase_2b>
+    <fase_3>Meta manual + export. Migración 037: my_agrupadores() devuelve meta_mensual; page.tsx la inyecta como ventaBudget del territorio sintético → cumplimiento del header. reportInput (PDF Avance Comercial) con rama modo-agrupador que salta REPORT_TERRITORIES; Excel por-tab ya servía. Meta = solo venta mensual.</fase_3>
+    <validacion>Cross-consistencia (Chef Leo): penetración = precio_items = $32.68M por distintos GROUP BY. Modo normal intacto (penetración 1059 cli/$753M). Commits 48f6d82…c48bc31 (F1), 56b8e6d/6b58cb3/c0e2563 (F2), 9c42a46/bed8ab1/1308920/c3ea0b1 (F2b), 19aba43 (F3).</validacion>
+  </fase_14>
+
+  <fase_15 fecha="2026-07-05" titulo="Tracking Diario · histograma mensual en las pastillas">
+    <resumen>
+      Las 3 pastillas KPI (Venta/Margen/KG) de Tracking Diario abren (hover en desktop, tap en touch) un popover con el histórico mensual de su métrica: barras por mes + línea de tendencia, toggle Timeline (meses seguidos 2024→actual, línea = media móvil 3m) ↔ Comparativo por año (Ene–Dic, una barra por año 2024/25/26 + línea de promedio estacional). Hover por mes = valor + Δ vs el mismo mes del año anterior (en Margen además el % de venta).
+    </resumen>
+    <implementacion>Nuevo components/dashboard/KpiHistogramPopover.tsx (client, Recharts ComposedChart) que envuelve cada KpiCard. SIN backend: reusa activeKpi.monthly (serie ya cargada, scoped por selección + modo agrupador); se pasa page→DashboardClient→KpiCardsRow (prop monthly). Commit abe8071.</implementacion>
+  </fase_15>
 
   <archivos>
     <directorio nombre="app/" descripcion="Páginas Next.js 16 (App Router)">

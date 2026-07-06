@@ -1,4 +1,21 @@
-# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.0
+# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.1
+
+**Periodo cubierto (V4.1):** 2026-06-16 al 2026-07-05
+**Versión:** 4.0.0 → **4.1.0**
+**Bloques:** 5º Insight (Penetración/Canasta) · **Módulo Agrupadores** (territorios virtuales, Fase 1→3) · Histograma mensual en las pastillas de Tracking
+
+## 🚀 V4.1 en una línea
+
+- **Agrupadores** — territorios *virtuales*: agrupas cualquier combinación de clientes / productos / grupos / territorios y aparece en la barra lateral como un territorio más que re-filtra **TODO** el dashboard. Frontera de seguridad real (un KAM ve SOLO su agrupador vía RLS), meta manual (PTTO sintético mensual → cumplimiento en el header) y export (PDF + Excel). Opera en los 7 tabs. Migraciones 029-037. Commits `48f6d82`…`19aba43`.
+- **Insights #5 — Penetración / Canasta** — amplitud de canasta: por cliente = # SKUs que compra, por SKU = # clientes que lo compran, vs el año anterior. Scatter + tabla drill-down + Excel. Migración 028.
+- **Histograma en las pastillas** — hover/tap en Venta / Margen / KG (Tracking Diario) → histórico mensual: barras + línea de tendencia, toggle Timeline ↔ Comparativo por año, hover = valor + Δ YoY. Cero backend. Commit `abe8071`.
+- **Fixes:** reactivación de usuarios (confirmar email + is_active); Perdidos sin duplicados (agrupa por nombre).
+
+> **¿Por qué V4.1?** Un módulo nuevo completo (Agrupadores) + un 5º Insight + interactividad en Tracking, todo aditivo y sin romper el modo territorios normal.
+
+---
+
+# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.0 (histórico)
 
 **Periodo cubierto:** 2026-05-23 al 2026-06-07
 **Versión:** 3.9.0 → **4.0.0**

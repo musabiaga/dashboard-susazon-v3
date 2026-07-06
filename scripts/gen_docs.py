@@ -29,11 +29,11 @@ from docx.oxml import OxmlElement
 # ============================================================
 # Constantes del proyecto
 # ============================================================
-PROYECTO = "Dashboard Comercial Susazón V4.0 — InCom"
+PROYECTO = "Dashboard Comercial Susazón V4.1 — InCom"
 EMPRESA = "Grupo Susazón (Susazón + Suve)"
 OWNER = "Mauricio Usabiaga, Director de Operaciones"
-VERSION = "4.0.0"
-FECHA = "2026-06-07"
+VERSION = "4.1.0"
+FECHA = "2026-07-05"
 REPO = "github.com/musabiaga/dashboard-susazon-v3"
 URL_PROD = "www.dashboardcomercialsusazon.com"
 URL_FALLBACK = "dashboard-susazon-v3-44sp.vercel.app"
@@ -191,8 +191,8 @@ def gen_arquitectura():
     doc = Document()
 
     add_cover(doc, "Arquitectura Técnica", "Diseño del sistema, stack y flujo de información")
-    add_h2(doc, "Estado de este documento (V4.0)")
-    add_para(doc, "El núcleo describe la arquitectura base (Fases 0-5). Las Fases 6-12 (versiones 3.5.0 → 4.0.0) — Insights con 4 sub-análisis, tab Clientes y Productos combinado, cards de Tracking, seguridad de sesión y PDF Avance Comercial — están resumidas en el ChangeLog (doc 03) y a detalle en LO_NUEVO.md, SESSION_LOG.md e INSTRUCTIVO_AGENTE.xml. Estado actual: 7 tabs, 24 migraciones SQL, 29 endpoints.")
+    add_h2(doc, "Estado de este documento (V4.1)")
+    add_para(doc, "El núcleo describe la arquitectura base (Fases 0-5). Las Fases 6-15 (versiones 3.5.0 → 4.1.0) — Insights con 5 sub-análisis, tab Clientes y Productos combinado, cards de Tracking, seguridad de sesión, PDF Avance Comercial, el módulo Agrupadores (territorios virtuales, Fase 1→3) y el histograma mensual de las pastillas — están resumidas en el ChangeLog (doc 03) y a detalle en LO_NUEVO.md, SESSION_LOG.md e INSTRUCTIVO_AGENTE.xml. Estado actual: 7 tabs (todos operan también en modo agrupador), 37 migraciones SQL. Nota clave de arquitectura: 'agrupador como territorio sintético' — funciones SQL que agregan la unión de miembros del agrupador y devuelven territorio = nombre, reutilizando el render entero; el modo territorios normal queda byte-idéntico (opt-in por ?agrupador / p_agrupador_id).")
 
     add_h1(doc, "Resumen Ejecutivo")
     add_para(
@@ -368,8 +368,8 @@ Supabase Postgres
 def gen_diccionario():
     doc = Document()
     add_cover(doc, "Diccionario de Datos", "Schemas de DB, contratos de APIs y estructuras internas")
-    add_h2(doc, "Estado de este documento (V4.0)")
-    add_para(doc, "El núcleo describe los schemas base. En V4.0 se agregaron 4 funciones SQL de Insights (migraciones 021-024: insights_concentracion con dimensión territorios, insights_precio_items, insights_cuadrante, insights_estacionalidad) y 5 endpoints (precio-dispersion, cuadrante, estacionalidad, tracking-variedad, tracking-clientes-activos). Ver detalle en el ChangeLog (doc 03) e INSTRUCTIVO_AGENTE.xml. REGLA CLAVE: un cliente se identifica por NOMBRE, no por no_cliente (cada ERP Sus/Suve numera aparte).")
+    add_h2(doc, "Estado de este documento (V4.1)")
+    add_para(doc, "El núcleo describe los schemas base. En V4.0-4.1 se agregaron: las funciones de Insights (migr 021-024) + insights_penetracion/_detalle (028); el módulo Agrupadores (migr 029-037): tablas agrupadores, agrupador_members, users_permissions.allowed_agrupadores + agrupadores.meta_mensual, y ~15 funciones agrupador_* (member_arrays gateado SECURITY DEFINER, monthly/daily/grupo/sku/cliente/vendedor/perdidos, y el branch p_agrupador_id en las 6 insights_*). Total 37 migraciones. Ver detalle en el ChangeLog (doc 03) e INSTRUCTIVO_AGENTE.xml. REGLA CLAVE: un cliente se identifica por NOMBRE, no por no_cliente (cada ERP Sus/Suve numera aparte).")
 
     add_h1(doc, "Tablas de Postgres")
 
@@ -608,7 +608,29 @@ Body:
 # ============================================================
 def gen_changelog():
     doc = Document()
-    add_cover(doc, "ChangeLog & Release Notes", "Evolución V2.2 → V4.0 + historial de commits")
+    add_cover(doc, "ChangeLog & Release Notes", "Evolución V2.2 → V4.1 + historial de commits")
+
+    # ===== V4.1 (Fases 13-15) =====
+    add_h1(doc, "Versión 4.1.0 — V4.1 (2026-07-05)")
+    add_para(doc, "Tres bloques sobre V4.0: un 5º Insight (Penetración/Canasta), el módulo nuevo Agrupadores (territorios virtuales, completo Fase 1→3), y un histograma mensual interactivo en las pastillas de Tracking Diario. 37 migraciones SQL; datos Ene 2024 – Jul 2026.")
+
+    add_h2(doc, "Módulo Agrupadores — territorios virtuales (Fase 1 → 3)")
+    add_bullet(doc, "Un Agrupador = 'territorio virtual' configurable por UNIÓN de miembros tipados (territorio / grupo / familia / SKU / cliente). Casos: campañas/incentivos por producto, KAMs por cartera de clientes. Migraciones 029-037.")
+    add_bullet(doc, "Fase 1 — Seguridad/KAM: tablas agrupadores + agrupador_members + users_permissions.allowed_agrupadores; RLS de sales_rows extendida (un KAM puede ver SOLO su agrupador); admin CRUD en /admin/territorios + asignación en /admin/usuarios.")
+    add_bullet(doc, "Fase 2 — Vista enfocada: clic en un agrupador (director/admin con acceso amplio) → ?agrupador=<id> re-filtra TODO el dashboard a ese scope. Patrón 'agrupador como territorio sintético': funciones que agregan la unión de miembros y devuelven territorio = nombre del agrupador (1 bucket) → se reutiliza el render entero.")
+    add_bullet(doc, "Fase 2b — Todos los tabs en modo agrupador: Vendedores, Perdidos e Insights (los 5 sub-análisis). Migraciones 034/035/036; las funciones insights_* branchean por p_agrupador_id (modo normal byte-idéntico).")
+    add_bullet(doc, "Fase 3 — Meta manual: PTTO sintético mensual por agrupador (agrupadores.meta_mensual) → cumplimiento en el header. Export (PDF 'Avance Comercial' + Excel) en modo agrupador. Migración 037.")
+    add_bullet(doc, "Disciplina de riesgo cero: cada pieza mantiene el modo normal (territorios) byte-idéntico; el modo agrupador es opt-in por URL/parámetro. Cross-consistencia validada (Chef Leo: penetración = precio_items = $32.68M).")
+
+    add_h2(doc, "Insights — 5º sub-análisis: Penetración / Canasta")
+    add_bullet(doc, "Bidireccional: por cliente = # de SKUs distintos que compra; por SKU = # de clientes distintos que lo compran; todo vs el mismo tramo del año anterior. Scatter (Δ conteo vs Δ venta) + tabla con drill-down (marca nuevos / dejó de comprar). Export Excel 2 hojas. Migración 028; insights_penetracion / insights_penetracion_detalle.")
+
+    add_h2(doc, "Tracking Diario — histograma mensual en las pastillas")
+    add_bullet(doc, "Las pastillas Venta / Margen / KG abren (hover en desktop, tap en touch) un popover con el histórico mensual de su métrica: barras + línea de tendencia, toggle Timeline ↔ Comparativo por año, y hover por mes = valor + Δ vs el mismo mes del año anterior. Reusa la serie mensual ya cargada (0 llamadas extra) y respeta la selección del sidebar y el modo agrupador.")
+
+    add_h2(doc, "Fixes")
+    add_bullet(doc, "Reactivación de usuarios: al fijar la contraseña se confirma el email + se hace cumplir is_active (ban/unban).")
+    add_bullet(doc, "Perdidos: se eliminaron duplicados por casing y por Sus/Suve agrupando por NOMBRE de cliente.")
 
     # ===== V4.0 (Fases 10-12) =====
     add_h1(doc, "Versión 4.0.0 — V4.0 (2026-06-07)")
@@ -794,8 +816,17 @@ def gen_manual():
     doc = Document()
     add_cover(doc, "Manual de Usuario", "Guía no-técnica para los 15 usuarios del sistema")
 
-    add_h1(doc, "🆕 Novedades V4.0 (lo más reciente)")
-    add_para(doc, "Si ya conocías el dashboard, esto es lo nuevo de la versión 4.0:")
+    add_h1(doc, "🆕 Novedades V4.1 (lo más reciente)")
+    add_para(doc, "Lo nuevo desde la V4.0:")
+    add_h2(doc, "Agrupadores — 'territorios' a tu medida")
+    add_para(doc, "Un Agrupador es un territorio virtual: agrupas los clientes, productos, grupos o territorios que quieras y lo ves en la barra lateral como si fuera un territorio más. Sirve para campañas/incentivos por producto o para darle a un KAM SOLO su cartera. Al hacer clic en un agrupador, TODO el dashboard (Ventas, Grupo, Clientes/Productos, Tracking, Vendedores, Perdidos e Insights) se re-filtra a ese scope. El admin los crea en Administración → Territorios y los asigna a quien deba verlos; puedes ponerle una meta mensual para ver su cumplimiento en el header, y exportar su PDF 'Avance Comercial' / Excel.")
+    add_h2(doc, "Insights — Penetración / Canasta (5º análisis)")
+    add_para(doc, "Mide qué tan amplia es la canasta: por cliente, cuántos SKUs distintos compra; por SKU, cuántos clientes lo compran; todo comparado contra el mismo tramo del año pasado. Ideal para cross-sell (ampliar canasta) y para rescatar a quien la está angostando. Incluye scatter, tabla con drill-down (marca nuevos y los que dejaron de comprar) y export a Excel.")
+    add_h2(doc, "Histograma en las pastillas de Tracking Diario")
+    add_para(doc, "Pasa el cursor (o pícale) sobre las pastillas de Venta, Margen o KG y verás su histórico mensual: barras por mes + línea de tendencia, con un toggle para verlo como línea de tiempo (meses seguidos) o comparando año contra año (estacionalidad). Al posarte sobre un mes ves su valor y cuánto creció/cayó vs el mismo mes del año anterior.")
+
+    add_h1(doc, "Novedades V4.0")
+    add_para(doc, "Si ya conocías el dashboard, esto es lo de la versión 4.0:")
     add_h2(doc, "Tab 'Clientes y Productos' (antes eran dos tabs)")
     add_para(doc, "Los tabs Productos y Clientes ahora son uno solo. Arriba tienes 3 toggles independientes: Gráfica (Clientes|Productos), Tabla (Clientes|Productos) y Volumen (Pesos|Kilos). Así puedes ver, por ejemplo, la gráfica de Clientes junto a la tabla de Productos. Conserva todo el análisis profundo que ya tenía Clientes (evolución, buscador, 3 vistas de tabla, desglose), y ahora puedes expandir un SKU para ver qué clientes lo compran.")
     add_h2(doc, "Insights: ahora 4 análisis (antes 1)")
@@ -944,8 +975,8 @@ def gen_manual():
 def gen_guia_ti():
     doc = Document()
     add_cover(doc, "Guía de TI y Despliegue", "Para ingenieros que mantienen, deployan o continúan el sistema")
-    add_h2(doc, "Estado de este documento (V4.0)")
-    add_para(doc, "Los procesos de despliegue (Vercel + Supabase + Resend) siguen vigentes. En V4.0 el dashboard tiene 7 tabs y 24 migraciones SQL. El respaldo profesional (Plan Z) se sincroniza con scripts/respaldar.sh; los .docx se regeneran con scripts/gen_docs.py; el PDF visual, desde public/instructivo.html. Ver ChangeLog (doc 03) para el historial completo.")
+    add_h2(doc, "Estado de este documento (V4.1)")
+    add_para(doc, "Los procesos de despliegue (Vercel + Supabase + Resend) siguen vigentes. En V4.1 el dashboard tiene 7 tabs (todos operan también en modo agrupador) y 37 migraciones SQL. El respaldo profesional (Plan Z) se sincroniza con scripts/respaldar.sh; los .docx se regeneran con scripts/gen_docs.py; el PDF visual, desde public/instructivo.html. Ver ChangeLog (doc 03) para el historial completo.")
 
     add_h1(doc, "Quién debe leer esto")
     add_para(doc, "Este documento está pensado para un ingeniero de TI que necesite:")
@@ -1152,8 +1183,8 @@ git push origin main""")
 def gen_reconstruccion():
     doc = Document()
     add_cover(doc, "Guía de Reconstrucción", "Cómo rebuildear el sistema desde cero")
-    add_h2(doc, "Estado de este documento (V4.0)")
-    add_para(doc, "El procedimiento de reconstrucción base (Fases 0-5) sigue válido. Para reconstruir el estado completo V4.0 hay que aplicar las 24 migraciones SQL (incluidas 021-024 de Insights) y construir los 7 tabs (incluido Clientes y Productos combinado e Insights con 4 sub-análisis). Ver el inventario completo de archivos/componentes/endpoints en INSTRUCTIVO_AGENTE.xml (secciones fase_10/11/12) y el ChangeLog (doc 03).")
+    add_h2(doc, "Estado de este documento (V4.1)")
+    add_para(doc, "El procedimiento de reconstrucción base (Fases 0-5) sigue válido. Para reconstruir el estado completo V4.1 hay que aplicar las 37 migraciones SQL (incluidas 021-024 y 028 de Insights, y 029-037 del módulo Agrupadores) y construir los 7 tabs (incluido Clientes y Productos combinado, Insights con 5 sub-análisis y el histograma de pastillas de Tracking), más el módulo Agrupadores que opera en todos los tabs vía las funciones agrupador_* (territorio sintético). Ver el inventario completo de archivos/componentes/endpoints en INSTRUCTIVO_AGENTE.xml (secciones fase_10 a fase_15) y el ChangeLog (doc 03).")
 
     add_h1(doc, "Cuándo usar esta guía")
     add_para(doc, "Esta es la guía CRÍTICA — debe permitir a un ingeniero competente reconstruir el sistema completo desde cero, asumiendo que solo tiene esta documentación + acceso a las APIs externas.")

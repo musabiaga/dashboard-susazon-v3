@@ -1,11 +1,11 @@
-# Dashboard Comercial Susazón V4.0 — InCom
+# Dashboard Comercial Susazón V4.1 — InCom
 
 Dashboard comercial semanal/mensual de **Grupo Susazón** (Susazón + Suve). Inteligencia
 Comercial Susazón® (**InCom**). En producción.
 
 - **URL:** https://www.dashboardcomercialsusazon.com
 - **Owner:** Mauricio Usabiaga (Director de Operaciones)
-- **Versión:** 4.0.0
+- **Versión:** 4.1.0
 
 ## Qué hace
 

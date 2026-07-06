@@ -606,6 +606,40 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 **Pendiente (Fase 2b/3):** Perdidos/Vendedores/Insights en modo agrupador; meta manual (PTTO sintético) por agrupador; export.
 **Estado:** Vigente (Fase 2 core completa). Commits `56b8e6d`, `6b58cb3`, `c0e2563` + migración 033.
 
+### D040 — 2026-07-02 | Agrupadores Fase 2b: Vendedores + Perdidos + Insights en modo agrupador
+
+**Contexto:** Cerrada la Fase 2 core (D039), Mauricio pidió completar los tabs que quedaban fuera de la vista enfocada. Los tres se resolvieron con la MISMA arquitectura ("agrupador como territorio sintético" + disciplina `p_agrupador_id ? nuevo : original`), en 3 chunks.
+
+**Implementación:**
+1. **Vendedores** (migr **034**): `agrupador_vendedor_summary`/`_diario` — agregan sobre la unión de miembros, `territorio = nombre`, incluyen `empresa` (0=Sus/1=Suve) para el toggle Separar/Unir. Commit `9c42a46`.
+2. **Perdidos** (migr **035**): `agrupador_cliente_perdidos` + `agrupador_cliente_lifecycle` — espejan `kpi_cliente_perdidos` (026) y `kpi_cliente_lifecycle` (016). Validado Chef Leo: 73 filas/17 clientes/YTD $32.4M. Commit `bed8ab1`.
+3. **Insights** (migr **036**, el complejo): las **6 funciones** `insights_*` (concentracion, cuadrante, estacionalidad, penetracion, penetracion_detalle, precio_items) reciben `p_agrupador_id uuid` con un **branch CASE** en el WHERE: NULL → filtro por territorios **idéntico**; con id → unión de miembros (vía `agrupador_member_arrays`, gateado al usuario). El CASE cortocircuita → cero overhead en modo normal. Las **5 rutas RPC** pasan el param; las **2 rutas que leen `sales_rows` directo** (precio-dispersion, item-detail) usan `lib/insightsAgrupador.agrupadorOrFilter` → filtro PostgREST `.or()` por miembros. `InsightsTab` + los 5 componentes mandan `&agrupador=id` y lo suman a los deps. Commits `1308920` (SQL) + `c3ea0b1` (rutas/front).
+
+**Decisión clave:** cada pieza mantiene el modo normal byte-idéntico (branch opt-in por `p_agrupador_id`/`?agrupador`). Validado: modo NORMAL intacto (concentración 850 cli/$743M; penetración 1059 cli/$753M) y agrupador Chef Leo **cross-consistente** (penetración = precio_items = $32.68M → sin doble conteo). `NONCORE_TABS = []` → con Fase 2b **todos** los tabs están disponibles en modo agrupador.
+
+**Pendiente (Fase 3):** meta manual (PTTO sintético) por agrupador; export por agrupador.
+**Estado:** Vigente (Fase 2b completa). Commits `9c42a46`, `bed8ab1`, `1308920`, `c3ea0b1` + migraciones 034/035/036.
+
+### D041 — 2026-07-02 | Agrupadores Fase 3: meta manual (PTTO) + export → feature COMPLETA
+
+**Contexto:** Última fase de Agrupadores. Dos piezas (AskUserQuestion): **meta manual** (PTTO sintético por agrupador) y **export**. Decisiones: meta = **solo venta mensual** (sin kg/margen → cero cambios de schema); export = **reutilizar** el PDF "Avance Comercial" + Excel existentes (no bespoke).
+
+**Implementación:**
+1. **Meta manual:** la captura en admin (`agrupadores.meta_mensual` + `AgrupadoresManager` + `/api/admin/agrupadores`) **ya existía desde Fase 1**. Faltaba usarla: migr **037** expone `meta_mensual` vía `my_agrupadores()`; `page.tsx` la inyecta como `ventaBudget` del territorio sintético (`budgetByTerritory[nombre] = meta_mensual`) → alimenta `ventaBudget` + `totalVentaBudget` → el cumplimiento del header sale idéntico a un territorio. Sin meta → 0 (cumplimiento oculto). `meta_mensual` es mensual = mismo grano que el PTTO del header (`territory_budgets` del mes actual).
+2. **Export:** `reportInput` (PDF) tenía filtro `REPORT_TERRITORIES` (11 territorios reales) → el nombre sintético quedaba fuera → `null` = sin PDF. Se agregó una **rama modo-agrupador** que salta ese filtro y reporta el territorio sintético (`mode: single`, título = nombre del agrupador, cumplimiento vs meta). El **Excel por-tab ya servía** (no está gateado por ese filtro; construye del data ya cargado del agrupador).
+
+**Decisión clave:** el PDF ya consumía `ventaBudget` para `ptto`/`alcancePct` → la meta fluye al PDF **gratis** por Chunk A. Reutilizar en vez de bespoke = mínimo riesgo.
+**Estado:** Vigente. **Agrupadores COMPLETA (Fase 1 + 2 + 2b + 3).** Commit `19aba43` + migración 037.
+
+### D042 — 2026-07-05 | Histograma mensual interactivo en las pastillas de Tracking Diario
+
+**Contexto:** Mauricio pidió que las 3 pastillas (Venta/Margen/KG) de Tracking Diario abrieran un histograma mensual al pasar el cursor o dar tap. Rebotado (AskUserQuestion): forma = **ambos con toggle** (Timeline ↔ Comparativo); estilo = **barras + línea de tendencia**; detalle = **valor + Δ vs el mismo mes del año anterior**.
+
+**Implementación:** nuevo `KpiHistogramPopover` (client) que envuelve cada `KpiCard`. Popover (hover desktop / tap touch) con `ComposedChart` (Recharts): barras por mes + línea. Toggle **Timeline** (meses seguidos 2024→actual, línea = media móvil 3m) ↔ **Comparativo** (Ene–Dic, una barra por año 2024/25/26 + línea de promedio estacional); tooltip por mes = valor + Δ YoY (en Margen, además el % de venta). **Sin backend**: reusa `activeKpi.monthly` (serie ya cargada, scoped por selección + modo agrupador); se pasa page→DashboardClient→KpiCardsRow.
+
+**Decisión clave:** reutilizar la serie mensual ya cargada (0 llamadas extra, consistente con el número de la pastilla) en vez de un endpoint nuevo. Validado tsc + build + SSR 200 (ruta temporal, ya eliminada). Falta verificación visual autenticada (pixel).
+**Estado:** Vigente. Commit `abe8071`. Incluido en el release documental **V4.1.0**.
+
 ---
 
 ## Bugs Resueltos

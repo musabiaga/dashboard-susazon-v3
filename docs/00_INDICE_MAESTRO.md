@@ -1,14 +1,15 @@
-# Índice Maestro — Dashboard Comercial Susazón V4.0
+# Índice Maestro — Dashboard Comercial Susazón V4.1
 
-**Proyecto:** Dashboard Comercial Susazón V4.0 — **InCom** (Inteligencia Comercial Susazón®)
+**Proyecto:** Dashboard Comercial Susazón V4.1 — **InCom** (Inteligencia Comercial Susazón®)
 **Empresa:** Grupo Susazón (Susazón + Suve)
 **Owner:** Mauricio Usabiaga (Director de Operaciones)
-**Estado:** En producción (versión 4.0.0)
+**Estado:** En producción (versión 4.1.0)
 **URL canonical:** `https://www.dashboardcomercialsusazon.com`
-**Última actualización:** 2026-06-07
+**Última actualización:** 2026-07-05
 
-> 🆕 **Lee primero `LO_NUEVO.md`** si vienes de una sesión previa a Fase 10 (≤ 2026-05-23) — te
-> ahorra leer todo el SESSION_LOG para identificar qué se agregó en V4.0 (Fases 10, 11, 12).
+> 🆕 **Lee primero `LO_NUEVO.md`** si vienes de una sesión previa — te ahorra leer todo el
+> SESSION_LOG. V4.1 agregó el módulo **Agrupadores** (territorios virtuales, Fase 1→3), el
+> 5º Insight **Penetración/Canasta** y el **histograma** de las pastillas de Tracking.
 
 ---
 
@@ -16,25 +17,25 @@
 
 | # | Archivo | Tipo | Propósito | Versión | Última actualización |
 |---|---------|------|-----------|---------|---------------------|
-| 1 | `01_Arquitectura_Tecnica.docx` | Word | Diseño del sistema, stack tecnológico, flujo de información, decisiones arquitectónicas | **4.0.0** | **2026-06-07** |
-| 2 | `02_Diccionario_Datos.docx` | Word | Schemas de DB, contratos de APIs, estructura de objetos, mapeo de columnas, funciones SQL | **4.0.0** | **2026-06-07** |
-| 3 | `03_ChangeLog_Release_Notes.docx` | Word | Evolución V2.2 → V4.0 (incluye Fases 1-12) | **4.0.0** | **2026-06-07** |
-| 4 | `04_Manual_Usuario.docx` | Word | Manual para usuarios finales — incluye tab Clientes y Productos, Insights (4 sub-análisis), Tracking cards | **4.0.0** | **2026-06-07** |
-| 5 | `05_Guia_TI_Despliegue.docx` | Word | Guía para ingeniero de TI: despliegue, env vars, troubleshooting, monitoreo | **4.0.0** | **2026-06-07** |
-| 6 | `06_Guia_Reconstruccion.docx` | Word | Reconstrucción desde cero: paso a paso, algoritmos, dependencias, verificación | **4.0.0** | **2026-06-07** |
-| 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude. **Incluye Fases 6-12** | **4.0** | **2026-06-07** |
-| 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones D001-D031, bugs 1-42, backlog. **Incluye Fases 6-12** | **4.0** | **2026-06-07** |
-| 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | **4.0** | **2026-06-07** |
-| 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | Contexto compacto para retomar el proyecto en otra sesión Claude | **4.0** | **2026-06-07** |
-| 11 | `Instructivo_Usuario_Visual.html` / `.pdf` | HTML/PDF | Manual visual para usuarios finales (el HTML es el que se abre desde el dashboard). **V4.0 con secciones nuevas marcadas** | **4.0** | **2026-06-07** |
+| 1 | `01_Arquitectura_Tecnica.docx` | Word | Diseño del sistema, stack tecnológico, flujo de información, decisiones arquitectónicas | **4.1.0** | **2026-07-05** |
+| 2 | `02_Diccionario_Datos.docx` | Word | Schemas de DB, contratos de APIs, estructura de objetos, mapeo de columnas, funciones SQL | **4.1.0** | **2026-07-05** |
+| 3 | `03_ChangeLog_Release_Notes.docx` | Word | Evolución V2.2 → V4.1 (incluye Fases 1-15) | **4.1.0** | **2026-07-05** |
+| 4 | `04_Manual_Usuario.docx` | Word | Manual para usuarios finales — incluye Agrupadores, Insights (5 sub-análisis + Penetración), histograma de pastillas, tab Clientes y Productos | **4.1.0** | **2026-07-05** |
+| 5 | `05_Guia_TI_Despliegue.docx` | Word | Guía para ingeniero de TI: despliegue, env vars, troubleshooting, monitoreo | **4.1.0** | **2026-07-05** |
+| 6 | `06_Guia_Reconstruccion.docx` | Word | Reconstrucción desde cero: paso a paso, algoritmos, dependencias, verificación | **4.1.0** | **2026-07-05** |
+| 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude. **Incluye Fases 6-15** | **4.1** | **2026-07-05** |
+| 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones D001-D042, bugs 1-42, backlog. **Incluye Fases 6-15** | **4.1** | **2026-07-05** |
+| 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | **4.1** | **2026-07-05** |
+| 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | Contexto compacto para retomar el proyecto en otra sesión Claude | **4.1** | **2026-07-05** |
+| 11 | `Instructivo_Usuario_Visual.html` / `.pdf` | HTML/PDF | Manual visual para usuarios finales (el HTML es el que se abre desde el dashboard). **V4.1 con secciones nuevas marcadas** | **4.1** | **2026-07-05** |
 | 12 | `AUTH_FLOWS.md` | Markdown | Documentación técnica del sistema de auth. Diagramas de los 3 flows | 1.0 | 2026-05-01 |
-| 12b | `GUIA_OBTENER_SECRETS.md` | Markdown | **Cómo obtener CADA credencial** (Supabase, Vercel, GitHub, APIs, Resend, GoDaddy) para reconstruir desde cero. Sin valores reales (committeable) | **1.0** | **2026-06-07** |
-| 13 | `LO_NUEVO.md` | Markdown | **Resumen ejecutivo de V4.0 (Fases 10-12).** Lee primero si vienes de una sesión previa | **3.0** | **2026-06-07** |
+| 12b | `GUIA_OBTENER_SECRETS.md` | Markdown | **Cómo obtener CADA credencial** (Supabase, Vercel, GitHub, APIs, Resend, GoDaddy) para reconstruir desde cero. Sin valores reales (committeable) | **1.0** | **2026-07-05** |
+| 13 | `LO_NUEVO.md` | Markdown | **Resumen ejecutivo de V4.1 (Fases 10-15: Agrupadores, Penetración, histograma).** Lee primero si vienes de una sesión previa | **3.0** | **2026-07-05** |
 | 14 | `_backups/2026-05-10_pre-update/` | Snapshot | Snapshot inmutable de los docs antes de la actualización del 10-may | — | 2026-05-10 |
 
-> **Sobre los `.docx` y el PDF:** en V4.0 se regeneraron los 6 `.docx` a la versión **4.0.0**
+> **Sobre los `.docx` y el PDF:** en V4.1 se regeneraron los 6 `.docx` a la versión **4.1.0**
 > vía `scripts/gen_docs.py`, y el PDF visual se regeneró desde `public/instructivo.html`.
-> Todos reflejan el estado al **2026-06-07** (Fases 1-12).
+> Todos reflejan el estado al **2026-07-05** (Fases 1-15, incluye Agrupadores).
 
 ---
 
@@ -63,9 +64,9 @@ código + docs con renombre kebab-case + sesiones).
 El código vive en este repo (`github.com/musabiaga/dashboard-susazon-v3`). Carpetas críticas:
 
 - `app/` — Páginas Next.js (App Router) · **7 tabs** en `app/dashboard/`
-- `components/` — Componentes React (incl. `components/dashboard/insights/` con 4 sub-análisis)
+- `components/` — Componentes React (incl. `components/dashboard/insights/` con 5 sub-análisis)
 - `lib/` — Utilidades server-side y cliente
-- `supabase/migrations/` — Schemas SQL aplicados (**24 migraciones**)
+- `supabase/migrations/` — Schemas SQL aplicados (**37 migraciones**)
 - `docs/` — Esta documentación
 
 ## Dónde está deployado
