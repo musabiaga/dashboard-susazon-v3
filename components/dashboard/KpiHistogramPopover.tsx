@@ -165,6 +165,11 @@ function HistogramPanel({
       const ma = win.reduce((s, x) => s + valOf(x), 0) / win.length;
       const prev = byKey.get(`${p.anio - 1}-${p.mes}`);
       return {
+        // xkey = clave ÚNICA por punto (año-mes). CLAVE: si el eje X usara el
+        // label del mes ("Feb", "Mar"…) se repetiría entre años y Recharts
+        // colapsaría las categorías duplicadas → rompía el hover. El tick se
+        // formatea de vuelta al nombre del mes vía tickFormatter.
+        xkey: `${p.anio}-${String(p.mes).padStart(2, "0")}`,
         label: MES_ABBR[p.mes] + (p.mes === 1 ? ` '${String(p.anio).slice(2)}` : ""),
         anio: p.anio,
         mes: p.mes,
@@ -254,7 +259,11 @@ function HistogramPanel({
               margin={{ top: 8, right: 6, left: 0, bottom: 0 }}
             >
               <XAxis
-                dataKey="label"
+                dataKey="xkey"
+                tickFormatter={(xk: string) => {
+                  const mm = Number(xk.slice(5, 7));
+                  return MES_ABBR[mm] + (mm === 1 ? ` '${xk.slice(2, 4)}` : "");
+                }}
                 tick={{ fontSize: 9, fill: "var(--text-muted)" }}
                 interval={2}
                 tickLine={false}
