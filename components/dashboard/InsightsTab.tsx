@@ -19,8 +19,9 @@ import { PrecioAnalysis } from "@/components/dashboard/insights/PrecioAnalysis";
 import { CuadranteAnalysis } from "@/components/dashboard/insights/CuadranteAnalysis";
 import { EstacionalidadAnalysis } from "@/components/dashboard/insights/EstacionalidadAnalysis";
 import { PenetracionAnalysis } from "@/components/dashboard/insights/PenetracionAnalysis";
+import { CrecimientoVendedorAnalysis } from "@/components/dashboard/insights/CrecimientoVendedorAnalysis";
 
-type SubAnalysis = "concentracion" | "precio" | "cuadrante" | "estacionalidad" | "penetracion";
+type SubAnalysis = "concentracion" | "precio" | "cuadrante" | "estacionalidad" | "penetracion" | "crecimiento";
 
 const STORAGE_KEY = "insights-sub-analysis";
 
@@ -176,6 +177,32 @@ const SUB_ANALYSES: SubAnalysisDef[] = [
         <p>
           Sirve para <strong>cross-sell</strong> (ampliar canasta) y para
           rescatar a quien la está angostando.
+        </p>
+      </div>
+    ),
+  },
+  {
+    key: "crecimiento",
+    label: "Crecimiento x Vendedor",
+    description:
+      "¿Cómo va la cartera de cada vendedor vs el año pasado? Clientes o productos, con crecimiento en Mes y Acumulado — comparación justa capada al mismo día.",
+    help: (
+      <div className="space-y-1.5">
+        <p>
+          Evalúa el <strong>desempeño de un vendedor</strong>: elige uno en el
+          dropdown y ves <strong>su</strong> cartera de clientes (o productos),
+          con los montos de <strong>solo lo que él vendió</strong>.
+        </p>
+        <p>
+          Dos tablas: <strong>Año Anterior</strong> (Mes · Acumulado) y{" "}
+          <strong>Año Actual</strong> (Avance del Mes · Acumulado ·{" "}
+          <strong>Δ% de crecimiento</strong>). Ambos años se{" "}
+          <strong>capan al mismo día</strong> para que la comparación del mes sea
+          justa (no 6 días vs mes completo).
+        </p>
+        <p>
+          🟢 <strong>Nuevo</strong> = ganó ese cliente/producto este año ·
+          🔴 <strong>−100%</strong> = lo perdió. Ordena por cualquier columna.
         </p>
       </div>
     ),
@@ -367,6 +394,14 @@ export function InsightsTab({ today, territorios, contextLabel, canExportExcel =
           contextLabel={contextLabel}
           agrupadorId={agrupadorId}
           canExportExcel={canExportExcel}
+        />
+      )}
+      {active === "crecimiento" && (
+        <CrecimientoVendedorAnalysis
+          today={today}
+          territorios={territorios}
+          contextLabel={contextLabel}
+          agrupadorId={agrupadorId}
         />
       )}
     </div>
