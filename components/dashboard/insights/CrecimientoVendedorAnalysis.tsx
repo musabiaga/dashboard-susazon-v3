@@ -15,16 +15,16 @@ import { ArrowUp, ArrowDown, Search } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 
 type Dimension = "clientes" | "productos";
-type Medicion = "kg" | "venta" | "margenPct" | "margenAbs";
+type Medicion = "kg" | "venta" | "margenPct" | "margenAbs" | "variedad";
 type Period = "aa_mes" | "aa_ytd" | "act_mes" | "act_ytd";
 type SortCol = "name" | Period | "g_mes" | "g_ytd";
 
 interface Row {
   name: string;
-  aa_mes_venta: number; aa_mes_kg: number; aa_mes_margen: number;
-  aa_ytd_venta: number; aa_ytd_kg: number; aa_ytd_margen: number;
-  act_mes_venta: number; act_mes_kg: number; act_mes_margen: number;
-  act_ytd_venta: number; act_ytd_kg: number; act_ytd_margen: number;
+  aa_mes_venta: number; aa_mes_kg: number; aa_mes_margen: number; aa_mes_var: number;
+  aa_ytd_venta: number; aa_ytd_kg: number; aa_ytd_margen: number; aa_ytd_var: number;
+  act_mes_venta: number; act_mes_kg: number; act_mes_margen: number; act_mes_var: number;
+  act_ytd_venta: number; act_ytd_kg: number; act_ytd_margen: number; act_ytd_var: number;
 }
 
 interface Props {
@@ -39,6 +39,7 @@ const MEDICIONES: { key: Medicion; label: string }[] = [
   { key: "venta", label: "$ Vendido" },
   { key: "margenPct", label: "Margen %" },
   { key: "margenAbs", label: "Margen $" },
+  { key: "variedad", label: "Variedad" },
 ];
 const MES_NOM = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -55,6 +56,7 @@ function cellValue(r: Row, p: Period, m: Medicion): number | null {
   if (m === "kg") return kg;
   if (m === "venta") return venta;
   if (m === "margenAbs") return margen;
+  if (m === "variedad") return r[`${p}_var` as keyof Row] as number; // # SKUs (clientes) / # clientes (productos)
   return venta > 0 ? (margen / venta) * 100 : null; // margenPct
 }
 
@@ -89,6 +91,7 @@ function fmtCell(v: number | null, m: Medicion): string {
   if (v === null) return "—";
   if (m === "kg") return formatKilos(v);
   if (m === "margenPct") return `${v.toFixed(1)}%`;
+  if (m === "variedad") return Math.round(v).toLocaleString("es-MX");
   return formatMoney(v);
 }
 
@@ -232,6 +235,9 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
         <span>
           {contextLabel} · {vendedor ? `Vendedor: ${vendedor}` : "Todos los vendedores"} ·{" "}
           <strong style={{ color: "var(--text-secondary)" }}>{sorted.length}</strong> {dimLabel.toLowerCase()}s
+          {medicion === "variedad" && (
+            <> · <strong style={{ color: "var(--text-secondary)" }}>Variedad</strong> = # de {dimension === "clientes" ? "SKUs distintos" : "clientes distintos"}</>
+          )}
         </span>
         {refDate && (
           <span>Comparación justa: ambos años capados al <strong style={{ color: "var(--text-secondary)" }}>{dia} de {mesNom}</strong></span>
@@ -244,16 +250,18 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
       {/* Dos tablas sincronizadas (mismo orden), en un contenedor con scroll común */}
       {!loading && sorted.length > 0 && (
         <div className="max-h-[520px] overflow-auto rounded-[var(--radius-lg)] border" style={{ borderColor: "var(--border)" }}>
+          {/* Alturas fijas idénticas (título 26 · encabezado 32 · fila 34) para
+              que ambas tablas cuadren renglón a renglón sin importar el contenido. */}
           <div className="flex min-w-full flex-col gap-0 lg:flex-row">
             {/* Tabla 1 — Año Anterior */}
             <table className="w-full border-collapse text-xs lg:w-1/2">
               <thead className="sticky top-0 z-10" style={{ background: "var(--bg-surface-muted)" }}>
-                <tr>
-                  <th colSpan={3} className="px-2.5 pt-2 pb-0.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
+                <tr style={{ height: 26 }}>
+                  <th colSpan={3} className="px-2.5 pb-0.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
                     Año Anterior · {yAnt || "2025"}
                   </th>
                 </tr>
-                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                <tr style={{ height: 32, borderBottom: "1px solid var(--border)" }}>
                   <Th col="name" align="left">{dimLabel}</Th>
                   <Th col="aa_mes">{mesLbl}</Th>
                   <Th col="aa_ytd">Acum</Th>
@@ -261,10 +269,10 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
               </thead>
               <tbody>
                 {sorted.map((r) => (
-                  <tr key={"aa-" + r.name} style={{ borderBottom: "1px solid var(--border-subtle, var(--border))" }}>
-                    <td className="max-w-[240px] truncate px-2.5 py-1.5" style={{ color: "var(--text-primary)" }} title={r.name}>{r.name}</td>
-                    <td className="px-2.5 py-1.5 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>{fmtCell(cellValue(r, "aa_mes", medicion), medicion)}</td>
-                    <td className="px-2.5 py-1.5 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>{fmtCell(cellValue(r, "aa_ytd", medicion), medicion)}</td>
+                  <tr key={"aa-" + r.name} style={{ height: 34, borderBottom: "1px solid var(--border)" }}>
+                    <td className="max-w-[240px] truncate px-2.5 py-0" style={{ color: "var(--text-primary)" }} title={r.name}>{r.name}</td>
+                    <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>{fmtCell(cellValue(r, "aa_mes", medicion), medicion)}</td>
+                    <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>{fmtCell(cellValue(r, "aa_ytd", medicion), medicion)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -273,12 +281,12 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
             {/* Tabla 2 — Año Actual + crecimiento */}
             <table className="w-full border-collapse text-xs lg:w-1/2" style={{ borderLeft: "2px solid var(--border)" }}>
               <thead className="sticky top-0 z-10" style={{ background: "var(--bg-surface-muted)" }}>
-                <tr>
-                  <th colSpan={5} className="px-2.5 pt-2 pb-0.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>
+                <tr style={{ height: 26 }}>
+                  <th colSpan={5} className="px-2.5 pb-0.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>
                     Año Actual · {yAct || "2026"}
                   </th>
                 </tr>
-                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                <tr style={{ height: 32, borderBottom: "1px solid var(--border)" }}>
                   <Th col="name" align="left">{dimLabel}</Th>
                   <Th col="act_mes">Avance {mesNom}</Th>
                   <Th col="g_mes">Δ Mes</Th>
@@ -291,12 +299,12 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
                   const gMes = growthLabel(cellValue(r, "aa_mes", medicion), cellValue(r, "act_mes", medicion), medicion);
                   const gYtd = growthLabel(cellValue(r, "aa_ytd", medicion), cellValue(r, "act_ytd", medicion), medicion);
                   return (
-                    <tr key={"act-" + r.name} style={{ borderBottom: "1px solid var(--border-subtle, var(--border))" }}>
-                      <td className="max-w-[200px] truncate px-2.5 py-1.5" style={{ color: "var(--text-primary)" }} title={r.name}>{r.name}</td>
-                      <td className="px-2.5 py-1.5 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>{fmtCell(cellValue(r, "act_mes", medicion), medicion)}</td>
-                      <td className="px-2.5 py-1.5 text-right font-semibold tabular-nums" style={{ color: toneColor(gMes.tone) }}>{gMes.txt}</td>
-                      <td className="px-2.5 py-1.5 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>{fmtCell(cellValue(r, "act_ytd", medicion), medicion)}</td>
-                      <td className="px-2.5 py-1.5 text-right font-semibold tabular-nums" style={{ color: toneColor(gYtd.tone) }}>{gYtd.txt}</td>
+                    <tr key={"act-" + r.name} style={{ height: 34, borderBottom: "1px solid var(--border)" }}>
+                      <td className="max-w-[200px] truncate px-2.5 py-0" style={{ color: "var(--text-primary)" }} title={r.name}>{r.name}</td>
+                      <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>{fmtCell(cellValue(r, "act_mes", medicion), medicion)}</td>
+                      <td className="px-2.5 py-0 text-right font-semibold tabular-nums" style={{ color: toneColor(gMes.tone) }}>{gMes.txt}</td>
+                      <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>{fmtCell(cellValue(r, "act_ytd", medicion), medicion)}</td>
+                      <td className="px-2.5 py-0 text-right font-semibold tabular-nums" style={{ color: toneColor(gYtd.tone) }}>{gYtd.txt}</td>
                     </tr>
                   );
                 })}
