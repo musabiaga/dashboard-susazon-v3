@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ dimension, refDate: null, vendedores: [], rows: [] });
   }
 
-  const [dataRes, metaRes] = await Promise.all([
+  const [dataRes, metaRes, totRes] = await Promise.all([
     supabase.rpc("insights_crecimiento_vendedor", {
       p_dimension: dimension,
       p_vendedor: vendedor,
@@ -55,6 +55,14 @@ export async function GET(request: NextRequest) {
       p_agrupador_id: agrupadorId,
     }),
     supabase.rpc("insights_crecimiento_meta", {
+      p_territorios: territoriosFilter,
+      p_agrupador_id: agrupadorId,
+    }),
+    // Totales REALES del scope: Σ para venta/kg/margen y COUNT(DISTINCT) para
+    // variedad/tickets → nunca la suma de los renglones (duplicaría).
+    supabase.rpc("insights_crecimiento_totales", {
+      p_dimension: dimension,
+      p_vendedor: vendedor,
       p_territorios: territoriosFilter,
       p_agrupador_id: agrupadorId,
     }),
@@ -68,10 +76,13 @@ export async function GET(request: NextRequest) {
     | { ref_date: string | null; vendedores: string[] | null }
     | undefined;
 
+  const totales = Array.isArray(totRes.data) ? totRes.data[0] : totRes.data;
+
   return NextResponse.json({
     dimension,
     refDate: meta?.ref_date ?? null,
     vendedores: meta?.vendedores ?? [],
     rows: dataRes.data ?? [],
+    totales: totales ?? null,
   });
 }

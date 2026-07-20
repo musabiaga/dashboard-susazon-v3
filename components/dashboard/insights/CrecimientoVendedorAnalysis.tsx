@@ -15,17 +15,21 @@ import { ArrowUp, ArrowDown, Search } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 
 type Dimension = "clientes" | "productos";
-type Medicion = "kg" | "venta" | "margenPct" | "margenAbs" | "variedad";
+type Medicion = "kg" | "venta" | "margenPct" | "margenAbs" | "variedad" | "ticketProm";
 type Period = "aa_mes" | "aa_ytd" | "act_mes" | "act_ytd";
 type SortCol = "name" | Period | "g_mes" | "g_ytd";
 
-interface Row {
-  name: string;
-  aa_mes_venta: number; aa_mes_kg: number; aa_mes_margen: number; aa_mes_var: number;
-  aa_ytd_venta: number; aa_ytd_kg: number; aa_ytd_margen: number; aa_ytd_var: number;
-  act_mes_venta: number; act_mes_kg: number; act_mes_margen: number; act_mes_var: number;
-  act_ytd_venta: number; act_ytd_kg: number; act_ytd_margen: number; act_ytd_var: number;
+/** Métricas crudas de las 4 celdas. Row = Cells + name; Totales = Cells (scope). */
+interface Cells {
+  aa_mes_venta: number; aa_mes_kg: number; aa_mes_margen: number; aa_mes_var: number; aa_mes_tick: number;
+  aa_ytd_venta: number; aa_ytd_kg: number; aa_ytd_margen: number; aa_ytd_var: number; aa_ytd_tick: number;
+  act_mes_venta: number; act_mes_kg: number; act_mes_margen: number; act_mes_var: number; act_mes_tick: number;
+  act_ytd_venta: number; act_ytd_kg: number; act_ytd_margen: number; act_ytd_var: number; act_ytd_tick: number;
 }
+interface Row extends Cells {
+  name: string;
+}
+type Totales = Cells;
 
 interface Props {
   today: { year: number; month: number; day: number };
@@ -40,6 +44,7 @@ const MEDICIONES: { key: Medicion; label: string }[] = [
   { key: "margenPct", label: "Margen %" },
   { key: "margenAbs", label: "Margen $" },
   { key: "variedad", label: "Variedad" },
+  { key: "ticketProm", label: "Ticket Prom." },
 ];
 const MES_NOM = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -49,15 +54,21 @@ function territoriosKeyOf(t: string[] | null): string {
   return [...t].sort().join("|");
 }
 
-function cellValue(r: Row, p: Period, m: Medicion): number | null {
-  const venta = r[`${p}_venta` as keyof Row] as number;
-  const kg = r[`${p}_kg` as keyof Row] as number;
-  const margen = r[`${p}_margen` as keyof Row] as number;
+function cellValue(r: Cells, p: Period, m: Medicion, dim: Dimension): number | null {
+  const venta = r[`${p}_venta` as keyof Cells] as number;
+  const kg = r[`${p}_kg` as keyof Cells] as number;
+  const margen = r[`${p}_margen` as keyof Cells] as number;
   if (m === "kg") return kg;
   if (m === "venta") return venta;
   if (m === "margenAbs") return margen;
-  if (m === "variedad") return r[`${p}_var` as keyof Row] as number; // # SKUs (clientes) / # clientes (productos)
-  return venta > 0 ? (margen / venta) * 100 : null; // margenPct
+  if (m === "variedad") return r[`${p}_var` as keyof Cells] as number; // # SKUs (clientes) / # clientes (productos)
+  if (m === "ticketProm") {
+    const tick = r[`${p}_tick` as keyof Cells] as number;
+    if (!tick) return null;
+    // Clientes → $ por ticket · Productos → kg por ticket
+    return (dim === "clientes" ? venta : kg) / tick;
+  }
+  return venta > 0 ? (margen / venta) * 100 : null; // margenPct (ponderado)
 }
 
 /** Número ordenable del crecimiento (Nuevo=tope, sin dato=fondo). */
@@ -87,11 +98,12 @@ function growthLabel(aa: number | null, act: number | null, m: Medicion): { txt:
   return { txt: `${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%`, tone: pct > 0 ? "up" : pct < 0 ? "down" : "neutral" };
 }
 
-function fmtCell(v: number | null, m: Medicion): string {
+function fmtCell(v: number | null, m: Medicion, dim: Dimension): string {
   if (v === null) return "—";
   if (m === "kg") return formatKilos(v);
   if (m === "margenPct") return `${v.toFixed(1)}%`;
   if (m === "variedad") return Math.round(v).toLocaleString("es-MX");
+  if (m === "ticketProm") return dim === "clientes" ? formatMoney(v) : formatKilos(v);
   return formatMoney(v);
 }
 
@@ -108,6 +120,7 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [rows, setRows] = useState<Row[]>([]);
+  const [totales, setTotales] = useState<Totales | null>(null);
   const [vendedores, setVendedores] = useState<string[]>([]);
   const [refDate, setRefDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -118,7 +131,7 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
   useEffect(() => {
     let cancelled = false;
     if (!agrupadorId && tKey === "__NONE__") {
-      setRows([]); setVendedores([]); setRefDate(null);
+      setRows([]); setTotales(null); setVendedores([]); setRefDate(null);
       return;
     }
     setLoading(true); setError(null);
@@ -129,9 +142,10 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
     else if (territorios !== null) params.set("territorios", territorios.join(","));
     fetch(`/api/insights/crecimiento-vendedor?${params.toString()}`)
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then((json: { rows?: Row[]; vendedores?: string[]; refDate?: string | null }) => {
+      .then((json: { rows?: Row[]; totales?: Totales | null; vendedores?: string[]; refDate?: string | null }) => {
         if (cancelled) return;
         setRows(json.rows ?? []);
+        setTotales(json.totales ?? null);
         // el dropdown de vendedores NO cambia al elegir uno; solo lo poblamos
         // cuando venimos de "Todos" (o si aún está vacío).
         if (!vendedor || vendedores.length === 0) setVendedores(json.vendedores ?? []);
@@ -157,9 +171,9 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
     const q = query.trim().toLowerCase();
     const filtered = q ? rows.filter((r) => r.name.toLowerCase().includes(q)) : rows;
     const valOf = (r: Row): number => {
-      if (sortCol === "g_mes") return growthNum(cellValue(r, "aa_mes", medicion), cellValue(r, "act_mes", medicion), medicion);
-      if (sortCol === "g_ytd") return growthNum(cellValue(r, "aa_ytd", medicion), cellValue(r, "act_ytd", medicion), medicion);
-      const v = cellValue(r, sortCol as Period, medicion);
+      if (sortCol === "g_mes") return growthNum(cellValue(r, "aa_mes", medicion, dimension), cellValue(r, "act_mes", medicion, dimension), medicion);
+      if (sortCol === "g_ytd") return growthNum(cellValue(r, "aa_ytd", medicion, dimension), cellValue(r, "act_ytd", medicion, dimension), medicion);
+      const v = cellValue(r, sortCol as Period, medicion, dimension);
       return v === null ? -Infinity : v;
     };
     return [...filtered].sort((a, b) => {
@@ -169,7 +183,17 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
       const va = valOf(a), vb = valOf(b);
       return sortDir === "asc" ? va - vb : vb - va;
     });
-  }, [rows, query, sortCol, sortDir, medicion]);
+  }, [rows, query, sortCol, sortDir, medicion, dimension]);
+
+  // Helpers para el JSX (cierran sobre medición + dimensión activas)
+  const cv = (r: Cells, p: Period) => cellValue(r, p, medicion, dimension);
+  const fc = (v: number | null) => fmtCell(v, medicion, dimension);
+
+  // Δ del TOTALIZADOR: se calcula de los totales REALES del scope (Σ para
+  // venta/kg/margen; COUNT(DISTINCT) para variedad/tickets), nunca promediando
+  // renglones. Margen% = Σmargen/Σventa · Ticket = Σventa/#tickets.
+  const gTotMes = totales ? growthLabel(cv(totales, "aa_mes"), cv(totales, "act_mes"), medicion) : null;
+  const gTotYtd = totales ? growthLabel(cv(totales, "aa_ytd"), cv(totales, "act_ytd"), medicion) : null;
 
   const setSort = (c: SortCol) => {
     if (sortCol === c) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
@@ -238,6 +262,9 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
           {medicion === "variedad" && (
             <> · <strong style={{ color: "var(--text-secondary)" }}>Variedad</strong> = # de {dimension === "clientes" ? "SKUs distintos" : "clientes distintos"}</>
           )}
+          {medicion === "ticketProm" && (
+            <> · <strong style={{ color: "var(--text-secondary)" }}>Ticket</strong> = compra de un cliente en un día · muestra {dimension === "clientes" ? "$ por ticket" : "kg por ticket"}</>
+          )}
         </span>
         {refDate && (
           <span>Comparación justa: ambos años capados al <strong style={{ color: "var(--text-secondary)" }}>{dia} de {mesNom}</strong></span>
@@ -271,11 +298,20 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
                 {sorted.map((r) => (
                   <tr key={"aa-" + r.name} style={{ height: 34, borderBottom: "1px solid var(--border)" }}>
                     <td className="max-w-[240px] truncate px-2.5 py-0" style={{ color: "var(--text-primary)" }} title={r.name}>{r.name}</td>
-                    <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>{fmtCell(cellValue(r, "aa_mes", medicion), medicion)}</td>
-                    <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>{fmtCell(cellValue(r, "aa_ytd", medicion), medicion)}</td>
+                    <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>{fc(cv(r, "aa_mes"))}</td>
+                    <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>{fc(cv(r, "aa_ytd"))}</td>
                   </tr>
                 ))}
               </tbody>
+              {totales && (
+                <tfoot className="sticky bottom-0 z-10" style={{ background: "var(--bg-surface-muted)" }}>
+                  <tr style={{ height: 38, borderTop: "2px solid var(--border)" }}>
+                    <td className="px-2.5 py-0 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Total</td>
+                    <td className="px-2.5 py-0 text-right font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>{fc(cv(totales, "aa_mes"))}</td>
+                    <td className="px-2.5 py-0 text-right font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>{fc(cv(totales, "aa_ytd"))}</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
 
             {/* Tabla 2 — Año Actual + crecimiento */}
@@ -296,19 +332,30 @@ export function CrecimientoVendedorAnalysis({ territorios, contextLabel, agrupad
               </thead>
               <tbody>
                 {sorted.map((r) => {
-                  const gMes = growthLabel(cellValue(r, "aa_mes", medicion), cellValue(r, "act_mes", medicion), medicion);
-                  const gYtd = growthLabel(cellValue(r, "aa_ytd", medicion), cellValue(r, "act_ytd", medicion), medicion);
+                  const gMes = growthLabel(cv(r, "aa_mes"), cv(r, "act_mes"), medicion);
+                  const gYtd = growthLabel(cv(r, "aa_ytd"), cv(r, "act_ytd"), medicion);
                   return (
                     <tr key={"act-" + r.name} style={{ height: 34, borderBottom: "1px solid var(--border)" }}>
                       <td className="max-w-[200px] truncate px-2.5 py-0" style={{ color: "var(--text-primary)" }} title={r.name}>{r.name}</td>
-                      <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>{fmtCell(cellValue(r, "act_mes", medicion), medicion)}</td>
+                      <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>{fc(cv(r, "act_mes"))}</td>
                       <td className="px-2.5 py-0 text-right font-semibold tabular-nums" style={{ color: toneColor(gMes.tone) }}>{gMes.txt}</td>
-                      <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>{fmtCell(cellValue(r, "act_ytd", medicion), medicion)}</td>
+                      <td className="px-2.5 py-0 text-right tabular-nums" style={{ color: "var(--text-primary)" }}>{fc(cv(r, "act_ytd"))}</td>
                       <td className="px-2.5 py-0 text-right font-semibold tabular-nums" style={{ color: toneColor(gYtd.tone) }}>{gYtd.txt}</td>
                     </tr>
                   );
                 })}
               </tbody>
+              {totales && (
+                <tfoot className="sticky bottom-0 z-10" style={{ background: "var(--bg-surface-muted)" }}>
+                  <tr style={{ height: 38, borderTop: "2px solid var(--border)" }}>
+                    <td className="px-2.5 py-0 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>Total</td>
+                    <td className="px-2.5 py-0 text-right font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>{fc(cv(totales, "act_mes"))}</td>
+                    <td className="px-2.5 py-0 text-right font-bold tabular-nums" style={{ color: toneColor(gTotMes?.tone ?? "neutral") }}>{gTotMes?.txt ?? "—"}</td>
+                    <td className="px-2.5 py-0 text-right font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>{fc(cv(totales, "act_ytd"))}</td>
+                    <td className="px-2.5 py-0 text-right font-bold tabular-nums" style={{ color: toneColor(gTotYtd?.tone ?? "neutral") }}>{gTotYtd?.txt ?? "—"}</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
