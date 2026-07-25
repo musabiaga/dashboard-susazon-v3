@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<instructivo version="4.1" fecha="2026-07-05" idioma="es-MX">
+<instructivo version="4.2" fecha="2026-07-24" idioma="es-MX">
 
   <contexto>
-    <proyecto>Dashboard Comercial Susazón V4.1 — InCom (versión 4.1.0)</proyecto>
+    <proyecto>Dashboard Comercial Susazón V4.2 — InCom (versión 4.2.0)</proyecto>
     <propietario>Mauricio Usabiaga, Director de Operaciones, Grupo Susazón</propietario>
     <empresa>Grupo Susazón (incluye marca Susazón y marca Suve)</empresa>
     <usuarios_finales>15 personas internas (admin, director, gerente regional, vendedor)</usuarios_finales>
@@ -18,12 +18,38 @@
       el V3.0 esté siendo evaluado. Útil como referencia de fórmulas y lógica de negocio.
     </predecesor>
     <estado_actual>
-      EN PRODUCCIÓN versión 4.1.0. Deploy live en Vercel desde repo privado
+      EN PRODUCCIÓN versión 4.2.0. Deploy live en Vercel desde repo privado
       github.com/musabiaga/dashboard-susazon-v3. URL canonical:
       https://www.dashboardcomercialsusazon.com (custom domain GoDaddy → Vercel).
 
-      37 migraciones Supabase, 337K+ filas de datos comerciales (Ene 2024 - Jun 2026;
-      última fecha con datos 2026-06-05). 15/15 usuarios autorizados en prod.
+      40 migraciones Supabase, 337K+ filas de datos comerciales (Ene 2024 - Jul 2026).
+      15/15 usuarios autorizados en prod. Insights = 6 sub-análisis.
+
+      === V4.2 (Fase 16 · 2026-07-12 al 2026-07-19) ===
+      Insights gana su 6º sub-análisis: "Crecimiento x Vendedor". Objetivo: evaluar el
+      desempeño de cada vendedor comparando su cartera Año Anterior vs Año Actual (Mes +
+      Acumulado), por cliente o por producto. Filtra por vendedor (+ territorio/agrupador
+      del sidebar) y CAPA el año en curso a la última fecha con datos para comparar al
+      mismo día (comparación justa). 6 mediciones en un toggle: Kg, $, Margen %, Margen $,
+      Variedad (No. SKUs = COUNT DISTINCT del campo espejo según dimensión), Ticket
+      Promedio (ticket = fecha+cliente, junta Sus+Suve; Clientes→$/ticket, Productos→kg/ticket).
+      Cada fila con Δ% Mes y Δ% Acum coloreado (Nuevo/−100%, margen en pp). FILA TOTAL fija
+      al pie con TOTALIZADOR REAL: Σ pura en aditivas, COUNT DISTINCT en variedad/tickets,
+      Margen % = Σmargen/Σventa, Δ del total calculado de los totales (NUNCA promedio de
+      filas). Migraciones 038 (RPC base + meta), 039 (Variedad), 040 (totales REALES +
+      tickets); endpoint insights/crecimiento-vendedor; componente CrecimientoVendedorAnalysis.
+      Ver &lt;fase_16&gt;.
+
+      === V4.1 (Fases 13-15 · 2026-06-16 al 2026-07-07) ===
+      Tres bloques: (1) 5º Insight "Penetración / Canasta" — amplitud de canasta (cliente→#SKUs,
+      SKU→#clientes) vs año anterior; migración 028, endpoints penetracion(+detalle), componente
+      PenetracionAnalysis. (2) Módulo AGRUPADORES — territorios virtuales, Fase 1→3 (seguridad KAM
+      por RLS real, vista enfocada en los 7 tabs, meta manual PTTO + export); migraciones 029-037;
+      FEATURE COMPLETA. (3) Histograma mensual interactivo en las 3 pastillas de Tracking
+      (Venta/Margen/KG): toggle Timeline↔Comparativo, barras + línea de tendencia, Δ YoY; sin backend
+      (reusa activeKpi.monthly). Fix posterior (bug 50): el hover del histograma en modo Timeline caía
+      en el mes equivocado por eje X categórico con nombres de mes duplicados entre años → clave única
+      AAAA-MM. Ver &lt;fase_13&gt;, &lt;fase_14&gt;, &lt;fase_15&gt;.
 
       === V4.0 (Fases 10-12 · 2026-06-01 al 2026-06-07) ===
       Tres bloques grandes sobre v3.9.0:
@@ -492,7 +518,22 @@
       Las 3 pastillas KPI (Venta/Margen/KG) de Tracking Diario abren (hover en desktop, tap en touch) un popover con el histórico mensual de su métrica: barras por mes + línea de tendencia, toggle Timeline (meses seguidos 2024→actual, línea = media móvil 3m) ↔ Comparativo por año (Ene–Dic, una barra por año 2024/25/26 + línea de promedio estacional). Hover por mes = valor + Δ vs el mismo mes del año anterior (en Margen además el % de venta).
     </resumen>
     <implementacion>Nuevo components/dashboard/KpiHistogramPopover.tsx (client, Recharts ComposedChart) que envuelve cada KpiCard. SIN backend: reusa activeKpi.monthly (serie ya cargada, scoped por selección + modo agrupador); se pasa page→DashboardClient→KpiCardsRow (prop monthly). Commit abe8071.</implementacion>
+    <fix fecha="2026-07-07" bug="50">En modo Timeline el hover mostraba el mes equivocado (se veían solo los extremos). Causa: el eje X usaba dataKey='label' (nombre de mes), que se repite entre años → Recharts colapsa las categorías duplicadas y las ~31 barras se mapeaban sobre ~14 posiciones. Fix: eje X con clave ÚNICA por punto (xkey='AAAA-MM') + tickFormatter que la vuelve a mostrar como nombre de mes. Comparativo no se afecta. Commit 52c141b.</fix>
   </fase_15>
+
+  <fase_16 fecha="2026-07-12 al 2026-07-19" titulo="Insights · 6º sub-análisis: Crecimiento x Vendedor (V4.2)">
+    <resumen>
+      Análisis para evaluar el desempeño y crecimiento de cada vendedor: dos tablas sincronizadas lado a lado (Año Anterior / Año Actual), cada una con columnas Mes y Acumulado, de la cartera del vendedor por cliente o por producto. Se elige vendedor en un dropdown (+ respeta territorio/agrupador del sidebar) y se CAPA el año en curso a la última fecha con datos (ref = max fecha) para comparar al mismo día. 6 mediciones en un toggle: Kg, $, Margen %, Margen $, Variedad (No. SKUs), Ticket Promedio. Cada fila con Δ% Mes y Δ% Acum coloreado (Nuevo 🟢 / −100% 🔴; margen % en puntos porcentuales pp). Ordenable por columna, con buscador. Registrado como 6º en SUB_ANALYSES de InsightsTab.
+    </resumen>
+    <medicion_variedad>Variedad = COUNT(DISTINCT campo espejo). Dimensión Clientes = # SKUs distintos que compró el cliente; dimensión Productos = # clientes distintos que compraron el producto. Hint en UI de qué cuenta según la dimensión.</medicion_variedad>
+    <medicion_ticket>Ticket = fecha + cliente (no hay folio en sales_rows; junta Sus+Suve del mismo día). Dimensión Clientes → $/ticket; dimensión Productos → kg/ticket.</medicion_ticket>
+    <totalizador_real>
+      Fila TOTAL fija al pie de AMBAS tablas, calculada por RPC aparte (insights_crecimiento_totales), NO por reduce de los renglones. Agrega sobre TODO el scope: Σ pura para venta/kg/margen $; COUNT(DISTINCT) para variedad y # tickets; Margen % = Σmargen/Σventa; Ticket Prom. = Σventa/#tickets. Los Δ del total se calculan de los totales 2025 vs 2026, jamás promediando filas. Razón: sumar renglones da números FALSOS en métricas no aditivas — prueba dura: Variedad 2026 total REAL = 272 SKUs vs 6,793 si se sumaran filas (mismo SKU comprado por muchos clientes); venta sí cuadra exacta ($822M = Σ filas, aditiva); Margen % pasa de 13.0% (promedio ingenuo) a 15.2% (real). Coherente con la gobernanza del proyecto: la métrica se define por regla de negocio.
+    </totalizador_real>
+    <backend>Migración 038: insights_crecimiento_vendedor(dimension, vendedor, territorios, agrupador) devuelve las 4 celdas (AA/actual × mes/YTD) capadas al mismo día + insights_crecimiento_meta (corte + lista de vendedores). Migración 039: Variedad (COUNT DISTINCT espejo). Migración 040: insights_crecimiento_totales (fila TOTAL) + conteo de tickets. Todas SECURITY INVOKER (respetan RLS) con branch de agrupador. Endpoint /api/insights/crecimiento-vendedor (1 fetch → data + meta).</backend>
+    <frontend>components/dashboard/insights/CrecimientoVendedorAnalysis.tsx. Tablas con alturas fijas por fila (título 26 / encabezado 32 / fila 34) para que cuadren renglón a renglón. Toggles Dimensión (Clientes|Productos) + Medición; dropdown Vendedor; buscador.</frontend>
+    <validacion>COSTCO Mes 2025 $24.06M vs 2026 $20.58M (capado justo), Acum +19%; SABOR E HIGIENE 139 SKUs, COSTCO Variedad=1 (solo Arrachera Kirkland); 44 vendedores; corte 2026-07-12. tsc + build OK en cada entrega. Commits 7cc5122 (base) + 2d8abc7 (Variedad+alineación) + cb1793d (totalizador+ticket).</validacion>
+  </fase_16>
 
   <archivos>
     <directorio nombre="app/" descripcion="Páginas Next.js 16 (App Router)">

@@ -1,8 +1,8 @@
-# Session Log — Dashboard Comercial Susazón V4.0
+# Session Log — Dashboard Comercial Susazón V4.2
 
 ## Metadata
 
-- **Proyecto:** Dashboard Comercial Susazón V4.0 (Profesional) — **InCom** (Inteligencia Comercial Susazón®)
+- **Proyecto:** Dashboard Comercial Susazón V4.2 (Profesional) — **InCom** (Inteligencia Comercial Susazón®)
 - **Empresa/Usuario:** Grupo Susazón (Susazón + Suve) — Mauricio Usabiaga, Director de Operaciones
 - **Inicio:** 2026-04-26
 - **Cierre fase 1:** 2026-04-28 (deploy a producción)
@@ -18,11 +18,13 @@
 - **Cierre fase 11:** 2026-06-06 (Tab unificado "Clientes y Productos": fusión Productos+Clientes con toggles independientes gráfica/tabla, buscador en tabla, desglose simétrico SKU→clientes)
 - **Cierre fase 12:** 2026-06-07 (Insights ampliado: Pareto reemplaza Radar + dimensión Territorios + 3 sub-análisis nuevos — Precio $/kg, Cuadrante BCG, Estacionalidad — + comparación YoY justa + popovers de ayuda)
 - **Cierre fase 13:** 2026-06-07 (Documentación V4.0 completa: docs vivos + 6 .docx regenerados + manual HTML/PDF + sync a Plan Z + auditoría de reconstrucción desde cero)
-- **Versión actual:** 4.0.0 (en producción)
+- **Cierre fases 14-15 (V4.1):** 2026-07-05 (Insight #5 Penetración/Canasta + módulo Agrupadores completo Fase 1→3 + histograma mensual en las pastillas de Tracking + fixes D033-D035/D037)
+- **Cierre fase 16 (V4.2):** 2026-07-19 (Insights: 6º sub-análisis "Crecimiento x Vendedor" — comparativa AA vs Actual capada al mismo día, mediciones Kg/$/Margen %/Margen $/Variedad/Ticket Promedio + totalizador REAL)
+- **Versión actual:** 4.2.0 (en producción)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
 - **URL prod canonical:** `https://www.dashboardcomercialsusazon.com`
 - **URL prod fallback:** `https://dashboard-susazon-v3.vercel.app`
-- **Última actualización:** 2026-05-23
+- **Última actualización:** 2026-07-23
 
 ---
 
@@ -36,11 +38,11 @@
 | `app/dashboard/` | Dashboard principal con **7 tabs** (Tracking, Ventas, Grupo Producto, **Clientes y Productos**, Vendedores, Perdidos, **Insights**) — Productos+Clientes fusionados en V4.0 |
 | `app/admin/` | Panel admin (territorios, usuarios, audit, **configuración de sesión**) |
 | `app/cargar-datos/` | Refresh APIs + editor PTTO |
-| `app/api/` | API routes server-side (**34 endpoints** totales; +penetracion/-detalle del Insight; +admin/agrupadores (CRUD), /delete, /options) |
-| `app/api/insights/` | Endpoints del tab Insights (`concentracion`, `item-detail`, **`precio-dispersion`**, **`cuadrante`**, **`estacionalidad`**) |
+| `app/api/` | API routes server-side (**35 endpoints** totales; +penetracion/-detalle del Insight; +admin/agrupadores (CRUD), /delete, /options; **+insights/crecimiento-vendedor V4.2**) |
+| `app/api/insights/` | Endpoints del tab Insights (`concentracion`, `item-detail`, **`precio-dispersion`**, **`cuadrante`**, **`estacionalidad`**, **`penetracion`** (+`-detalle`), **`crecimiento-vendedor`**) |
 | `app/api/dashboard/` | Endpoints del dashboard (incluye **`tracking-variedad`**, **`tracking-clientes-activos`** nuevos en V4.0) |
 | `components/dashboard/` | Componentes de los 7 tabs y charts (incl. `ClientesProductosTab`, `DimensionTab` generalizado, `ProductoDesglose`) |
-| `components/dashboard/insights/` | Componentes del tab Insights (ConcentracionAnalysis, **PrecioAnalysis**, **CuadranteAnalysis**, **EstacionalidadAnalysis**, **ItemPicker**, ConcentracionGrid, DateRangePicker) |
+| `components/dashboard/insights/` | Componentes del tab Insights (ConcentracionAnalysis, **PrecioAnalysis**, **CuadranteAnalysis**, **EstacionalidadAnalysis**, **PenetracionAnalysis**, **CrecimientoVendedorAnalysis**, **ItemPicker**, ConcentracionGrid, DateRangePicker) |
 | `components/dashboard/report-pdf/` | Generador PDF "Avance Comercial" con `@react-pdf/renderer` (3 páginas) |
 | `components/session/` | Modal "¿Sigues ahí?" + hooks de seguridad de sesión |
 | `components/theme/` | 6 themes + selector modal |
@@ -52,7 +54,7 @@
 | `lib/format.ts` | Formatters (money, kilos, dates) — portado del V2.2 |
 | `lib/business-days.ts` | Cálculo de días hábiles L-S menos LFT + helpers `findCalendarDayForBizDays`, `computePrevYearAlDia` |
 | `lib/admin-guards.ts` | Guards de rol admin para API routes |
-| `supabase/migrations/` | **33 migraciones SQL aplicadas** (021-024 Insights; 025 enum audit_action; 026 Perdidos por nombre; 027 fix RLS timeout; 028 Insight Penetración; **029-033 Agrupadores**: 029 modelo, 030 RLS extendida, 031 opciones picker, 032 my_agrupadores, 033 agregaciones de la vista enfocada Fase 2) |
+| `supabase/migrations/` | **40 migraciones SQL aplicadas** (021-024 Insights; 025 enum audit_action; 026 Perdidos por nombre; 027 fix RLS timeout; 028 Insight Penetración; **029-037 Agrupadores**: 029 modelo, 030 RLS extendida, 031 opciones picker, 032 my_agrupadores, 033 agregaciones vista enfocada, 034 vendedor, 035 perdidos, 036 insights, 037 meta manual; **038-040 Crecimiento x Vendedor**: 038 RPC base + meta, 039 Variedad, 040 totales REALES + tickets) |
 | `docs/` | Esta documentación (+ `LO_NUEVO.md` con resumen ejecutivo) |
 | `proxy.ts` | Middleware de Next.js 16 (renombrado de middleware.ts) — ahora valida sesión en cada request |
 | `.env.local` | Secrets (NO commit) |
@@ -640,6 +642,29 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 **Decisión clave:** reutilizar la serie mensual ya cargada (0 llamadas extra, consistente con el número de la pastilla) en vez de un endpoint nuevo. Validado tsc + build + SSR 200 (ruta temporal, ya eliminada). Falta verificación visual autenticada (pixel).
 **Estado:** Vigente. Commit `abe8071`. Incluido en el release documental **V4.1.0**.
 
+### D043 — 2026-07-12 → 2026-07-19 | Insights: 6º sub-análisis "Crecimiento x Vendedor" (V4.2)
+
+**Contexto:** Mauricio pidió un análisis para **evaluar el desempeño y crecimiento de cada vendedor**: una comparativa Año Anterior vs Año Actual (Mes y Acumulado) de su cartera, por cliente o por producto. Es el 6º sub-análisis del tab Insights. Se construyó en 3 entregas chunkeadas (regla de commits chunkeados).
+
+**Entrega 1 — base (commit `7cc5122`, migr 038):**
+1. **Backend:** `insights_crecimiento_vendedor(dimension, vendedor, territorios, agrupador)` devuelve venta/kg/margen de las **4 celdas** (año anterior/actual × mes/YTD), **capadas al MISMO día** (`ref` = max fecha con datos) para que la comparación sea justa. + `insights_crecimiento_meta` (fecha de corte + lista de vendedores). Branch de agrupador incluido. SECURITY INVOKER (respeta RLS).
+2. **API:** `/api/insights/crecimiento-vendedor` — 1 solo fetch devuelve `data` + `meta`.
+3. **Frontend:** `CrecimientoVendedorAnalysis` — 2 tablas sincronizadas (año anterior / año actual), toggles **Dimensión** (Clientes|Productos) y **Medición**, dropdown de **Vendedor**, búsqueda, Δ% Mes/Acum con color (Nuevo 🟢 / −100% 🔴, margen % en **pp**), ordenable por columna. Registrado como 6º en `SUB_ANALYSES` de `InsightsTab`.
+
+**Validado:** COSTCO Mes 2025 $24.06M vs 2026 $20.58M (capado justo), Acum +19%; 44 vendedores; corte 2026-07-12.
+
+**Entrega 2 — Variedad + alineación (commit `2d8abc7`, migr 039):**
+1. **Medición "Variedad" (No. de SKUs):** `COUNT(DISTINCT campo espejo)` en las 4 celdas. Dimensión **Clientes** = # SKUs distintos que compró; Dimensión **Productos** = # clientes distintos que lo compraron (espejo). Hint en UI de qué cuenta según la dimensión. Validado: SABOR E HIGIENE 139 SKUs, COSTCO 1 (real: solo compra Arrachera Kirkland).
+2. **Alineación de tablas:** alturas fijas por fila (título 26 · encabezado 32 · fila 34) en ambas tablas → cuadran renglón a renglón sin importar el contenido (antes había drift de ~3px por diferencia de encabezados).
+
+**Entrega 3 — Totalizador REAL + Ticket Promedio (commit `cb1793d`, migr 040):**
+1. **Totalizador (fila TOTAL fija al pie de ambas tablas)** — `insights_crecimiento_totales` agrega **sobre TODO el scope**: Σ pura para venta/kg/margen $ y `COUNT(DISTINCT)` para variedad/tickets. **NUNCA la suma de los renglones.** Margen % = **Σmargen ÷ Σventa**; Ticket Prom. = **Σventa ÷ #tickets**. Los **Δ del total se calculan de los totales** 2025 vs 2026, jamás promediando renglones.
+2. **Medición "Ticket Promedio"** — ticket = **fecha + cliente** (no hay folio en `sales_rows`; junta Sus+Suve del mismo día). Dimensión Clientes → **$/ticket**; Dimensión Productos → **kg/ticket**. Conteo de tickets por fila agregado a `insights_crecimiento_vendedor`.
+
+**Decisión clave (por qué el totalizador es una RPC aparte y no un `reduce` en el cliente):** sumar los renglones da un número **falso** en toda métrica no aditiva. Prueba dura — Variedad 2026: el total REAL es **272 SKUs** vs **6,793** si se sumaran las filas (el mismo SKU lo compran muchos clientes). Venta sí cuadra exacto ($822,001,343 = Σ filas, por ser aditiva), y Margen % pasa de 13.0% (promedio ingenuo de filas) a **15.2%** (Σmargen/Σventa, el real). Total ponderado de Ticket Promedio = $45,210. Esto es coherente con la regla de gobernanza del proyecto: la métrica se define por regla de negocio, no por conveniencia del render.
+
+**Estado:** Vigente. **Insights = 6 sub-análisis.** Migraciones 038-040. Commits `7cc5122` + `2d8abc7` + `cb1793d`. tsc + build OK en cada entrega. Release **V4.2.0**.
+
 ---
 
 ## Bugs Resueltos
@@ -696,6 +721,7 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 | 49 | 2026-06-22 | "Desactivar" usuario no bloqueaba el acceso (era cosmético) — un desactivado podía seguir iniciando sesión | `is_active` no se hacía cumplir en ningún lado: ni `proxy.ts`, ni login, ni RLS, ni función/hook de la DB. El handler de desactivar ni siquiera cerraba la sesión. El mensaje "no podrá iniciar sesión" era falso. | `update`: al desactivar → **banear** en auth (`ban_duration` ~100 años) + `force_signout_user`; al reactivar → des-banear (`ban_duration:"none"`). Ahora `is_active` se hace cumplir de verdad. | `1fff49c` |
 | 46 | 2026-06-16 | Tabs Grupo/Vendedores/Productos/Perdidos/Insights vacíos: gráficas con nombres pero venta/margen en 0 (intermitente) | La política RLS de `sales_rows` (`territorio = ANY(visible_territories_for_current_user())`) evaluaba la función SECURITY DEFINER **por fila** (28,939×/consulta). Las vistas `_summary` y `kpi_cliente_perdidos` promediaban 2.7–3.4s con picos de 7.9s → cruzaban el `statement_timeout` de `authenticated` (8s) → la app recibía null → tabs en 0. Confirmado con `pg_stat_statements` (máximos clavados en ~7.9s). Preexistente, agravado por crecimiento de datos; NO por cambios de código. | Migración **027**: envolver la función en subconsulta `territorio IN (SELECT unnest(func()))` → evaluación única (1× vs 28,939×). Verificado: 1,612ms → 29ms (56×); seguridad intacta; datos idénticos. No se subió el timeout (sería parche). | migración 027 |
 | 45 | 2026-06-14 | Tab Perdidos: el mismo cliente aparecía repetido en varias filas | La vista `kpi_cliente_perdidos` agrupaba por `no_cliente` *case-sensitive*: (1) mismo ID con distinto casing (`CL-`/`cl-`/`Cl-`, **artefacto histórico** del export del ERP — 1,520 filas / 40 clientes, solo 2024-01→2025-09, 0 desde oct-2025) salía como clientes distintos → variante minúscula sin venta 2026 = PERDIDO falso; (2) mismo cliente en cuentas Sus + Suve (`no_cliente` distinto) salía 2 veces. | Migración **026**: la vista agrupa por NOMBRE `(anio, cliente, vendedor, territorio)` con `no_cliente = MIN(UPPER(...))` (UPPER solo al leer). Pivot de `page.tsx` + keys de `PerdidosTab` por `cliente\|vendedor`. **Decisión de gobernanza:** NO se transforma el dato de origen (se revirtió el `.toUpperCase()` del import, `8a0f48c`) ni se mutan las filas históricas; la unificación por nombre resuelve el síntoma. Verificado: VICTORIA HANUN SALUM → 1 fila/año activa; HECTOR VEGA → 2 filas legítimas (2 vendedores). | `6625f20` + `8a0f48c` + migr. 026 |
+| 50 | 2026-07-07 | Histograma de las pastillas (Tracking) en modo **Timeline**: el hover mostraba el mes equivocado — quedaba pegado en inicio-2024 ("solo se veían los extremos, no el medio") | El eje X usaba `dataKey='label'` (nombre del mes), que **se repite entre años** (Feb/Mar/… existen en 2024, 2025 y 2026). Recharts **colapsa las categorías duplicadas** de un eje categórico → las 31 barras se mapeaban sobre ~14 posiciones; solo Ene'24/Ene'26 eran únicos. | Eje X con clave **ÚNICA** por punto (`xkey = 'AAAA-MM'`) + `tickFormatter` que la vuelve a mostrar como nombre de mes. El modo Comparativo no se afecta (Ene–Dic ya eran únicos). Verificado con hover real (CDP): x=12%→Abr2024, x=50%→Abr2025, x=88%→Mar2026 (antes las tres caían en 2024). | `52c141b` |
 
 ---
 
@@ -820,6 +846,22 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 - [x] **6 .docx regenerados** a v4.0.0 (`gen_docs.py`) + manual HTML/PDF a V4.0 (PDF vía `chrome-headless-shell` de Playwright).
 - [x] **Sync a Plan Z** (`respaldar.sh`, fix bug 43) + CHANGELOG `[4.0.0]`.
 - [x] **Auditoría de reconstrucción desde cero**: 24 migraciones sin gaps, deps locked, `.env.example` completo (Suve documentado), código completo en ambas carpetas, secrets gitignored + documentados.
+
+### Completados en V4.1 — fases 14-15 (2026-06-14 a 2026-07-07) · Penetración + Agrupadores + histograma
+
+- [x] **5º Insight "Penetración / Canasta"** (D036): amplitud de canasta (cliente → # SKUs; SKU → # clientes) vs año anterior. Migración **028**, endpoints `penetracion` + `penetracion-detalle`, `PenetracionAnalysis`.
+- [x] **Módulo Agrupadores — territorios virtuales, Fase 1→3** (D038-D041): modelo + admin + **frontera de seguridad real por RLS** (un KAM ve SOLO su agrupador); **vista enfocada** en los 7 tabs (agrupador como "territorio sintético"); **meta manual (PTTO)** + export PDF/Excel. Migraciones **029-037**. Feature COMPLETA.
+- [x] **Histograma mensual interactivo** en las 3 pastillas de Tracking (Venta/Margen/KG) (D042): toggle Timeline ↔ Comparativo, barras + línea de tendencia, Δ YoY. Sin backend (reusa `activeKpi.monthly`).
+- [x] **Fixes:** Perdidos agrupa por nombre (bug 45); timeout RLS por evaluación por-fila (bug 46, migr 027); desglose de clientes por día en vista "Todos" (bug 47); reactivación de usuarios + `is_active` se hace cumplir de verdad (bugs 48-49).
+- [x] **Docs V4.1** (commits `7b4a973`, `170a3a4`, `34cfa8a`): LO_NUEVO, CONTINUACION, INSTRUCTIVO_AGENTE v4.1, GUIA_SECRETS, .docx a v4.1.0, PDF visual regenerado con `chrome-headless-shell`.
+- [x] **Fix histograma Timeline** (bug 50): eje X con clave única `AAAA-MM` → el hover ya cae en el mes correcto.
+
+### Completados en V4.2 — fase 16 (2026-07-12 a 2026-07-19) · Insights: Crecimiento x Vendedor
+
+- [x] **6º sub-análisis "Crecimiento x Vendedor"** (D043): comparativa Año Anterior vs Año Actual (Mes + Acumulado) por cliente o producto, filtrable por vendedor, **capada al mismo día** para comparación justa. Migración **038**, endpoint `crecimiento-vendedor`, `CrecimientoVendedorAnalysis`. Commit `7cc5122`.
+- [x] **Medición "Variedad" (No. de SKUs)** + alineación exacta de las 2 tablas. Migración **039**. Commit `2d8abc7`.
+- [x] **Totalizador REAL** (fila TOTAL fija al pie de ambas tablas): Σ pura en aditivas, `COUNT(DISTINCT)` en variedad/tickets, Margen % = Σmargen÷Σventa, Δ calculado de los totales — **nunca** promediando renglones. Migración **040**. Commit `cb1793d`.
+- [x] **Medición "Ticket Promedio"**: ticket = fecha + cliente (junta Sus+Suve); Clientes → $/ticket, Productos → kg/ticket. Commit `cb1793d`.
 
 ### Próximo a venir (acordado con Mauricio)
 

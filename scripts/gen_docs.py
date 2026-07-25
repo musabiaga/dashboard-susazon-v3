@@ -29,11 +29,11 @@ from docx.oxml import OxmlElement
 # ============================================================
 # Constantes del proyecto
 # ============================================================
-PROYECTO = "Dashboard Comercial Susazón V4.1 — InCom"
+PROYECTO = "Dashboard Comercial Susazón V4.2 — InCom"
 EMPRESA = "Grupo Susazón (Susazón + Suve)"
 OWNER = "Mauricio Usabiaga, Director de Operaciones"
-VERSION = "4.1.0"
-FECHA = "2026-07-05"
+VERSION = "4.2.0"
+FECHA = "2026-07-24"
 REPO = "github.com/musabiaga/dashboard-susazon-v3"
 URL_PROD = "www.dashboardcomercialsusazon.com"
 URL_FALLBACK = "dashboard-susazon-v3-44sp.vercel.app"
@@ -191,8 +191,8 @@ def gen_arquitectura():
     doc = Document()
 
     add_cover(doc, "Arquitectura Técnica", "Diseño del sistema, stack y flujo de información")
-    add_h2(doc, "Estado de este documento (V4.1)")
-    add_para(doc, "El núcleo describe la arquitectura base (Fases 0-5). Las Fases 6-15 (versiones 3.5.0 → 4.1.0) — Insights con 5 sub-análisis, tab Clientes y Productos combinado, cards de Tracking, seguridad de sesión, PDF Avance Comercial, el módulo Agrupadores (territorios virtuales, Fase 1→3) y el histograma mensual de las pastillas — están resumidas en el ChangeLog (doc 03) y a detalle en LO_NUEVO.md, SESSION_LOG.md e INSTRUCTIVO_AGENTE.xml. Estado actual: 7 tabs (todos operan también en modo agrupador), 37 migraciones SQL. Nota clave de arquitectura: 'agrupador como territorio sintético' — funciones SQL que agregan la unión de miembros del agrupador y devuelven territorio = nombre, reutilizando el render entero; el modo territorios normal queda byte-idéntico (opt-in por ?agrupador / p_agrupador_id).")
+    add_h2(doc, "Estado de este documento (V4.2)")
+    add_para(doc, "El núcleo describe la arquitectura base (Fases 0-5). Las Fases 6-16 (versiones 3.5.0 → 4.2.0) — Insights con 6 sub-análisis (Concentración, Precio $/kg, Cuadrante BCG, Estacionalidad, Penetración y Crecimiento x Vendedor), tab Clientes y Productos combinado, cards de Tracking, seguridad de sesión, PDF Avance Comercial, el módulo Agrupadores (territorios virtuales, Fase 1→3) y el histograma mensual de las pastillas — están resumidas en el ChangeLog (doc 03) y a detalle en LO_NUEVO.md, SESSION_LOG.md e INSTRUCTIVO_AGENTE.xml. Estado actual: 7 tabs (todos operan también en modo agrupador), 40 migraciones SQL. Nota clave de arquitectura: 'agrupador como territorio sintético' — funciones SQL que agregan la unión de miembros del agrupador y devuelven territorio = nombre, reutilizando el render entero; el modo territorios normal queda byte-idéntico (opt-in por ?agrupador / p_agrupador_id). El totalizador de Crecimiento x Vendedor (V4.2) usa una RPC de agregación aparte (insights_crecimiento_totales) — nunca la suma de renglones — para que Variedad (COUNT DISTINCT), Margen % (Σmargen÷Σventa) y Ticket Promedio (Σventa÷#tickets) sean el total REAL del negocio.")
 
     add_h1(doc, "Resumen Ejecutivo")
     add_para(
@@ -368,8 +368,8 @@ Supabase Postgres
 def gen_diccionario():
     doc = Document()
     add_cover(doc, "Diccionario de Datos", "Schemas de DB, contratos de APIs y estructuras internas")
-    add_h2(doc, "Estado de este documento (V4.1)")
-    add_para(doc, "El núcleo describe los schemas base. En V4.0-4.1 se agregaron: las funciones de Insights (migr 021-024) + insights_penetracion/_detalle (028); el módulo Agrupadores (migr 029-037): tablas agrupadores, agrupador_members, users_permissions.allowed_agrupadores + agrupadores.meta_mensual, y ~15 funciones agrupador_* (member_arrays gateado SECURITY DEFINER, monthly/daily/grupo/sku/cliente/vendedor/perdidos, y el branch p_agrupador_id en las 6 insights_*). Total 37 migraciones. Ver detalle en el ChangeLog (doc 03) e INSTRUCTIVO_AGENTE.xml. REGLA CLAVE: un cliente se identifica por NOMBRE, no por no_cliente (cada ERP Sus/Suve numera aparte).")
+    add_h2(doc, "Estado de este documento (V4.2)")
+    add_para(doc, "El núcleo describe los schemas base. En V4.0-4.2 se agregaron: las funciones de Insights (migr 021-024) + insights_penetracion/_detalle (028) + insights_crecimiento_vendedor/_meta/_totales (038-040, Crecimiento x Vendedor); el módulo Agrupadores (migr 029-037): tablas agrupadores, agrupador_members, users_permissions.allowed_agrupadores + agrupadores.meta_mensual, y ~15 funciones agrupador_* (member_arrays gateado SECURITY DEFINER, monthly/daily/grupo/sku/cliente/vendedor/perdidos, y el branch p_agrupador_id en las 6 insights_*). Total 40 migraciones. Ver detalle en el ChangeLog (doc 03) e INSTRUCTIVO_AGENTE.xml. REGLA CLAVE: un cliente se identifica por NOMBRE, no por no_cliente (cada ERP Sus/Suve numera aparte). El totalizador de Crecimiento x Vendedor usa insights_crecimiento_totales (RPC aparte, no suma de renglones) para que Variedad/Margen %/Ticket Promedio sean el total REAL.")
 
     add_h1(doc, "Tablas de Postgres")
 
@@ -608,7 +608,19 @@ Body:
 # ============================================================
 def gen_changelog():
     doc = Document()
-    add_cover(doc, "ChangeLog & Release Notes", "Evolución V2.2 → V4.1 + historial de commits")
+    add_cover(doc, "ChangeLog & Release Notes", "Evolución V2.2 → V4.2 + historial de commits")
+
+    # ===== V4.2 (Fase 16) =====
+    add_h1(doc, "Versión 4.2.0 — V4.2 (2026-07-19)")
+    add_para(doc, "Insights gana su 6º sub-análisis: 'Crecimiento x Vendedor', para evaluar el desempeño y crecimiento de cada vendedor. 40 migraciones SQL; datos Ene 2024 – Jul 2026.")
+
+    add_h2(doc, "Insights — 6º sub-análisis: Crecimiento x Vendedor")
+    add_bullet(doc, "Comparativa Año Anterior vs Año Actual (Mes + Acumulado) de la cartera de un vendedor, por cliente o por producto. Se elige vendedor en un dropdown (+ respeta territorio/agrupador del sidebar) y se capa el año en curso a la última fecha con datos (ref = max fecha) para comparar al mismo día. Migración 038; insights_crecimiento_vendedor + insights_crecimiento_meta; endpoint /api/insights/crecimiento-vendedor; componente CrecimientoVendedorAnalysis.")
+    add_bullet(doc, "6 mediciones en un toggle: Kg, $, Margen %, Margen $, Variedad (No. SKUs = COUNT DISTINCT del campo espejo según dimensión) y Ticket Promedio (ticket = fecha+cliente, junta Sus+Suve; Clientes→$/ticket, Productos→kg/ticket). Cada fila con Δ% Mes y Δ% Acum coloreado (Nuevo / −100%; margen en pp). Migración 039 (Variedad).")
+    add_bullet(doc, "Totalizador REAL (fila TOTAL fija al pie de ambas tablas): RPC insights_crecimiento_totales agrega sobre TODO el scope — Σ pura en aditivas, COUNT DISTINCT en variedad/tickets, Margen % = Σmargen÷Σventa, Ticket Prom. = Σventa÷#tickets. El Δ del total se calcula de los totales, NUNCA promediando renglones. Prueba: Variedad total REAL 272 SKUs vs 6,793 si se sumaran filas. Migración 040.")
+
+    add_h2(doc, "Fixes")
+    add_bullet(doc, "Histograma de pastillas (modo Timeline): el hover caía en el mes equivocado por eje X categórico con nombres de mes repetidos entre años. Fix: clave única AAAA-MM en el eje + tickFormatter (bug 50, commit 52c141b).")
 
     # ===== V4.1 (Fases 13-15) =====
     add_h1(doc, "Versión 4.1.0 — V4.1 (2026-07-05)")
@@ -816,8 +828,13 @@ def gen_manual():
     doc = Document()
     add_cover(doc, "Manual de Usuario", "Guía no-técnica para los 15 usuarios del sistema")
 
-    add_h1(doc, "🆕 Novedades V4.1 (lo más reciente)")
-    add_para(doc, "Lo nuevo desde la V4.0:")
+    add_h1(doc, "🆕 Novedades V4.2 (lo más reciente)")
+    add_para(doc, "Lo nuevo desde la V4.1:")
+    add_h2(doc, "Insights — Crecimiento x Vendedor (6º análisis)")
+    add_para(doc, "Para evaluar cómo va cada vendedor: dos tablas lado a lado, Año Anterior y Año Actual, cada una con Mes y Acumulado de su cartera — por cliente o por producto. Eliges al vendedor en el menú y el sistema compara al mismo día (recorta el año en curso hasta la última fecha con datos) para que el crecimiento sea justo. Puedes ver 6 mediciones: Kg, $, Margen %, Margen $, Variedad (No. de SKUs) y Ticket Promedio. Cada renglón trae su Δ% del Mes y Δ% Acumulado con color (verde si crece, rojo si cae; 'Nuevo' si no había el año pasado). Al pie de cada tabla hay una fila TOTAL real: no es la suma de los renglones, es el total correcto del negocio (la Variedad cuenta SKUs distintos sin duplicar, el Margen % es ponderado y el Ticket Promedio pondera por número de tickets).")
+
+    add_h1(doc, "Novedades V4.1")
+    add_para(doc, "Si vienes de la V4.0:")
     add_h2(doc, "Agrupadores — 'territorios' a tu medida")
     add_para(doc, "Un Agrupador es un territorio virtual: agrupas los clientes, productos, grupos o territorios que quieras y lo ves en la barra lateral como si fuera un territorio más. Sirve para campañas/incentivos por producto o para darle a un KAM SOLO su cartera. Al hacer clic en un agrupador, TODO el dashboard (Ventas, Grupo, Clientes/Productos, Tracking, Vendedores, Perdidos e Insights) se re-filtra a ese scope. El admin los crea en Administración → Territorios y los asigna a quien deba verlos; puedes ponerle una meta mensual para ver su cumplimiento en el header, y exportar su PDF 'Avance Comercial' / Excel.")
     add_h2(doc, "Insights — Penetración / Canasta (5º análisis)")
@@ -975,8 +992,8 @@ def gen_manual():
 def gen_guia_ti():
     doc = Document()
     add_cover(doc, "Guía de TI y Despliegue", "Para ingenieros que mantienen, deployan o continúan el sistema")
-    add_h2(doc, "Estado de este documento (V4.1)")
-    add_para(doc, "Los procesos de despliegue (Vercel + Supabase + Resend) siguen vigentes. En V4.1 el dashboard tiene 7 tabs (todos operan también en modo agrupador) y 37 migraciones SQL. El respaldo profesional (Plan Z) se sincroniza con scripts/respaldar.sh; los .docx se regeneran con scripts/gen_docs.py; el PDF visual, desde public/instructivo.html. Ver ChangeLog (doc 03) para el historial completo.")
+    add_h2(doc, "Estado de este documento (V4.2)")
+    add_para(doc, "Los procesos de despliegue (Vercel + Supabase + Resend) siguen vigentes. En V4.2 el dashboard tiene 7 tabs (todos operan también en modo agrupador), Insights con 6 sub-análisis y 40 migraciones SQL. El respaldo profesional (Plan Z) se sincroniza con scripts/respaldar.sh; los .docx se regeneran con scripts/gen_docs.py; el PDF visual, desde public/instructivo.html. Ver ChangeLog (doc 03) para el historial completo.")
 
     add_h1(doc, "Quién debe leer esto")
     add_para(doc, "Este documento está pensado para un ingeniero de TI que necesite:")
@@ -1183,8 +1200,8 @@ git push origin main""")
 def gen_reconstruccion():
     doc = Document()
     add_cover(doc, "Guía de Reconstrucción", "Cómo rebuildear el sistema desde cero")
-    add_h2(doc, "Estado de este documento (V4.1)")
-    add_para(doc, "El procedimiento de reconstrucción base (Fases 0-5) sigue válido. Para reconstruir el estado completo V4.1 hay que aplicar las 37 migraciones SQL (incluidas 021-024 y 028 de Insights, y 029-037 del módulo Agrupadores) y construir los 7 tabs (incluido Clientes y Productos combinado, Insights con 5 sub-análisis y el histograma de pastillas de Tracking), más el módulo Agrupadores que opera en todos los tabs vía las funciones agrupador_* (territorio sintético). Ver el inventario completo de archivos/componentes/endpoints en INSTRUCTIVO_AGENTE.xml (secciones fase_10 a fase_15) y el ChangeLog (doc 03).")
+    add_h2(doc, "Estado de este documento (V4.2)")
+    add_para(doc, "El procedimiento de reconstrucción base (Fases 0-5) sigue válido. Para reconstruir el estado completo V4.2 hay que aplicar las 40 migraciones SQL (incluidas 021-024 y 028 de Insights, 029-037 del módulo Agrupadores y 038-040 de Crecimiento x Vendedor) y construir los 7 tabs (incluido Clientes y Productos combinado, Insights con 6 sub-análisis y el histograma de pastillas de Tracking), más el módulo Agrupadores que opera en todos los tabs vía las funciones agrupador_* (territorio sintético). Ver el inventario completo de archivos/componentes/endpoints en INSTRUCTIVO_AGENTE.xml (secciones fase_10 a fase_16) y el ChangeLog (doc 03).")
 
     add_h1(doc, "Cuándo usar esta guía")
     add_para(doc, "Esta es la guía CRÍTICA — debe permitir a un ingeniero competente reconstruir el sistema completo desde cero, asumiendo que solo tiene esta documentación + acceso a las APIs externas.")

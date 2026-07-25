@@ -73,9 +73,14 @@ title()   { echo -e "\n${BOLD}${BLUE}━━ $* ━━${NC}"; }
 
 if $DRY_RUN; then
   RSYNC_FLAGS="-av --dry-run"
+  # En dry-run mostramos la LISTA COMPLETA de archivos que se copiarían (antes un
+  # `tail -3` la ocultaba y solo se veía el resumen → el dry-run parecía "vacío").
+  RSYNC_VIEW="cat"
   warn "MODO DRY-RUN — nada se va a modificar. Solo te muestro qué haría."
 else
   RSYNC_FLAGS="-av"
+  # En sync real basta con el resumen (últimas líneas) para no inundar la terminal.
+  RSYNC_VIEW="tail -3"
 fi
 
 # Verificaciones preliminares
@@ -94,7 +99,7 @@ for dir in "${CODE_DIRS[@]}"; do
       --exclude='.next' \
       --exclude='.DS_Store' \
       --exclude='*.tsbuildinfo' \
-      "$PRINCIPAL/$dir/" "$PLANZ/$dir/" 2>&1 | tail -3 | sed 's/^/    /'
+      "$PRINCIPAL/$dir/" "$PLANZ/$dir/" 2>&1 | $RSYNC_VIEW | sed 's/^/    /'
   fi
 done
 

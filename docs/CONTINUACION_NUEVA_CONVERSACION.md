@@ -1,4 +1,4 @@
-# Continuación en Nueva Conversación — Dashboard Comercial Susazón V4.1
+# Continuación en Nueva Conversación — Dashboard Comercial Susazón V4.2
 
 > **Para Claude / Agente AI que está retomando el proyecto.**
 > Lee este archivo primero (toma 5 min), luego pasa a los recursos específicos según lo que vayas a hacer.
@@ -13,9 +13,9 @@
 
 **Stack:** Next.js 16 + Supabase Postgres + Vercel. Frontend React 19, Tailwind 4 CSS-first, Recharts 3.x.
 
-**Estado:** EN PRODUCCIÓN versión **4.1.0** (deploy 2026-04-28; Fases 1-15 cerradas. V4.1 agregó el 5º Insight Penetración/Canasta, el módulo Agrupadores completo (territorios virtuales, Fase 1→3) y el histograma mensual de las pastillas de Tracking, 2026-07-05).
+**Estado:** EN PRODUCCIÓN versión **4.2.0** (deploy 2026-04-28; Fases 1-16 cerradas). **V4.2** (2026-07-19) agregó el **6º Insight "Crecimiento x Vendedor"**: comparativa Año Anterior vs Año Actual (Mes + Acumulado) por cliente o producto, filtrable por vendedor y capada al mismo día, con 6 mediciones (Kg · $ · Margen % · Margen $ · Variedad · Ticket Promedio) y **fila TOTAL con totalizador REAL**. V4.1 (2026-07-05) había agregado el 5º Insight Penetración/Canasta, el módulo Agrupadores completo (territorios virtuales, Fase 1→3) y el histograma mensual de las pastillas de Tracking.
 
-> 🆕 **Si vienes de antes de Fase 10 (≤ 2026-05-23):** Lee primero `LO_NUEVO.md` — resume V4.0-4.1 (Fases 10-15) en una página.
+> 🆕 **Si vienes de antes de Fase 10 (≤ 2026-05-23):** Lee primero `LO_NUEVO.md` — resume V4.0-4.2 (Fases 10-16) en una página.
 
 **URL canonical:** `https://www.dashboardcomercialsusazon.com`
 
@@ -30,9 +30,9 @@
 | 1 | `AGENTS.md` (raíz del repo) | Auto-cargado al `cd`. Stack, gotchas críticos, reglas absolutas. |
 | 2 | **🆕 `docs/LO_NUEVO.md`** | **Si la última sesión fue antes de 2026-05-23.** Resumen ejecutivo de V4.0-4.1 (Fases 10-15: Agrupadores, Penetración, histograma). |
 | 3 | Este archivo (`CONTINUACION_NUEVA_CONVERSACION.md`) | Estás aquí. Contexto compacto. |
-| 4 | `docs/SESSION_LOG.md` | **Todas** las decisiones (D001-D031) + bugs resueltos (1-42). Lee si vas a tocar algo relacionado. |
-| 5 | `docs/INSTRUCTIVO_AGENTE.xml` | Inventario estructurado (v4.0, fecha 2026-06-07). Lee si vas a hacer cambios estructurales. |
-| 6 | `docs/01_Arquitectura_Tecnica.docx` | Diseño del sistema y decisiones arquitectónicas (regenerado a v4.1.0). |
+| 4 | `docs/SESSION_LOG.md` | **Todas** las decisiones (D001-D043) + bugs resueltos (1-50). Lee si vas a tocar algo relacionado. |
+| 5 | `docs/INSTRUCTIVO_AGENTE.xml` | Inventario estructurado (v4.2, fecha 2026-07-24). Lee si vas a hacer cambios estructurales. |
+| 6 | `docs/01_Arquitectura_Tecnica.docx` | Diseño del sistema y decisiones arquitectónicas (regenerado a v4.2.0). |
 | 7 | `~/Downloads/SECRETS_DASHBOARD_V3.txt` | Tokens, API keys, credenciales (privado, no en repo). |
 
 **Memoria persistente del usuario** (auto-cargada): `~/.claude/projects/-Users-mauusabiaga-Desktop-Claude-Code-PROJECTS-/memory/MEMORY.md` y archivos relacionados.
@@ -221,7 +221,7 @@ ANTES de implementar nada, preguntar:
 ### 3. Antes de tocar código
 
 - Lee `AGENTS.md` (auto-cargado).
-- Si vas a tocar un área específica, busca en `SESSION_LOG.md` decisiones previas (D001-D016).
+- Si vas a tocar un área específica, busca en `SESSION_LOG.md` decisiones previas (D001-D043).
 - Si encuentras una decisión "Vigente" relacionada, **respétala** — ya se discutió y aprobó.
 
 ### 4. Implementación

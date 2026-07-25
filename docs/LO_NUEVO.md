@@ -1,4 +1,23 @@
-# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.1
+# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.2
+
+**Periodo cubierto (V4.2):** 2026-07-12 al 2026-07-19
+**Versión:** 4.1.0 → **4.2.0**
+**Bloque:** Insights — **6º sub-análisis "Crecimiento x Vendedor"**
+
+## 🚀 V4.2 en una línea
+
+- **Insights #6 — Crecimiento x Vendedor** — para evaluar el desempeño de cada vendedor: dos tablas lado a lado (**Año Anterior** vs **Año Actual**) con **Mes** y **Acumulado** de su cartera, por **cliente** o por **producto**. Se filtra por vendedor (+ territorio/agrupador del sidebar) y **compara al mismo día** (capa el año en curso a la última fecha con datos) para que el crecimiento sea justo. **6 mediciones** en un toggle: **Kg · $ · Margen % · Margen $ · Variedad (No. SKUs) · Ticket Promedio**. Cada fila trae **Δ% Mes** y **Δ% Acum** con color (Nuevo 🟢 / −100% 🔴; el margen % en puntos porcentuales). Migraciones 038-040, endpoint `crecimiento-vendedor`, componente `CrecimientoVendedorAnalysis`.
+
+### Las 2 mejoras que lo vuelven confiable
+
+- **① Totalizador REAL (fila TOTAL fija al pie de ambas tablas).** No es la suma de los renglones — es una agregación aparte sobre TODO el scope: **Σ pura** para Kilos/$/Margen $, **COUNT(DISTINCT)** para Variedad y # de tickets, **Margen % = Σmargen ÷ Σventa**, **Ticket Prom. = Σventa ÷ #tickets**. El Δ del total se calcula de los totales 2025 vs 2026, nunca promediando filas. *Por qué importa:* sumar los renglones de Variedad daría **6,793 SKUs** cuando el número REAL es **272** (el mismo SKU lo compran muchos clientes). La venta sí cuadra exacta ($822M = Σ filas, por ser aditiva) y el Margen % real sube de 13.0% a **15.2%**.
+- **② Ticket Promedio.** El ticket se arma con **fecha + cliente** (no hay folio en los datos; junta Susazón + Suve del mismo día). En dimensión **Clientes** mide **$ por ticket**; en **Productos**, **kg por ticket**.
+
+> **¿Por qué V4.2?** Un 6º sub-análisis completo de Insights, con lógica de totalización que respeta la regla de gobernanza del proyecto (la métrica se define por regla de negocio, no por lo que es fácil de sumar en pantalla). Aditivo, no rompe nada existente.
+
+---
+
+# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.1 (histórico)
 
 **Periodo cubierto (V4.1):** 2026-06-16 al 2026-07-05
 **Versión:** 4.0.0 → **4.1.0**

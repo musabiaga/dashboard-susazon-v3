@@ -1,4 +1,4 @@
-# Guía para obtener TODAS las credenciales — Dashboard Comercial Susazón V4.1
+# Guía para obtener TODAS las credenciales — Dashboard Comercial Susazón V4.2
 
 > **Propósito:** que cualquier developer o agente pueda **reconstruir el sistema desde
 > cero** obteniendo cada credencial de su servicio de origen. **Este documento NO contiene
