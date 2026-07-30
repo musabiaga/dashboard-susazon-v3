@@ -22,6 +22,7 @@ import { VariedadCard } from "@/components/dashboard/VariedadCard";
 import { ClientesActivosCard } from "@/components/dashboard/ClientesActivosCard";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
 import { ReportButton } from "@/components/dashboard/ReportButton";
+import { TrackingCompareYoY, type CompareClientRow } from "@/components/dashboard/TrackingCompareYoY";
 import type { BuildReportInput } from "@/lib/report-pdf/data";
 import type {
   ExcelColumn,
@@ -45,6 +46,7 @@ interface ClientesDiaResponse {
 
 type ViewMode = "pesos" | "kg";
 const VIEW_MODE_KEY = "tracking-diario-mode";
+const COMPARE_YOY_KEY = "tracking-compare-yoy";
 
 const DOW_ES = ["D", "L", "M", "Mi", "J", "V", "S"];
 const MONTH_SHORT_LOWER = [
@@ -196,6 +198,75 @@ export function TrackingDiarioTab({
     }
   }
 
+  // ============ Loader del comparativo de clientes por día (2026 vs 2025) ======
+  // Al expandir un día en modo comparación: 2 fetches al MISMO endpoint
+  // (año actual + año anterior, mismo mes y día) y cruce por NOMBRE de cliente
+  // (regla de gobernanza: un cliente se identifica por nombre, no por no_cliente).
+  // Nuevos → prev en 0; perdidos → cur en 0.
+  async function loadDayClientsCompare(day: number): Promise<CompareClientRow[]> {
+    const fetchYear = async (yr: number): Promise<ClienteDelDia[]> => {
+      // "Todos (sin territorios)" → nada que consultar.
+      if (territoriosEfectivos && territoriosEfectivos.length === 0) return [];
+      const params = new URLSearchParams({
+        year: String(yr),
+        month: String(currentMonth),
+        day: String(day),
+      });
+      if (territoriosEfectivos) {
+        for (const t of territoriosEfectivos) params.append("territorio", t);
+      }
+      const resp = await fetch(`/api/dashboard/clientes-dia?${params}`);
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body.error ?? `HTTP ${resp.status}`);
+      }
+      const data = (await resp.json()) as ClientesDiaResponse;
+      return data.items;
+    };
+
+    const [cur, prev] = await Promise.all([
+      fetchYear(currentYear),
+      fetchYear(currentYear - 1),
+    ]);
+
+    const key = (n: string) => n.trim().toUpperCase();
+    const map = new Map<string, CompareClientRow>();
+    for (const it of cur) {
+      map.set(key(it.cliente), {
+        name: it.cliente,
+        curV: it.venta,
+        prevV: 0,
+        curK: it.kg,
+        prevK: 0,
+        curM: it.margen,
+        prevM: 0,
+        status: "nuevo",
+      });
+    }
+    for (const it of prev) {
+      const k = key(it.cliente);
+      const ex = map.get(k);
+      if (ex) {
+        ex.prevV = it.venta;
+        ex.prevK = it.kg;
+        ex.prevM = it.margen;
+        ex.status = "ambos";
+      } else {
+        map.set(k, {
+          name: it.cliente,
+          curV: 0,
+          prevV: it.venta,
+          curK: 0,
+          prevK: it.kg,
+          curM: 0,
+          prevM: it.margen,
+          status: "perdido",
+        });
+      }
+    }
+    return Array.from(map.values());
+  }
+
   // ============ Toggle de vista: Pesos vs Kilos ============
   // Persiste en localStorage. Default = "pesos".
   const [mode, setMode] = useState<ViewMode>("pesos");
@@ -216,6 +287,32 @@ export function TrackingDiarioTab({
     }
   };
   const isKg = mode === "kg";
+
+  // ============ Toggle on-demand: Comparar vs año anterior (al día) ============
+  // Apagado por defecto. Al prender, la gráfica y la tabla se transforman en la
+  // vista comparativa 2026 vs 2025 (client-side, sin queries nuevas). Persiste
+  // en localStorage. Los KPI cards de arriba NO se tocan.
+  const [compareYoY, setCompareYoY] = useState(false);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(COMPARE_YOY_KEY) === "true") {
+        setCompareYoY(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+  const toggleCompareYoY = () => {
+    setCompareYoY((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(COMPARE_YOY_KEY, next ? "true" : "false");
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   // ============ Cálculos KPI vista PESOS (verbatim del V2.2) ============
   const acum = kpi.venta;
@@ -335,11 +432,13 @@ export function TrackingDiarioTab({
         day: d,
         // Pesos
         ventaDiaria: currentByDayV.get(d) ?? 0,
+        ventaDiariaPrev: prevByDayV.get(d) ?? 0,
         acumulado: cumCV,
         pttoLinear: pttoLinearHere,
         anoAnterior: cumPV,
         // Kilos
         kgDiaria: currentByDayK.get(d) ?? 0,
+        kgDiariaPrev: prevByDayK.get(d) ?? 0,
         acumKg: cumCK,
         acumKgPrev: cumPK,
         paceKg: pace2025Here,
@@ -604,6 +703,26 @@ export function TrackingDiarioTab({
     <div className="space-y-4">
       {/* ============ Toggle Pesos / Kilos + Export ============ */}
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={toggleCompareYoY}
+          aria-pressed={compareYoY}
+          title="Compara el mes actual al día contra el mismo mes del año anterior"
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius)] border px-3 py-1.5 text-xs font-medium transition-colors"
+          style={{
+            borderColor: compareYoY ? "var(--accent)" : "var(--border)",
+            background: compareYoY ? "var(--accent)" : "var(--bg-surface)",
+            color: compareYoY ? "var(--accent-contrast, #fff)" : "var(--text-secondary)",
+          }}
+        >
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{
+              background: compareYoY ? "var(--accent-contrast, #fff)" : "var(--text-muted)",
+            }}
+          />
+          Comparar vs {currentYear - 1} (al día)
+        </button>
         <ModeToggle mode={mode} onChange={switchMode} />
         <ExportExcelButton
           onExport={handleExportExcel}
@@ -1000,7 +1119,7 @@ export function TrackingDiarioTab({
         );
       })()}
 
-      {/* ============ Chart ============ */}
+      {/* ============ Chart (agrega barras 2025 cuando el toggle está ON) === */}
       <div
         className="rounded-[var(--radius-lg)] border p-4"
         style={{
@@ -1092,6 +1211,9 @@ export function TrackingDiarioTab({
                             visualKind: "barras",
                             items: [
                               { label: "Venta Diaria", color: "rgba(59, 130, 246, 0.6)", type: "bar" },
+                              ...(compareYoY
+                                ? [{ label: `Venta Diaria ${prevMonthShortYY}`, color: "rgba(148, 163, 184, 0.75)", type: "bar" as const }]
+                                : []),
                             ],
                           },
                           {
@@ -1114,6 +1236,9 @@ export function TrackingDiarioTab({
                             visualKind: "barras",
                             items: [
                               { label: "KG Diaria", color: "rgba(16, 185, 129, 0.6)", type: "bar" },
+                              ...(compareYoY
+                                ? [{ label: `KG Diaria ${prevMonthShortYY}`, color: "rgba(148, 163, 184, 0.75)", type: "bar" as const }]
+                                : []),
                             ],
                           },
                           {
@@ -1142,6 +1267,15 @@ export function TrackingDiarioTab({
                     fill="rgba(59, 130, 246, 0.4)"
                     radius={[2, 2, 0, 0]}
                   />
+                  {compareYoY && (
+                    <Bar
+                      yAxisId="left"
+                      dataKey="ventaDiariaPrev"
+                      name={`Venta Diaria ${prevMonthShortYY}`}
+                      fill="rgba(148, 163, 184, 0.55)"
+                      radius={[2, 2, 0, 0]}
+                    />
+                  )}
                   <Line
                     yAxisId="right"
                     type="monotone"
@@ -1185,6 +1319,15 @@ export function TrackingDiarioTab({
                     fill="rgba(16, 185, 129, 0.4)"
                     radius={[2, 2, 0, 0]}
                   />
+                  {compareYoY && (
+                    <Bar
+                      yAxisId="left"
+                      dataKey="kgDiariaPrev"
+                      name={`KG Diaria ${prevMonthShortYY}`}
+                      fill="rgba(148, 163, 184, 0.55)"
+                      radius={[2, 2, 0, 0]}
+                    />
+                  )}
                   <Line
                     yAxisId="right"
                     type="monotone"
@@ -1225,8 +1368,27 @@ export function TrackingDiarioTab({
         )}
       </div>
 
-      {/* ============ Tabla diaria ============ */}
-      {tableRows.length > 0 && (
+      {/* ============ Tabla comparativa vs año anterior (toggle ON) ========= */}
+      {compareYoY && (
+        <TrackingCompareYoY
+          daily={kpi.daily}
+          mode={mode}
+          year={currentYear}
+          month={currentMonth}
+          alDia={{
+            curV: acum,
+            prevV: prevYearVentaAlDia,
+            curK: acumKg,
+            prevK: prevYearKgAlDia,
+            curM: marginMoney,
+            prevM: prevAlDia.m,
+          }}
+          loadDayClients={loadDayClientsCompare}
+        />
+      )}
+
+      {/* ============ Tabla diaria normal (toggle OFF) ============ */}
+      {!compareYoY && tableRows.length > 0 && (
         <div
           className="rounded-[var(--radius-lg)] border"
           style={{
