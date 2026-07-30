@@ -476,6 +476,13 @@ export function DashboardClient({
           }
         : null,
       ventaBudget,
+      // Promedio de Venta Diario: venta al día ÷ días hábiles transcurridos.
+      // Al día = currentMonthAlDia (mismo tramo de días hábiles); si no hay,
+      // cae a kpi.venta (mes en curso ya es al-día).
+      ventaAlDia: kpi.currentMonthAlDia?.v26 ?? kpi.venta,
+      prevYearVentaAlDia: kpi.currentMonthAlDia?.v25 ?? 0,
+      elapsedBizDays,
+      totalBizDays,
     };
   }, [
     activeKpi,

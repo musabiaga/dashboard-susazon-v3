@@ -1,7 +1,8 @@
 "use client";
 
-import { DollarSign, TrendingUp, Package, Zap, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { DollarSign, TrendingUp, Package, Zap, Gauge, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { formatMoney } from "@/lib/format";
+import { listBizDays } from "@/lib/business-days";
 import { KpiHistogramPopover } from "@/components/dashboard/KpiHistogramPopover";
 
 export interface KpiData {
@@ -27,6 +28,11 @@ export interface KpiData {
   } | null;
   // PTTO de venta del mes (0 = no configurado, no se muestra %).
   ventaBudget?: number;
+  // Promedio de Venta Diario = venta al día ÷ días hábiles transcurridos.
+  ventaAlDia?: number; // venta al día del mes actual (al mismo día hábil)
+  prevYearVentaAlDia?: number; // venta al día del mismo tramo del año anterior
+  elapsedBizDays?: number; // días hábiles transcurridos
+  totalBizDays?: number; // días hábiles totales del mes
 }
 
 interface KpiCardsRowProps {
@@ -96,11 +102,39 @@ export function KpiCardsRow({ data, loading = false, monthly }: KpiCardsRowProps
   const yoyV = data ? yoyDelta(data.venta, data.prevYear.venta) : null;
   const yoyM = data ? yoyDelta(data.margen, data.prevYear.margen) : null;
   const yoyK = data ? yoyDelta(data.kg, data.prevYear.kg) : null;
+
+  // ===== Promedio de Venta Diario (venta al día ÷ días hábiles transcurridos) =====
+  const elapsedBiz = data?.elapsedBizDays ?? rr?.daysCurrent ?? 0;
+  const totalBiz = data?.totalBizDays ?? rr?.daysTotal ?? 0;
+  const ventaAlDia = data?.ventaAlDia ?? data?.venta ?? 0;
+  const prevVentaAlDia = data?.prevYearVentaAlDia ?? 0;
+  const promedioDiario = elapsedBiz > 0 ? ventaAlDia / elapsedBiz : 0;
+  // Prom. del año anterior: mismo tramo (misma cantidad de días hábiles transcurridos).
+  const promedioDiarioPrev = elapsedBiz > 0 ? prevVentaAlDia / elapsedBiz : 0;
+  const yoyProm =
+    data && promedioDiarioPrev > 0 ? yoyDelta(promedioDiario, promedioDiarioPrev) : null;
+  // Objetivo diario = PTTO del mes ÷ días hábiles TOTALES.
+  const objetivoDiario = totalBiz > 0 ? ventaBudget / totalBiz : 0;
+  const vsPttoPromedio =
+    data && objetivoDiario > 0
+      ? {
+          pct: (promedioDiario / objetivoDiario) * 100,
+          tone: ptToneFromPct((promedioDiario / objetivoDiario) * 100),
+          budget: objetivoDiario,
+        }
+      : null;
+  // Serie mensual del promedio diario: cada mes = su venta ÷ sus días hábiles.
+  // Reusa el histograma (formato $) pasando `venta` = promedio del mes.
+  const monthlyPromedio = (monthly ?? []).map((p) => {
+    const dias = listBizDays(p.anio, p.mes).length;
+    return { ...p, venta: dias > 0 ? p.venta / dias : 0 };
+  });
   const prevLabel = data?.prevMonthShortYY ?? "año anterior";
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-9">
-      {/* 3 Main cards (col-span-2 on lg → 6 cols total) */}
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-9">
+      {/* 4 Main cards del mes (col-span-2 → 8 cols) + 1 ACUM consolidada (1 col) = 9.
+          La ACUM ocupa la mitad del ancho de un KPI; los KPIs crecen. */}
       <div className="lg:col-span-2">
         <KpiHistogramPopover monthly={monthly} metric="venta" accent="accent" metricLabel="Venta" align="left">
         <KpiCard
@@ -169,55 +203,83 @@ export function KpiCardsRow({ data, loading = false, monthly }: KpiCardsRowProps
         />
         </KpiHistogramPopover>
       </div>
+      <div className="lg:col-span-2">
+        <KpiHistogramPopover monthly={monthlyPromedio} metric="venta" accent="accent" metricLabel="Prom. Diario" align="right">
+        <KpiCard
+          label={`Prom. Diario ${data?.monthShortYY ?? ""}`.trim()}
+          value={data ? formatMoney(promedioDiario) : "—"}
+          sublabel={
+            yoyProm
+              ? { text: `${yoyProm.pct >= 0 ? "+" : ""}${yoyProm.pct.toFixed(1)}% vs ${prevLabel}`, tone: yoyProm.tone }
+              : { text: "venta ÷ días hábiles", tone: "neutral" }
+          }
+          icon={<Gauge size={18} />}
+          accent="accent"
+          loading={loading}
+          runRate={null}
+          vsPtto={vsPttoPromedio}
+        />
+        </KpiHistogramPopover>
+      </div>
 
-      {/* 3 Acum cards (col-span-1 on lg → 3 cols total) */}
-      {(data?.acumYears ?? []).map((year) => (
-        <div key={year} className="lg:col-span-1">
-          <AcumCard
-            year={year}
-            value={data?.acumByYear[year] ?? 0}
-            loading={loading}
-          />
-        </div>
-      ))}
+      {/* ACUM 2024/2025/2026 consolidados en 1 sola pastilla (años en vertical) */}
+      <div className="lg:col-span-1">
+        <AcumCardStacked
+          years={data?.acumYears ?? []}
+          acumByYear={data?.acumByYear ?? {}}
+          loading={loading}
+        />
+      </div>
     </div>
   );
 }
 
-function AcumCard({
-  year,
-  value,
+function AcumCardStacked({
+  years,
+  acumByYear,
   loading,
 }: {
-  year: number;
-  value: number;
+  years: number[];
+  acumByYear: Record<number, number>;
   loading: boolean;
 }) {
-  const hasData = value > 0;
   return (
     <div
-      className="flex h-full flex-col justify-center rounded-[var(--radius-lg)] border p-4"
+      className="flex h-full flex-col justify-center gap-2 rounded-[var(--radius-lg)] border p-4"
       style={{
         background: "var(--bg-surface-muted)",
         borderColor: "var(--border)",
       }}
     >
-      <div
-        className="text-[10px] font-medium uppercase tracking-wider"
-        style={{ color: "var(--text-secondary)" }}
-      >
-        Acum {year}
-      </div>
-      <div
-        className="mt-1 text-base font-semibold tabular-nums"
-        style={{
-          color: hasData
-            ? "var(--text-primary)"
-            : "var(--text-muted)",
-        }}
-      >
-        {loading ? "…" : hasData ? formatMoney(value) : "—"}
-      </div>
+      {years.map((year, i) => {
+        const value = acumByYear[year] ?? 0;
+        const hasData = value > 0;
+        return (
+          <div
+            key={year}
+            style={
+              i > 0
+                ? { borderTop: "1px solid var(--border)", paddingTop: "0.5rem" }
+                : undefined
+            }
+          >
+            <div
+              className="text-[10px] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Acum {year}
+            </div>
+            <div
+              className="text-sm font-semibold tabular-nums"
+              style={{
+                color: hasData ? "var(--text-primary)" : "var(--text-muted)",
+              }}
+            >
+              {loading ? "…" : hasData ? formatMoney(value) : "—"}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
