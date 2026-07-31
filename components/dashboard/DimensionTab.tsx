@@ -11,6 +11,7 @@ import {
 } from "@/components/dashboard/GroupedBarChart";
 import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
 import { ClientesEvolutionChart } from "@/components/dashboard/ClientesEvolutionChart";
+import { ClientesTresAniosChart } from "@/components/dashboard/ClientesTresAniosChart";
 import {
   ClientesTableViews,
   type TableViewsContext,
@@ -809,7 +810,7 @@ export function DimensionTab({
                             : "none",
                       }}
                     >
-                      Mismo mes (3 años)
+                      Meses (3 años)
                     </button>
                     <button
                       type="button"
@@ -993,6 +994,18 @@ export function DimensionTab({
                   dim={dimension}
                 />
               )
+            ) : enableEvolution &&
+              evolutionContext &&
+              chartView === "mismo-mes" ? (
+              /* NUEVO: 12 meses × 3 años (agregado), solo tab Clientes/Productos */
+              <ClientesTresAniosChart
+                year={evolutionContext.year}
+                month={evolutionContext.month}
+                territorios={evolutionContext.territorios}
+                clientes={top.map((r) => r.name)}
+                mode={effectiveMode}
+                dim={dimension}
+              />
             ) : (
               <GroupedBarChart
                 data={top.map((r) => {
