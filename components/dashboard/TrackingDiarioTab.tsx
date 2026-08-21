@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
-import { countBizDays, isBusinessDay } from "@/lib/business-days";
+import { countBizDays, isBusinessDay, listBizDays } from "@/lib/business-days";
 import { computePrevYearAlDia } from "@/lib/prev-year-al-dia";
 import type { TerritoryKpi } from "@/components/dashboard/Sidebar";
 import { ChartLegend } from "@/components/dashboard/ChartLegend";
@@ -407,6 +407,12 @@ export function TrackingDiarioTab({
     const allDays = new Set<number>();
     for (const p of kpi.daily.current) allDays.add(p.d);
     for (const p of kpi.daily.prevYear) allDays.add(p.d);
+    // Extender el eje a TODOS los días hábiles del mes (aunque aún no haya
+    // venta) para que la línea de Ptto Linear llegue a su TOTAL en el último
+    // día hábil. Antes el eje se cortaba en el último día CON dato, dejando la
+    // línea sin alcanzar el 100% (ej. Ago: día 30 domingo, día 31 hábil sin
+    // pintar → mostraba 25/26 del presupuesto).
+    for (const d of listBizDays(currentYear, currentMonth)) allDays.add(d);
     const sorted = Array.from(allDays).sort((a, b) => a - b);
 
     const currentByDayV = new Map(kpi.daily.current.map((p) => [p.d, p.v]));
