@@ -252,7 +252,6 @@ export function ClientesTableViews({
       );
     }
     const nMonths = evolution.meses.length;
-    const subHeader = dim === "sku" ? "Clientes que lo compran" : "Productos que compra";
     const subEmpty = dim === "sku" ? "Sin clientes." : "Sin productos.";
     const subLoadingLabel = dim === "sku" ? "clientes" : "productos";
     return (
@@ -319,11 +318,6 @@ export function ClientesTableViews({
                       </tr>
                     ) : sub && sub.clientes.length > 0 ? (
                       <>
-                        <tr style={{ background: "var(--bg-surface-muted)" }}>
-                          <td colSpan={nMonths + 2} className="py-1 pl-8 pr-2 text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                            {subHeader} · {sub.clientes.length} · los meses vacíos = &quot;campo minado&quot;
-                          </td>
-                        </tr>
                         {sub.clientes.map((c) => {
                           const cells = c.monthly.slice(0, nMonths).map((m) => (isKg ? m.kg : m.venta));
                           const total = cells.reduce((a, b) => a + b, 0);
