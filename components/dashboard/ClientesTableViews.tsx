@@ -11,8 +11,8 @@
  * sidebar (RLS) y el toggle Pesos/Kilos (prop mode).
  */
 
-import { useEffect, useState, useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { Fragment, useEffect, useState, useMemo } from "react";
+import { Loader2, ChevronRight } from "lucide-react";
 import { formatMoney, formatKilos } from "@/lib/format";
 
 const MONTH_SHORT_ES = [
@@ -76,6 +76,55 @@ export function ClientesTableViews({
 }: Props) {
   const isKg = mode === "kg";
   const fmt = isKg ? formatKilos : formatMoney;
+
+  // ===== Expand mensual (Feature 1): al picar una fila, cruce por mes de la
+  // dimensión opuesta (SKU→clientes / cliente→SKUs). Datos de la función SQL
+  // insights_cliente_sku_mensual vía /api/dashboard/cliente-sku-mensual. =====
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [subData, setSubData] = useState<Map<string, EvolutionResponse>>(new Map());
+  const [subLoading, setSubLoading] = useState<Set<string>>(new Set());
+  const [subError, setSubError] = useState<Map<string, string>>(new Map());
+
+  async function toggleExpand(name: string) {
+    if (expandedRows.has(name)) {
+      setExpandedRows((p) => {
+        const n = new Set(p);
+        n.delete(name);
+        return n;
+      });
+      return;
+    }
+    setExpandedRows((p) => new Set(p).add(name));
+    if (subData.has(name) || subLoading.has(name)) return;
+    setSubLoading((p) => new Set(p).add(name));
+    setSubError((p) => {
+      const n = new Map(p);
+      n.delete(name);
+      return n;
+    });
+    try {
+      const params = new URLSearchParams();
+      params.set("year", String(context.year));
+      params.set("anchorDim", dim === "sku" ? "sku" : "cliente");
+      params.set("anchorValue", name);
+      if (context.territorios !== null) {
+        params.set("territorios", context.territorios.join(","));
+      }
+      const r = await fetch(`/api/dashboard/cliente-sku-mensual?${params.toString()}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const json = (await r.json()) as EvolutionResponse;
+      setSubData((p) => new Map(p).set(name, json));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error desconocido";
+      setSubError((p) => new Map(p).set(name, msg));
+    } finally {
+      setSubLoading((p) => {
+        const n = new Set(p);
+        n.delete(name);
+        return n;
+      });
+    }
+  }
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,6 +251,10 @@ export function ClientesTableViews({
         </p>
       );
     }
+    const nMonths = evolution.meses.length;
+    const subHeader = dim === "sku" ? "Clientes que lo compran" : "Productos que compra";
+    const subEmpty = dim === "sku" ? "Sin clientes." : "Sin productos.";
+    const subLoadingLabel = dim === "sku" ? "clientes" : "productos";
     return (
       <div className="overflow-x-auto">
         <table className="w-full text-sm tabular-nums">
@@ -217,23 +270,105 @@ export function ClientesTableViews({
             </tr>
           </thead>
           <tbody>
-            {mesesRows.map((r) => (
-              <tr
-                key={r.name}
-                className="border-t"
-                style={{ borderColor: "var(--border)" }}
-              >
-                <Td>{r.name}</Td>
-                {r.cells.map((v, i) => (
-                  <Td key={i} align="right">
-                    {v > 0 ? fmt(v) : "—"}
-                  </Td>
-                ))}
-                <Td align="right" bold>
-                  {fmt(r.total)}
-                </Td>
-              </tr>
-            ))}
+            {mesesRows.map((r) => {
+              const isOpen = expandedRows.has(r.name);
+              const sub = subData.get(r.name);
+              return (
+                <Fragment key={r.name}>
+                  <tr
+                    className="border-t"
+                    style={{ borderColor: "var(--border)", cursor: "pointer" }}
+                    onClick={() => toggleExpand(r.name)}
+                  >
+                    <Td>
+                      <span className="inline-flex items-center gap-1">
+                        <ChevronRight
+                          size={12}
+                          style={{
+                            transform: isOpen ? "rotate(90deg)" : "none",
+                            transition: "transform .15s",
+                            color: "var(--text-muted)",
+                          }}
+                        />
+                        {r.name}
+                      </span>
+                    </Td>
+                    {r.cells.map((v, i) => (
+                      <Td key={i} align="right">
+                        {v > 0 ? fmt(v) : "—"}
+                      </Td>
+                    ))}
+                    <Td align="right" bold>
+                      {fmt(r.total)}
+                    </Td>
+                  </tr>
+                  {isOpen &&
+                    (subLoading.has(r.name) ? (
+                      <tr style={{ background: "var(--bg-surface-muted)" }}>
+                        <td colSpan={nMonths + 2} className="px-4 py-2 text-xs" style={{ color: "var(--text-muted)" }}>
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 size={13} className="animate-spin" /> Cargando {subLoadingLabel}…
+                          </span>
+                        </td>
+                      </tr>
+                    ) : subError.has(r.name) ? (
+                      <tr style={{ background: "var(--bg-surface-muted)" }}>
+                        <td colSpan={nMonths + 2} className="px-4 py-2 text-xs" style={{ color: "var(--danger)" }}>
+                          Error: {subError.get(r.name)}
+                        </td>
+                      </tr>
+                    ) : sub && sub.clientes.length > 0 ? (
+                      <>
+                        <tr style={{ background: "var(--bg-surface-muted)" }}>
+                          <td colSpan={nMonths + 2} className="py-1 pl-8 pr-2 text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                            {subHeader} · {sub.clientes.length} · los meses vacíos = &quot;campo minado&quot;
+                          </td>
+                        </tr>
+                        {sub.clientes.map((c) => {
+                          const cells = c.monthly.slice(0, nMonths).map((m) => (isKg ? m.kg : m.venta));
+                          const total = cells.reduce((a, b) => a + b, 0);
+                          const lastIdx = cells.reduce((acc, v, i) => (v > 0 ? i : acc), -1);
+                          const stopped = lastIdx >= 0 && lastIdx < nMonths - 1;
+                          return (
+                            <tr key={c.name} style={{ background: "var(--bg-surface-muted)" }}>
+                              <td className="py-1 pl-8 pr-2 text-xs">
+                                <span style={{ color: "var(--text-secondary)" }}>{c.name}</span>
+                                {stopped && (
+                                  <span className="ml-2 text-[10px] font-medium" style={{ color: "var(--danger)" }}>
+                                    · sin comprar desde {evolution.meses[lastIdx + 1]?.label ?? ""}
+                                  </span>
+                                )}
+                              </td>
+                              {cells.map((v, i) => (
+                                <td
+                                  key={i}
+                                  className="px-2 py-1 text-right text-xs"
+                                  style={
+                                    v <= 0
+                                      ? { background: "rgba(239,68,68,0.07)", color: "var(--text-muted)" }
+                                      : { color: "var(--text-secondary)" }
+                                  }
+                                >
+                                  {v > 0 ? fmt(v) : "—"}
+                                </td>
+                              ))}
+                              <td className="px-2 py-1 text-right text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
+                                {fmt(total)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <tr style={{ background: "var(--bg-surface-muted)" }}>
+                        <td colSpan={nMonths + 2} className="px-4 py-2 text-xs" style={{ color: "var(--text-muted)" }}>
+                          {subEmpty}
+                        </td>
+                      </tr>
+                    ))}
+                </Fragment>
+              );
+            })}
             {/* Fila TOTAL */}
             <tr
               className="border-t-2 font-semibold"
