@@ -442,6 +442,53 @@ export function DimensionTab({
     return topNTable == null ? sorted : sorted.slice(0, topNTable);
   }, [isCustomMode, top, sorted, topNTable]);
 
+  // ===== Orden por columna de la tabla "Año vs Año" (click en header). =====
+  const [anioSortKey, setAnioSortKey] = useState<string | null>(null);
+  const [anioSortDir, setAnioSortDir] = useState<"asc" | "desc">("desc");
+  function toggleAnioSort(key: string) {
+    if (anioSortKey === key) setAnioSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    else {
+      setAnioSortKey(key);
+      setAnioSortDir("desc");
+    }
+  }
+  useEffect(() => {
+    setAnioSortKey(null);
+    setAnioSortDir("desc");
+  }, [dimension]);
+
+  const sortedTableRows = useMemo(() => {
+    if (!anioSortKey) return tableRows;
+    const val = (r: (typeof tableRows)[number]): number => {
+      const v24 = r.v24_alDia ?? r.v24;
+      const v25 = r.v25_alDia ?? r.v25;
+      const v26 = r.v26_alDia ?? r.v26;
+      const k24 = r.k24_alDia ?? r.k24 ?? 0;
+      const k25 = r.k25_alDia ?? r.k25 ?? 0;
+      const k26 = r.k26_alDia ?? r.k26 ?? 0;
+      const m26 = r.m26_alDia ?? r.m26 ?? 0;
+      const m25 = r.m25_alDia ?? r.m25 ?? 0;
+      switch (anioSortKey) {
+        case "v24": return v24;
+        case "v25": return v25;
+        case "v26": return v26;
+        case "varv": return v25 > 0 ? (v26 - v25) / v25 : 0;
+        case "k24": return k24;
+        case "k25": return k25;
+        case "k26": return k26;
+        case "varkg": return k25 > 0 ? (k26 - k25) / k25 : 0;
+        case "mg26": return m26;
+        case "mgpct26": return v26 > 0 ? m26 / v26 : 0;
+        case "mgpct25": return v25 > 0 ? m25 / v25 : 0;
+        case "dpp": return (v26 > 0 ? m26 / v26 : 0) - (v25 > 0 ? m25 / v25 : 0);
+        default: return 0;
+      }
+    };
+    return [...tableRows].sort((a, b) =>
+      anioSortDir === "desc" ? val(b) - val(a) : val(a) - val(b)
+    );
+  }, [tableRows, anioSortKey, anioSortDir]);
+
   // Series de barras (cambian según modo Pesos/Kilos).
   // Las labels son los meses (Abr 24/25/26). El título "Venta" vs "Kilos"
   // lo decide barSeriesTitle del GroupedBarChart.
@@ -1190,30 +1237,30 @@ export function DimensionTab({
                 <tr style={{ background: "var(--bg-surface-muted)" }}>
                   <Th>{dimensionLabel}</Th>
                   {/* Pesos — al-día */}
-                  <Th align="right">{monthLabel24}</Th>
-                  <Th align="right">{monthLabel25}</Th>
-                  <Th align="right">{monthLabel26}</Th>
-                  <Th align="right">Var %</Th>
+                  <Th align="right" onClick={() => toggleAnioSort("v24")} active={anioSortKey === "v24"} dir={anioSortDir}>{monthLabel24}</Th>
+                  <Th align="right" onClick={() => toggleAnioSort("v25")} active={anioSortKey === "v25"} dir={anioSortDir}>{monthLabel25}</Th>
+                  <Th align="right" onClick={() => toggleAnioSort("v26")} active={anioSortKey === "v26"} dir={anioSortDir}>{monthLabel26}</Th>
+                  <Th align="right" onClick={() => toggleAnioSort("varv")} active={anioSortKey === "varv"} dir={anioSortDir}>Var %</Th>
                   {/* KG (opcional) — al-día */}
                   {showKg && (
                     <>
-                      <Th align="right" subtle>{`KG ${monthLabel24}`}</Th>
-                      <Th align="right" subtle>{`KG ${monthLabel25}`}</Th>
-                      <Th align="right" subtle>{`KG ${monthLabel26}`}</Th>
-                      <Th align="right" subtle>Var % KG</Th>
+                      <Th align="right" subtle onClick={() => toggleAnioSort("k24")} active={anioSortKey === "k24"} dir={anioSortDir}>{`KG ${monthLabel24}`}</Th>
+                      <Th align="right" subtle onClick={() => toggleAnioSort("k25")} active={anioSortKey === "k25"} dir={anioSortDir}>{`KG ${monthLabel25}`}</Th>
+                      <Th align="right" subtle onClick={() => toggleAnioSort("k26")} active={anioSortKey === "k26"} dir={anioSortDir}>{`KG ${monthLabel26}`}</Th>
+                      <Th align="right" subtle onClick={() => toggleAnioSort("varkg")} active={anioSortKey === "varkg"} dir={anioSortDir}>Var % KG</Th>
                     </>
                   )}
                   {/* Margen del mes actual (siempre visible, no depende del
                       toggle ni de showKg). 4 columnas: Mg $ / Mg % / Mg % prev
                       / Δ pp para leer evolución del margen vs año anterior. */}
-                  <Th align="right">{`Mg $ ${monthLabel26}`}</Th>
-                  <Th align="right">{`Mg % ${monthLabel26}`}</Th>
-                  <Th align="right" subtle>{`Mg % ${monthLabel25}`}</Th>
-                  <Th align="right">Δ pp</Th>
+                  <Th align="right" onClick={() => toggleAnioSort("mg26")} active={anioSortKey === "mg26"} dir={anioSortDir}>{`Mg $ ${monthLabel26}`}</Th>
+                  <Th align="right" onClick={() => toggleAnioSort("mgpct26")} active={anioSortKey === "mgpct26"} dir={anioSortDir}>{`Mg % ${monthLabel26}`}</Th>
+                  <Th align="right" subtle onClick={() => toggleAnioSort("mgpct25")} active={anioSortKey === "mgpct25"} dir={anioSortDir}>{`Mg % ${monthLabel25}`}</Th>
+                  <Th align="right" onClick={() => toggleAnioSort("dpp")} active={anioSortKey === "dpp"} dir={anioSortDir}>Δ pp</Th>
                 </tr>
               </thead>
               <tbody>
-                {tableRows.map((r, i) => {
+                {sortedTableRows.map((r, i) => {
                   // === Mostrar SIEMPRE al-día (coherente con tooltip del chart) ===
                   // Si al-día no existe (data vieja sin Mejora 2), fallback a cierre.
                   const v24Show = r.v24_alDia ?? r.v24;
@@ -1443,22 +1490,42 @@ function Th({
   children,
   align = "left",
   subtle = false,
+  onClick,
+  active = false,
+  dir,
 }: {
   children: React.ReactNode;
   align?: "left" | "right" | "center";
   /** Si true, color más tenue + borde izquierdo sutil para separar grupo de columnas. */
   subtle?: boolean;
+  /** Si se pasa, el header es clickeable para ordenar. */
+  onClick?: () => void;
+  active?: boolean;
+  dir?: "asc" | "desc";
 }) {
   return (
     <th
       className={`border-b px-3 py-2 font-semibold uppercase tracking-wider text-[10px] text-${align}`}
       style={{
         borderColor: "var(--border)",
-        color: subtle ? "var(--text-muted)" : "var(--text-secondary)",
+        color: active
+          ? "var(--accent)"
+          : subtle
+            ? "var(--text-muted)"
+            : "var(--text-secondary)",
         borderLeft: subtle ? "1px dashed var(--border)" : undefined,
+        cursor: onClick ? "pointer" : "default",
+        userSelect: "none",
       }}
+      onClick={onClick}
     >
-      {children}
+      <span
+        className="inline-flex items-center gap-1"
+        style={{ justifyContent: align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start" }}
+      >
+        {children}
+        {active && <span style={{ fontSize: "9px" }}>{dir === "desc" ? "▼" : "▲"}</span>}
+      </span>
     </th>
   );
 }

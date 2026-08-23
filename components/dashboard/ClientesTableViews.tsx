@@ -85,6 +85,16 @@ export function ClientesTableViews({
   const [subLoading, setSubLoading] = useState<Set<string>>(new Set());
   const [subError, setSubError] = useState<Map<string, string>>(new Map());
 
+  // Scope actual (año + dimensión + territorio) — se incluye en la llave del
+  // cache del expand para que NUNCA sirva el detalle de otro scope (fix del
+  // dropdown "congelado" al cambiar de territorio).
+  const scopeKey = `${context.year}|${dim}|${
+    context.territorios === null
+      ? "__ALL__"
+      : context.territorios.slice().sort().join(",")
+  }`;
+  const subCacheKey = (name: string) => `${scopeKey}::${name}`;
+
   async function toggleExpand(name: string) {
     if (expandedRows.has(name)) {
       setExpandedRows((p) => {
@@ -95,11 +105,12 @@ export function ClientesTableViews({
       return;
     }
     setExpandedRows((p) => new Set(p).add(name));
-    if (subData.has(name) || subLoading.has(name)) return;
-    setSubLoading((p) => new Set(p).add(name));
+    const key = subCacheKey(name);
+    if (subData.has(key) || subLoading.has(key)) return;
+    setSubLoading((p) => new Set(p).add(key));
     setSubError((p) => {
       const n = new Map(p);
-      n.delete(name);
+      n.delete(key);
       return n;
     });
     try {
@@ -113,14 +124,14 @@ export function ClientesTableViews({
       const r = await fetch(`/api/dashboard/cliente-sku-mensual?${params.toString()}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const json = (await r.json()) as EvolutionResponse;
-      setSubData((p) => new Map(p).set(name, json));
+      setSubData((p) => new Map(p).set(key, json));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error desconocido";
-      setSubError((p) => new Map(p).set(name, msg));
+      setSubError((p) => new Map(p).set(key, msg));
     } finally {
       setSubLoading((p) => {
         const n = new Set(p);
-        n.delete(name);
+        n.delete(key);
         return n;
       });
     }
@@ -186,6 +197,33 @@ export function ClientesTableViews({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, context.year, context.month, context.daysCurrent, territoriosKey, clientesKey, dim]);
 
+  // Al cambiar el SCOPE (territorio / año / dimensión), CERRAR los dropdowns
+  // abiertos. Si no, el expand se "congela" mostrando el detalle del territorio
+  // anterior mientras el header ya cambió (bug reportado). El cache queda
+  // llaveado por scope (subCacheKey), así que volver a un territorio da cache-hit.
+  useEffect(() => {
+    setExpandedRows(new Set());
+  }, [scopeKey]);
+
+  // ===== Orden por columna (click en el header). 1er clic = mayor→menor,
+  // 2º = menor→mayor. Para "Meses": índice de mes (0-based) o "total". =====
+  const [sortCol, setSortCol] = useState<
+    number | "total" | "r90" | "rmes" | "delta" | null
+  >(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  function toggleSort(col: number | "total" | "r90" | "rmes" | "delta") {
+    if (sortCol === col) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    else {
+      setSortCol(col);
+      setSortDir("desc");
+    }
+  }
+  // Reset del orden al cambiar de vista (columnas distintas).
+  useEffect(() => {
+    setSortCol(null);
+    setSortDir("desc");
+  }, [view]);
+
   // ============ Vista MESES ============
   const mesesRows = useMemo(() => {
     if (view !== "meses" || !evolution) return [];
@@ -195,6 +233,19 @@ export function ClientesTableViews({
       return { name: c.name, cells, total };
     });
   }, [view, evolution, isKg]);
+
+  // Filas ordenadas según el header clickeado (o el orden original si sortCol=null).
+  const sortedMesesRows = useMemo(() => {
+    if (sortCol === null) return mesesRows;
+    const val = (r: (typeof mesesRows)[number]) => {
+      if (sortCol === "total") return r.total;
+      if (typeof sortCol === "number") return r.cells[sortCol] ?? 0;
+      return 0;
+    };
+    return [...mesesRows].sort((a, b) =>
+      sortDir === "desc" ? val(b) - val(a) : val(a) - val(b)
+    );
+  }, [mesesRows, sortCol, sortDir]);
 
   const mesesTotals = useMemo(() => {
     if (view !== "meses" || !evolution) return { cells: [], total: 0 };
@@ -226,6 +277,21 @@ export function ClientesTableViews({
       return { name, ritmo90, ritmoMes, deltaPct };
     });
   }, [view, ritmo, clientes, isKg, context.elapsedBizDays, context.currentByClient]);
+
+  const sortedProm90Rows = useMemo(() => {
+    if (sortCol === null) return prom90Rows;
+    const val = (r: (typeof prom90Rows)[number]) =>
+      sortCol === "r90"
+        ? r.ritmo90
+        : sortCol === "rmes"
+          ? r.ritmoMes
+          : sortCol === "delta"
+            ? r.deltaPct
+            : 0;
+    return [...prom90Rows].sort((a, b) =>
+      sortDir === "desc" ? val(b) - val(a) : val(a) - val(b)
+    );
+  }, [prom90Rows, sortCol, sortDir]);
 
   if (loading) {
     return (
@@ -260,18 +326,27 @@ export function ClientesTableViews({
           <thead>
             <tr style={{ background: "var(--bg-surface-muted)" }}>
               <Th>{dimensionLabel}</Th>
-              {evolution.meses.map((m) => (
-                <Th key={m.mes} align="right">
+              {evolution.meses.map((m, i) => (
+                <Th
+                  key={m.mes}
+                  align="right"
+                  onClick={() => toggleSort(i)}
+                  active={sortCol === i}
+                  dir={sortDir}
+                >
                   {m.label}
                 </Th>
               ))}
-              <Th align="right">Total YTD</Th>
+              <Th align="right" onClick={() => toggleSort("total")} active={sortCol === "total"} dir={sortDir}>
+                Total YTD
+              </Th>
             </tr>
           </thead>
           <tbody>
-            {mesesRows.map((r) => {
+            {sortedMesesRows.map((r) => {
               const isOpen = expandedRows.has(r.name);
-              const sub = subData.get(r.name);
+              const key = subCacheKey(r.name);
+              const sub = subData.get(key);
               return (
                 <Fragment key={r.name}>
                   <tr
@@ -302,7 +377,7 @@ export function ClientesTableViews({
                     </Td>
                   </tr>
                   {isOpen &&
-                    (subLoading.has(r.name) ? (
+                    (subLoading.has(key) ? (
                       <tr style={{ background: "var(--bg-surface-muted)" }}>
                         <td colSpan={nMonths + 2} className="px-4 py-2 text-xs" style={{ color: "var(--text-muted)" }}>
                           <span className="inline-flex items-center gap-2">
@@ -310,15 +385,29 @@ export function ClientesTableViews({
                           </span>
                         </td>
                       </tr>
-                    ) : subError.has(r.name) ? (
+                    ) : subError.has(key) ? (
                       <tr style={{ background: "var(--bg-surface-muted)" }}>
                         <td colSpan={nMonths + 2} className="px-4 py-2 text-xs" style={{ color: "var(--danger)" }}>
-                          Error: {subError.get(r.name)}
+                          Error: {subError.get(key)}
                         </td>
                       </tr>
                     ) : sub && sub.clientes.length > 0 ? (
                       <>
-                        {sub.clientes.map((c) => {
+                        {[...sub.clientes]
+                          .sort((a, b) => {
+                            if (sortCol === null) return 0;
+                            const valOf = (x: (typeof sub.clientes)[number]) => {
+                              if (sortCol === "total")
+                                return x.monthly
+                                  .slice(0, nMonths)
+                                  .reduce((s, m) => s + (isKg ? m.kg : m.venta), 0);
+                              if (typeof sortCol === "number")
+                                return (isKg ? x.monthly[sortCol]?.kg : x.monthly[sortCol]?.venta) ?? 0;
+                              return 0;
+                            };
+                            return sortDir === "desc" ? valOf(b) - valOf(a) : valOf(a) - valOf(b);
+                          })
+                          .map((c) => {
                           const cells = c.monthly.slice(0, nMonths).map((m) => (isKg ? m.kg : m.venta));
                           const total = cells.reduce((a, b) => a + b, 0);
                           const lastIdx = cells.reduce((acc, v, i) => (v > 0 ? i : acc), -1);
@@ -411,13 +500,19 @@ export function ClientesTableViews({
         <thead>
           <tr style={{ background: "var(--bg-surface-muted)" }}>
             <Th>{dimensionLabel}</Th>
-            <Th align="right">{isKg ? "Kg/día 90d" : "$/día 90d"}</Th>
-            <Th align="right">{isKg ? "Kg/día mes" : "$/día mes"}</Th>
-            <Th align="right">Δ % ritmo</Th>
+            <Th align="right" onClick={() => toggleSort("r90")} active={sortCol === "r90"} dir={sortDir}>
+              {isKg ? "Kg/día 90d" : "$/día 90d"}
+            </Th>
+            <Th align="right" onClick={() => toggleSort("rmes")} active={sortCol === "rmes"} dir={sortDir}>
+              {isKg ? "Kg/día mes" : "$/día mes"}
+            </Th>
+            <Th align="right" onClick={() => toggleSort("delta")} active={sortCol === "delta"} dir={sortDir}>
+              Δ % ritmo
+            </Th>
           </tr>
         </thead>
         <tbody>
-          {prom90Rows.map((r) => {
+          {sortedProm90Rows.map((r) => {
             const up = r.deltaPct >= 0;
             return (
               <tr
@@ -451,19 +546,36 @@ export function ClientesTableViews({
 function Th({
   children,
   align = "left",
+  onClick,
+  active = false,
+  dir,
 }: {
   children: React.ReactNode;
   align?: "left" | "right";
+  /** Si se pasa, el header es clickeable para ordenar. */
+  onClick?: () => void;
+  /** True si esta columna es la del orden activo. */
+  active?: boolean;
+  dir?: "asc" | "desc";
 }) {
   return (
     <th
       className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider"
       style={{
-        color: "var(--text-secondary)",
+        color: active ? "var(--accent)" : "var(--text-secondary)",
         textAlign: align,
+        cursor: onClick ? "pointer" : "default",
+        userSelect: "none",
       }}
+      onClick={onClick}
     >
-      {children}
+      <span
+        className="inline-flex items-center gap-1"
+        style={{ justifyContent: align === "right" ? "flex-end" : "flex-start" }}
+      >
+        {children}
+        {active && <span style={{ fontSize: "9px" }}>{dir === "desc" ? "▼" : "▲"}</span>}
+      </span>
     </th>
   );
 }
