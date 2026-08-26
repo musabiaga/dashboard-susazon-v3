@@ -25,8 +25,16 @@ const ALLOWED_DIMENSIONS = new Set([
   "grupos",
   "productos",
   "territorios",
+  "familias",
 ]);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** CSV → array (null si ausente/vacío = sin filtrar por esa dimensión). */
+function parseList(v: string | null): string[] | null {
+  if (v === null || v === "") return null;
+  const a = v.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  return a.length ? a : null;
+}
 
 export async function GET(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
@@ -94,13 +102,24 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Llamar la función RPC (p_agrupador_id: modo agrupador Fase 2b)
-  const { data, error } = await supabase.rpc("insights_concentracion", {
+  // Filtros cruzados (Idea 2): acotan el universo a items de otras dimensiones
+  // antes del Pareto. Cada uno opcional (null = no filtra por esa dimensión).
+  const fcliente = parseList(sp.get("fcliente"));
+  const fsku = parseList(sp.get("fsku"));
+  const fgrupo = parseList(sp.get("fgrupo"));
+  const ffamilia = parseList(sp.get("ffamilia"));
+
+  // Llamar la función RPC cruzada (territorios + agrupador + filtros cruzados).
+  const { data, error } = await supabase.rpc("insights_concentracion_cruzada", {
     p_from: fromParam,
     p_to: toParam,
     p_dimension: dimensionParam,
     p_territorios: territoriosFilter,
     p_agrupador_id: sp.get("agrupador") || null,
+    p_clientes: fcliente,
+    p_skus: fsku,
+    p_grupos: fgrupo,
+    p_familias: ffamilia,
   });
 
   if (error) {

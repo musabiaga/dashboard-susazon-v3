@@ -58,6 +58,21 @@ import {
 import { MultiSelectChips } from "@/components/dashboard/MultiSelectChips";
 
 type Dimension = "clientes" | "grupos" | "productos" | "territorios";
+
+// Dimensiones por las que se puede CRUZAR (filtrar el universo). Idea 2.
+type CrossDim = "clientes" | "productos" | "grupos" | "familias" | null;
+const CROSS_PARAM: Record<Exclude<CrossDim, null>, string> = {
+  clientes: "fcliente",
+  productos: "fsku",
+  grupos: "fgrupo",
+  familias: "ffamilia",
+};
+const CROSS_LABEL: Record<Exclude<CrossDim, null>, string> = {
+  clientes: "Cliente",
+  productos: "Producto",
+  grupos: "Grupo",
+  familias: "Familia",
+};
 type Metric = "venta" | "kg" | "margen" | "margen_pct";
 type ChartKind = "treemap" | "pareto";
 
@@ -171,6 +186,14 @@ export function ConcentracionAnalysis({
   const [topN, setTopN] = useState<TopN>(DEFAULT_TOP_N);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isCustom, setIsCustom] = useState(false);
+
+  // ===== Cruce de dimensiones (Idea 2): acotar el universo por items de OTRA
+  // dimensión antes del Pareto. Ej: Pareto de clientes filtrando por un SKU. =====
+  const [crossDim, setCrossDim] = useState<CrossDim>(null);
+  const [crossItems, setCrossItems] = useState<string[]>([]);
+  const [crossOptions, setCrossOptions] = useState<string[]>([]);
+  const [crossLoading, setCrossLoading] = useState(false);
+  const crossKey = crossItems.slice().sort().join("|");
   // Items EXCLUIDOS del cálculo del universo (no cuentan como 100%).
   // Por dimensión, para que cuando cambies de Clientes → Grupos, las
   // exclusiones de cada dimensión sean independientes.
@@ -297,6 +320,10 @@ export function ConcentracionAnalysis({
     } else if (territoriosKey !== "__ALL__") {
       params.set("territorios", territoriosKey.split("|").join(","));
     }
+    // Cruce: acotar por items de otra dimensión (Idea 2).
+    if (crossDim && crossItems.length > 0) {
+      params.set(CROSS_PARAM[crossDim], crossItems.join(","));
+    }
     fetch(`/api/insights/concentracion?${params.toString()}`, {
       credentials: "include",
     })
@@ -323,7 +350,36 @@ export function ConcentracionAnalysis({
     return () => {
       cancelled = true;
     };
-  }, [range.from, range.to, dimension, territoriosKey, agrupadorId]);
+  }, [range.from, range.to, dimension, territoriosKey, agrupadorId, crossDim, crossKey]);
+
+  // Cargar las opciones (items) de la dimensión de cruce elegida — reusa el
+  // mismo endpoint (sin cruce) para listar todos los items de esa dimensión.
+  useEffect(() => {
+    if (!crossDim) {
+      setCrossOptions([]);
+      return;
+    }
+    let cancelled = false;
+    setCrossLoading(true);
+    const p = new URLSearchParams({ from: range.from, to: range.to, dimension: crossDim });
+    if (agrupadorId) p.set("agrupador", agrupadorId);
+    else if (territoriosKey === "__NONE__") p.set("territorios", "");
+    else if (territoriosKey !== "__ALL__") p.set("territorios", territoriosKey.split("|").join(","));
+    fetch(`/api/insights/concentracion?${p.toString()}`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((j: ApiResponse) => {
+        if (!cancelled) setCrossOptions((j.items ?? []).map((it) => it.name));
+      })
+      .catch(() => {
+        if (!cancelled) setCrossOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCrossLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [crossDim, range.from, range.to, territoriosKey, agrupadorId]);
 
   // ============== Items EXCLUIDOS del universo ==============
   // Set de los excluidos para la dimensión actual. Estos items NO se
@@ -797,6 +853,47 @@ export function ConcentracionAnalysis({
           value={String(topN)}
           onChange={(v) => persistTopN(Number(v) as TopN)}
         />
+      </div>
+
+      {/* ============ Filtrar por (cruce de dimensiones · Idea 2) ============ */}
+      <div className="flex flex-wrap items-center gap-2">
+        <ChipToggle
+          label="Filtrar por"
+          options={[
+            { value: "", label: "— Ninguno" },
+            { value: "productos", label: "Producto" },
+            { value: "clientes", label: "Cliente" },
+            { value: "grupos", label: "Grupo" },
+            { value: "familias", label: "Familia" },
+          ]}
+          value={crossDim ?? ""}
+          onChange={(v) => {
+            setCrossDim((v || null) as CrossDim);
+            setCrossItems([]);
+          }}
+        />
+        {crossDim &&
+          (crossLoading ? (
+            <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+              Cargando {CROSS_LABEL[crossDim].toLowerCase()}s…
+            </span>
+          ) : (
+            <MultiSelectChips
+              options={crossOptions}
+              selected={crossItems}
+              onChange={setCrossItems}
+              maxItems={9999}
+              placeholder={`Elegir ${CROSS_LABEL[crossDim].toLowerCase()}…`}
+              emptyLabel="Todos"
+            />
+          ))}
+        {crossDim && crossItems.length > 0 && (
+          <span className="text-[10px] font-medium" style={{ color: "var(--accent)" }}>
+            → Pareto de {DIMENSION_LABEL[dimension].pl.toLowerCase()} de {crossItems.length}{" "}
+            {CROSS_LABEL[crossDim].toLowerCase()}
+            {crossItems.length === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
 
       {/* ============ Multi-select de items ============ */}
