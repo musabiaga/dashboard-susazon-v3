@@ -786,6 +786,11 @@ export function DashboardClient({
                             daysCurrent,
                             territorios: cypTerritorios,
                           }}
+                          fullYearSearchContext={{
+                            year: currentYear,
+                            territorios: cypTerritorios,
+                            agrupadorId: currentAgrupadorId,
+                          }}
                         />
                       ) : (
                         <DimensionTab
@@ -833,6 +838,11 @@ export function DashboardClient({
                             month: currentMonth,
                             daysCurrent,
                             territorios: cypTerritorios,
+                          }}
+                          fullYearSearchContext={{
+                            year: currentYear,
+                            territorios: cypTerritorios,
+                            agrupadorId: currentAgrupadorId,
                           }}
                         />
                       )

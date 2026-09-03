@@ -145,6 +145,15 @@ interface Props {
     daysCurrent: number;
     territorios: string[] | null;
   };
+  /** Si se pasa, el buscador (multi-select) usa el UNIVERSO DEL AÑO COMPLETO
+   *  (todos los SKUs/clientes con venta en el año, no solo los del mes
+   *  seleccionado). Resuelve el caso de un item que vendió en otro mes pero 0
+   *  en el mes en curso. Se busca vía /api/dashboard/dim-universe. */
+  fullYearSearchContext?: {
+    year: number;
+    territorios: string[] | null;
+    agrupadorId: string | null;
+  };
   /** Dimensión de los datos: "cliente" (default) | "sku". Determina a qué
    *  endpoints llaman las features ricas (evolución / meses / prom 90d).
    *  Permite reutilizar el motor para Productos (Fase 2). */
@@ -204,6 +213,7 @@ export function DimensionTab({
   tableViewsContext,
   enableRowExpand = false,
   rowExpandContext,
+  fullYearSearchContext,
   dimension = "cliente",
   controlledMode,
   showChart = true,
@@ -256,6 +266,45 @@ export function DimensionTab({
   const [productClientRows, setProductClientRows] = useState<DimensionRow[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const productMode = enableProductSearch && searchMode === "productos";
+
+  // ===== Universo de búsqueda del AÑO COMPLETO (fix: SKU/cliente sin venta en
+  // el mes seleccionado no aparecía en el buscador). Fetch lazy vía
+  // /api/dashboard/dim-universe cuando se pasa fullYearSearchContext. =====
+  const [yearUniverse, setYearUniverse] = useState<string[]>([]);
+  const fyTerritoriosKey =
+    fullYearSearchContext == null
+      ? ""
+      : fullYearSearchContext.territorios === null
+        ? "__ALL__"
+        : fullYearSearchContext.territorios.slice().sort().join("|");
+  useEffect(() => {
+    let cancelled = false;
+    if (!fullYearSearchContext) {
+      setYearUniverse([]);
+      return;
+    }
+    const params = new URLSearchParams();
+    params.set("dimension", dimension === "sku" ? "productos" : "clientes");
+    params.set("year", String(fullYearSearchContext.year));
+    if (fullYearSearchContext.territorios !== null) {
+      params.set("territorios", fullYearSearchContext.territorios.join(","));
+    }
+    if (fullYearSearchContext.agrupadorId) {
+      params.set("agrupador", fullYearSearchContext.agrupadorId);
+    }
+    fetch(`/api/dashboard/dim-universe?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((json: { names?: string[] }) => {
+        if (!cancelled) setYearUniverse(json.names ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setYearUniverse([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dimension, fullYearSearchContext?.year, fyTerritoriosKey, fullYearSearchContext?.agrupadorId]);
   // Cliente elegido para la vista Evolución en modo Productos (1 a la vez).
   const [evolutionClient, setEvolutionClient] = useState<string | null>(null);
   // ============ Toggle vista gráfica: Mismo mes (3 años) / Evolución ============
@@ -404,10 +453,17 @@ export function DimensionTab({
   // Items disponibles para el multi-select:
   //  - modo Clientes: nombres de clientes
   //  - modo Productos: lista de SKUs (productOptions)
-  const availableItems = useMemo(
-    () => (productMode ? (productOptions ?? []) : sorted.map((r) => r.name)),
-    [productMode, productOptions, sorted]
-  );
+  const availableItems = useMemo(() => {
+    if (productMode) return productOptions ?? [];
+    const monthNames = sorted.map((r) => r.name);
+    // Con universo de año completo: unimos los del mes (orden por venta) con
+    // los del año que no estén ya (fix del buscador). NO quitamos ninguno de
+    // los del mes (incluye items que solo vendieron en el mes de años previos).
+    if (!fullYearSearchContext || yearUniverse.length === 0) return monthNames;
+    const seen = new Set(monthNames);
+    const extras = yearUniverse.filter((n) => !seen.has(n));
+    return [...monthNames, ...extras];
+  }, [productMode, productOptions, sorted, fullYearSearchContext, yearUniverse]);
 
   // Selección activa según modo (clientes vs productos).
   const activeSelected = productMode ? selectedProducts : selectedItems;
@@ -425,11 +481,20 @@ export function DimensionTab({
     if (isCustomMode) {
       const byName = new Map(rows.map((r) => [r.name, r]));
       return selectedItems
-        .map((name) => byName.get(name))
+        .map(
+          (name) =>
+            byName.get(name) ??
+            // Item seleccionado del universo anual que NO vendió en el mes
+            // seleccionado → fila-cero. Las vistas de mes (Año vs Año, gráfica)
+            // lo muestran en 0; "Meses {año}" trae su desglose real por nombre.
+            (fullYearSearchContext
+              ? ({ name, v24: 0, v25: 0, v26: 0 } as DimensionRow)
+              : null)
+        )
         .filter((r): r is DimensionRow => r != null);
     }
     return topNChart == null ? sorted : sorted.slice(0, topNChart);
-  }, [isCustomMode, selectedItems, rows, sorted, topNChart]);
+  }, [isCustomMode, selectedItems, rows, sorted, topNChart, fullYearSearchContext]);
 
   // Tabla:
   //  - Si está en modo personalizado (con selección custom) → tabla muestra
