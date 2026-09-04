@@ -910,6 +910,7 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 - [x] **Territorio(s) en el expand mensual** cuando el scope es "Todos" (D044-8). Migración **044** (`territorios[]`). Commit `f7a3f7c`.
 - [x] **Desglose "Año vs Año" con 3 años** al expandir producto → clientes y cliente → SKUs (D044-9). `DesgloseYoYTable` compartido; `cliente-desglose` reescrito. Commits `d8c9e2a` + `0b970ca`.
 - [x] **Vista "Meses Hist."** — matriz Años×Meses expandible con heatmap (D044-10). Migración **045** `dim_mensual_multianio` + `MesesHistTable`. Commit `a4f136d`.
+- [x] **Paneles congelados** en las 4 vistas de tabla (Año vs Año, Meses, Meses Hist., Prom 90d): contenedor con scroll propio (`max-h-[70vh] overflow-auto`), encabezado `sticky top-0`, primera columna `sticky left-0` con fondo opaco que respeta el rayado, esquina `z-30`, y en Meses la fila TOTAL `sticky bottom-0`. Mauricio eligió: las 4 vistas, scroll propio y TOTAL fijo. Solo CSS/markup, sin backend.
 - [x] **Docs V4.3**: LO_NUEVO, CONTINUACION, INSTRUCTIVO_AGENTE fase_17, SESSION_LOG (D044 + bugs 51-53), índice maestro, AGENTS.md, .docx a v4.3.0 (`gen_docs.py`), instructivo visual HTML/PDF, sync a Plan Z.
 - [~] **Sincronización automática de datos** — diseñada y construida (pg_cron+Vault / auto-al-abrir), **parqueada** a petición de Mauricio; refresh sigue manual. Artefacto en `docs/parked/idea1-sync-auto/`.
 

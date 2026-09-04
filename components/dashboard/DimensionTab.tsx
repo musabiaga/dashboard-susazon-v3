@@ -1326,32 +1326,35 @@ export function DimensionTab({
               (comparativos día-vs-día equitativos entre años)
             </span>
           </div>
-          <div className="overflow-x-auto">
+          {/* Paneles congelados (V4.3): la tabla tiene su propio scroll
+              (alto máx 70vh) para que el encabezado (top) y la primera columna
+              (left) queden fijos en ambos ejes, como en Excel. */}
+          <div className="max-h-[70vh] overflow-auto">
             <table className="w-full text-sm tabular-nums">
               <thead>
                 <tr style={{ background: "var(--bg-surface-muted)" }}>
-                  <Th>{dimensionLabel}</Th>
+                  <Th sticky="corner">{dimensionLabel}</Th>
                   {/* Pesos — al-día */}
-                  <Th align="right" onClick={() => toggleAnioSort("v24")} active={anioSortKey === "v24"} dir={anioSortDir}>{monthLabel24}</Th>
-                  <Th align="right" onClick={() => toggleAnioSort("v25")} active={anioSortKey === "v25"} dir={anioSortDir}>{monthLabel25}</Th>
-                  <Th align="right" onClick={() => toggleAnioSort("v26")} active={anioSortKey === "v26"} dir={anioSortDir}>{monthLabel26}</Th>
-                  <Th align="right" onClick={() => toggleAnioSort("varv")} active={anioSortKey === "varv"} dir={anioSortDir}>Var %</Th>
+                  <Th sticky="top" align="right"onClick={() => toggleAnioSort("v24")} active={anioSortKey === "v24"} dir={anioSortDir}>{monthLabel24}</Th>
+                  <Th sticky="top" align="right"onClick={() => toggleAnioSort("v25")} active={anioSortKey === "v25"} dir={anioSortDir}>{monthLabel25}</Th>
+                  <Th sticky="top" align="right"onClick={() => toggleAnioSort("v26")} active={anioSortKey === "v26"} dir={anioSortDir}>{monthLabel26}</Th>
+                  <Th sticky="top" align="right"onClick={() => toggleAnioSort("varv")} active={anioSortKey === "varv"} dir={anioSortDir}>Var %</Th>
                   {/* KG (opcional) — al-día */}
                   {showKg && (
                     <>
-                      <Th align="right" subtle onClick={() => toggleAnioSort("k24")} active={anioSortKey === "k24"} dir={anioSortDir}>{`KG ${monthLabel24}`}</Th>
-                      <Th align="right" subtle onClick={() => toggleAnioSort("k25")} active={anioSortKey === "k25"} dir={anioSortDir}>{`KG ${monthLabel25}`}</Th>
-                      <Th align="right" subtle onClick={() => toggleAnioSort("k26")} active={anioSortKey === "k26"} dir={anioSortDir}>{`KG ${monthLabel26}`}</Th>
-                      <Th align="right" subtle onClick={() => toggleAnioSort("varkg")} active={anioSortKey === "varkg"} dir={anioSortDir}>Var % KG</Th>
+                      <Th sticky="top" align="right"subtle onClick={() => toggleAnioSort("k24")} active={anioSortKey === "k24"} dir={anioSortDir}>{`KG ${monthLabel24}`}</Th>
+                      <Th sticky="top" align="right"subtle onClick={() => toggleAnioSort("k25")} active={anioSortKey === "k25"} dir={anioSortDir}>{`KG ${monthLabel25}`}</Th>
+                      <Th sticky="top" align="right"subtle onClick={() => toggleAnioSort("k26")} active={anioSortKey === "k26"} dir={anioSortDir}>{`KG ${monthLabel26}`}</Th>
+                      <Th sticky="top" align="right"subtle onClick={() => toggleAnioSort("varkg")} active={anioSortKey === "varkg"} dir={anioSortDir}>Var % KG</Th>
                     </>
                   )}
                   {/* Margen del mes actual (siempre visible, no depende del
                       toggle ni de showKg). 4 columnas: Mg $ / Mg % / Mg % prev
                       / Δ pp para leer evolución del margen vs año anterior. */}
-                  <Th align="right" onClick={() => toggleAnioSort("mg26")} active={anioSortKey === "mg26"} dir={anioSortDir}>{`Mg $ ${monthLabel26}`}</Th>
-                  <Th align="right" onClick={() => toggleAnioSort("mgpct26")} active={anioSortKey === "mgpct26"} dir={anioSortDir}>{`Mg % ${monthLabel26}`}</Th>
-                  <Th align="right" subtle onClick={() => toggleAnioSort("mgpct25")} active={anioSortKey === "mgpct25"} dir={anioSortDir}>{`Mg % ${monthLabel25}`}</Th>
-                  <Th align="right" onClick={() => toggleAnioSort("dpp")} active={anioSortKey === "dpp"} dir={anioSortDir}>Δ pp</Th>
+                  <Th sticky="top" align="right"onClick={() => toggleAnioSort("mg26")} active={anioSortKey === "mg26"} dir={anioSortDir}>{`Mg $ ${monthLabel26}`}</Th>
+                  <Th sticky="top" align="right"onClick={() => toggleAnioSort("mgpct26")} active={anioSortKey === "mgpct26"} dir={anioSortDir}>{`Mg % ${monthLabel26}`}</Th>
+                  <Th sticky="top" align="right"subtle onClick={() => toggleAnioSort("mgpct25")} active={anioSortKey === "mgpct25"} dir={anioSortDir}>{`Mg % ${monthLabel25}`}</Th>
+                  <Th sticky="top" align="right"onClick={() => toggleAnioSort("dpp")} active={anioSortKey === "dpp"} dir={anioSortDir}>Δ pp</Th>
                 </tr>
               </thead>
               <tbody>
@@ -1391,7 +1394,10 @@ export function DimensionTab({
                             : "var(--bg-surface-muted)",
                       }}
                     >
-                      <Td>
+                      <Td
+                        sticky
+                        bg={i % 2 === 0 ? "var(--bg-surface)" : "var(--bg-surface-muted)"}
+                      >
                         {enableRowExpand && rowExpandContext ? (
                           <button
                             type="button"
@@ -1596,6 +1602,7 @@ function Th({
   onClick,
   active = false,
   dir,
+  sticky,
 }: {
   children: React.ReactNode;
   align?: "left" | "right" | "center";
@@ -1605,10 +1612,20 @@ function Th({
   onClick?: () => void;
   active?: boolean;
   dir?: "asc" | "desc";
+  /** Paneles congelados: "top" = encabezado fijo al bajar; "corner" = además
+   *  fijo a la izquierda (celda esquina, primera columna). Requiere que la
+   *  tabla viva en un contenedor con overflow-auto. */
+  sticky?: "top" | "corner";
 }) {
+  const stickyCls =
+    sticky === "corner"
+      ? "sticky top-0 left-0 z-30"
+      : sticky === "top"
+        ? "sticky top-0 z-20"
+        : "";
   return (
     <th
-      className={`border-b px-3 py-2 font-semibold uppercase tracking-wider text-[10px] text-${align}`}
+      className={`border-b px-3 py-2 font-semibold uppercase tracking-wider text-[10px] text-${align} ${stickyCls}`}
       style={{
         borderColor: "var(--border)",
         color: active
@@ -1619,6 +1636,10 @@ function Th({
         borderLeft: subtle ? "1px dashed var(--border)" : undefined,
         cursor: onClick ? "pointer" : "default",
         userSelect: "none",
+        // Fondo opaco: una celda sticky se despega de su fila y dejaría ver
+        // el contenido que pasa por debajo.
+        background: sticky ? "var(--bg-surface-muted)" : undefined,
+        boxShadow: sticky === "corner" ? "1px 0 0 var(--border)" : undefined,
       }}
       onClick={onClick}
     >
@@ -1639,6 +1660,8 @@ function Td({
   color,
   bold = false,
   subtle = false,
+  sticky = false,
+  bg,
 }: {
   children: React.ReactNode;
   align?: "left" | "right" | "center";
@@ -1646,14 +1669,20 @@ function Td({
   bold?: boolean;
   /** Si true, color más tenue + borde izquierdo sutil. */
   subtle?: boolean;
+  /** Paneles congelados: primera columna fija a la izquierda al desplazarse. */
+  sticky?: boolean;
+  /** Fondo opaco de la celda sticky — debe coincidir con el de su fila. */
+  bg?: string;
 }) {
   return (
     <td
-      className={`px-3 py-2 text-${align}`}
+      className={`px-3 py-2 text-${align} ${sticky ? "sticky left-0 z-10" : ""}`}
       style={{
         color: color ?? (subtle ? "var(--text-secondary)" : "var(--text-primary)"),
         fontWeight: bold ? 600 : 400,
         borderLeft: subtle ? "1px dashed var(--border)" : undefined,
+        background: sticky ? (bg ?? "var(--bg-surface)") : undefined,
+        boxShadow: sticky ? "1px 0 0 var(--border)" : undefined,
       }}
     >
       {children}

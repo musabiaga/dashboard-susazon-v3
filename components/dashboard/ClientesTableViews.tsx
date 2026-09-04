@@ -331,14 +331,17 @@ export function ClientesTableViews({
     const subEmpty = dim === "sku" ? "Sin clientes." : "Sin productos.";
     const subLoadingLabel = dim === "sku" ? "clientes" : "productos";
     return (
-      <div className="overflow-x-auto">
+      <div className="max-h-[70vh] overflow-auto">
+        {/* Paneles congelados (V4.3): scroll propio (alto máx 70vh) → encabezado
+            fijo al bajar, primera columna fija al ir a la derecha, TOTAL fijo al pie. */}
         <table className="w-full text-sm tabular-nums">
           <thead>
             <tr style={{ background: "var(--bg-surface-muted)" }}>
-              <Th>{dimensionLabel}</Th>
+              <Th sticky="corner">{dimensionLabel}</Th>
               {evolution.meses.map((m, i) => (
                 <Th
                   key={m.mes}
+                  sticky="top"
                   align="right"
                   onClick={() => toggleSort(i)}
                   active={sortCol === i}
@@ -347,7 +350,7 @@ export function ClientesTableViews({
                   {m.label}
                 </Th>
               ))}
-              <Th align="right" onClick={() => toggleSort("total")} active={sortCol === "total"} dir={sortDir}>
+              <Th sticky="top" align="right" onClick={() => toggleSort("total")} active={sortCol === "total"} dir={sortDir}>
                 Total YTD
               </Th>
             </tr>
@@ -364,7 +367,7 @@ export function ClientesTableViews({
                     style={{ borderColor: "var(--border)", cursor: "pointer" }}
                     onClick={() => toggleExpand(r.name)}
                   >
-                    <Td>
+                    <Td sticky="left">
                       <span className="inline-flex items-center gap-1">
                         <ChevronRight
                           size={12}
@@ -424,7 +427,10 @@ export function ClientesTableViews({
                           const stopped = lastIdx >= 0 && lastIdx < nMonths - 1;
                           return (
                             <tr key={c.name} style={{ background: "var(--bg-surface-muted)" }}>
-                              <td className="py-1 pl-8 pr-2 text-xs">
+                              <td
+                                className="sticky left-0 z-10 py-1 pl-8 pr-2 text-xs"
+                                style={{ background: "var(--bg-surface-muted)", boxShadow: "1px 0 0 var(--border)" }}
+                              >
                                 <span style={{ color: "var(--text-secondary)" }}>{c.name}</span>
                                 {isMultiTerritorio ? (
                                   // "Todos" / varios territorios → territorio(s) donde vendió.
@@ -487,13 +493,13 @@ export function ClientesTableViews({
                 background: "var(--bg-surface-muted)",
               }}
             >
-              <Td bold>TOTAL</Td>
+              <Td bold sticky="bottom-left">TOTAL</Td>
               {mesesTotals.cells.map((v, i) => (
-                <Td key={i} align="right" bold>
+                <Td key={i} align="right" bold sticky="bottom">
                   {fmt(v)}
                 </Td>
               ))}
-              <Td align="right" bold>
+              <Td align="right" bold sticky="bottom">
                 {fmt(mesesTotals.total)}
               </Td>
             </tr>
@@ -505,7 +511,7 @@ export function ClientesTableViews({
 
   // ===================== Render PROM 90d =====================
   return (
-    <div className="overflow-x-auto">
+    <div>
       <div
         className="border-b px-3 py-1.5 text-[10px] uppercase tracking-wider"
         style={{
@@ -523,17 +529,19 @@ export function ClientesTableViews({
           </span>
         )}
       </div>
+      {/* Paneles congelados (V4.3): scroll propio (alto máx 70vh). */}
+      <div className="max-h-[70vh] overflow-auto">
       <table className="w-full text-sm tabular-nums">
         <thead>
           <tr style={{ background: "var(--bg-surface-muted)" }}>
-            <Th>{dimensionLabel}</Th>
-            <Th align="right" onClick={() => toggleSort("r90")} active={sortCol === "r90"} dir={sortDir}>
+            <Th sticky="corner">{dimensionLabel}</Th>
+            <Th sticky="top" align="right" onClick={() => toggleSort("r90")} active={sortCol === "r90"} dir={sortDir}>
               {isKg ? "Kg/día 90d" : "$/día 90d"}
             </Th>
-            <Th align="right" onClick={() => toggleSort("rmes")} active={sortCol === "rmes"} dir={sortDir}>
+            <Th sticky="top" align="right" onClick={() => toggleSort("rmes")} active={sortCol === "rmes"} dir={sortDir}>
               {isKg ? "Kg/día mes" : "$/día mes"}
             </Th>
-            <Th align="right" onClick={() => toggleSort("delta")} active={sortCol === "delta"} dir={sortDir}>
+            <Th sticky="top" align="right" onClick={() => toggleSort("delta")} active={sortCol === "delta"} dir={sortDir}>
               Δ % ritmo
             </Th>
           </tr>
@@ -547,7 +555,7 @@ export function ClientesTableViews({
                 className="border-t"
                 style={{ borderColor: "var(--border)" }}
               >
-                <Td>{r.name}</Td>
+                <Td sticky="left">{r.name}</Td>
                 <Td align="right">{fmt(r.ritmo90)}</Td>
                 <Td align="right">{fmt(r.ritmoMes)}</Td>
                 <Td align="right">
@@ -565,6 +573,7 @@ export function ClientesTableViews({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -576,6 +585,7 @@ function Th({
   onClick,
   active = false,
   dir,
+  sticky,
 }: {
   children: React.ReactNode;
   align?: "left" | "right";
@@ -584,15 +594,27 @@ function Th({
   /** True si esta columna es la del orden activo. */
   active?: boolean;
   dir?: "asc" | "desc";
+  /** Paneles congelados: "top" = encabezado fijo al bajar; "corner" = además
+   *  fijo a la izquierda (primera columna). La tabla debe vivir en un
+   *  contenedor con overflow-auto. */
+  sticky?: "top" | "corner";
 }) {
+  const stickyCls =
+    sticky === "corner"
+      ? "sticky top-0 left-0 z-30"
+      : sticky === "top"
+        ? "sticky top-0 z-20"
+        : "";
   return (
     <th
-      className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider"
+      className={`px-3 py-2 text-[11px] font-semibold uppercase tracking-wider ${stickyCls}`}
       style={{
         color: active ? "var(--accent)" : "var(--text-secondary)",
         textAlign: align,
         cursor: onClick ? "pointer" : "default",
         userSelect: "none",
+        background: sticky ? "var(--bg-surface-muted)" : undefined,
+        boxShadow: sticky === "corner" ? "1px 0 0 var(--border)" : undefined,
       }}
       onClick={onClick}
     >
@@ -610,19 +632,46 @@ function Td({
   children,
   align = "left",
   bold = false,
+  sticky,
+  bg,
 }: {
   children: React.ReactNode;
   align?: "left" | "right";
   bold?: boolean;
+  /** Paneles congelados: "left" = primera columna fija; "bottom" = fila TOTAL
+   *  fija al pie; "bottom-left" = celda esquina inferior (TOTAL + 1ª col). */
+  sticky?: "left" | "bottom" | "bottom-left";
+  /** Fondo opaco de la celda sticky (default: el de la fila TOTAL si es
+   *  bottom, el del contenedor si es left). */
+  bg?: string;
 }) {
+  const stickyCls =
+    sticky === "bottom-left"
+      ? "sticky bottom-0 left-0 z-30"
+      : sticky === "bottom"
+        ? "sticky bottom-0 z-20"
+        : sticky === "left"
+          ? "sticky left-0 z-10"
+          : "";
+  const stickyBg =
+    sticky === "bottom" || sticky === "bottom-left"
+      ? "var(--bg-surface-muted)"
+      : "var(--bg-surface)";
   return (
     <td
-      className="px-3 py-1.5"
+      className={`px-3 py-1.5 ${stickyCls}`}
       style={{
         color: "var(--text-primary)",
         textAlign: align,
         fontWeight: bold ? 600 : 400,
         whiteSpace: "nowrap",
+        background: sticky ? (bg ?? stickyBg) : undefined,
+        boxShadow:
+          sticky === "left" || sticky === "bottom-left"
+            ? "1px 0 0 var(--border)"
+            : sticky === "bottom"
+              ? "0 -1px 0 var(--border)"
+              : undefined,
       }}
     >
       {children}

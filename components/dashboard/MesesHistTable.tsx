@@ -158,22 +158,31 @@ export function MesesHistTable({
           (expande una fila para comparar {years.join(" / ")} mes-a-mes · cierre de cada mes)
         </span>
       </div>
-      <div className="overflow-x-auto">
+      {/* Paneles congelados (V4.3): scroll propio (alto máx 70vh) → encabezado
+          fijo al bajar y primera columna fija al ir a la derecha. */}
+      <div className="max-h-[70vh] overflow-auto">
         <table className="w-full text-[13px] tabular-nums">
           <thead>
             <tr style={{ background: "var(--bg-surface-muted)", color: "var(--text-muted)" }}>
-              <th className="px-3 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider">
+              <th
+                className="sticky left-0 top-0 z-30 px-3 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style={{ background: "var(--bg-surface-muted)", boxShadow: "1px 0 0 var(--border)" }}
+              >
                 {dimensionLabel}
               </th>
               {meses.map((m) => (
                 <th
                   key={m.mes}
-                  className="px-2 py-1.5 text-right text-[10px] font-semibold uppercase tracking-wider"
+                  className="sticky top-0 z-20 px-2 py-1.5 text-right text-[10px] font-semibold uppercase tracking-wider"
+                  style={{ background: "var(--bg-surface-muted)" }}
                 >
                   {m.label}
                 </th>
               ))}
-              <th className="px-3 py-1.5 text-right text-[10px] font-semibold uppercase tracking-wider">
+              <th
+                className="sticky top-0 z-20 px-3 py-1.5 text-right text-[10px] font-semibold uppercase tracking-wider"
+                style={{ background: "var(--bg-surface-muted)" }}
+              >
                 Total
               </th>
             </tr>
@@ -243,7 +252,10 @@ function RowGroup({
     <>
       {/* Fila cabecera de la entidad: total de los años por mes */}
       <tr style={{ background: bg }}>
-        <td className="px-3 py-1.5">
+        <td
+          className="sticky left-0 z-10 px-3 py-1.5"
+          style={{ background: bg, boxShadow: "1px 0 0 var(--border)" }}
+        >
           <button
             type="button"
             onClick={onToggle}
@@ -284,8 +296,13 @@ function RowGroup({
           return (
             <tr key={y} style={{ background: "var(--bg-surface-muted)" }}>
               <td
-                className="py-1 pl-8 pr-2 text-xs"
-                style={{ color: "var(--text-secondary)", fontWeight: 600 }}
+                className="sticky left-0 z-10 py-1 pl-8 pr-2 text-xs"
+                style={{
+                  color: "var(--text-secondary)",
+                  fontWeight: 600,
+                  background: "var(--bg-surface-muted)",
+                  boxShadow: "1px 0 0 var(--border)",
+                }}
               >
                 {y}
               </td>
