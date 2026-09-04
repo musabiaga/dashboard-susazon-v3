@@ -1472,6 +1472,10 @@ export function DimensionTab({
                           cliente={r.name}
                           context={rowExpandContext}
                           colSpan={9 + (showKg ? 4 : 0)}
+                          monthLabel24={monthLabel24}
+                          monthLabel25={monthLabel25}
+                          monthLabel26={monthLabel26}
+                          showKg={showKg}
                         />
                       ))}
                     </Fragment>

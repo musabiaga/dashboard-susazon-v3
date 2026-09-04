@@ -1,24 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { countBizDays, findCalendarDayForBizDays } from "@/lib/business-days";
 
 /**
  * GET /api/dashboard/cliente-desglose
  *
- * Devuelve la facturación de un cliente desglosada por GRUPO de producto, y
- * dentro de cada grupo, por SKU (árbol de 2 niveles). Para el dropdown
- * expandible de la tabla del tab Clientes (Mejora 5).
- *
- * Periodo: al-día (mes seleccionado, hasta el día de corte daysCurrent).
+ * Devuelve los SKUs que compra un cliente, con la MISMA estructura de 3 años
+ * al-día que el encabezado (v/k/m por año 24/25/26 + al-día). Alimenta el
+ * desglose expandible de un cliente en la vista "Año vs Año" del tab
+ * Clientes/Productos (Mejora 2, V4.3). Antes agrupaba por grupo→SKU con solo
+ * el periodo actual; ahora aplana a SKU con comparación de 3 años.
  *
  * Query params:
- *   year:        YYYY
+ *   year:        YYYY (año actual del filtro)
  *   month:       1-12
- *   daysCurrent: día de corte del mes (al-día)
+ *   daysCurrent: día calendario de corte (para el al-día)
  *   cliente:     nombre del cliente
  *   territorios: null (todos por RLS) | "" (ninguno) | CSV
  *
- * Una sola query a sales_rows; el árbol grupo→SKU se arma server-side.
- * Respeta RLS de territorio.
+ * Calcula el "al-día" (acumulado al mismo día hábil) por año con los helpers
+ * de business-days, idéntico a clientes-por-producto. Respeta RLS.
  */
 
 export async function GET(request: NextRequest) {
@@ -59,21 +60,25 @@ export async function GET(request: NextRequest) {
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
   if (territoriosFilter !== null && territoriosFilter.length === 0) {
-    return NextResponse.json({ grupos: [] });
+    return NextResponse.json({ rows: [] });
   }
 
-  // Al-día: fecha <= día de corte del mes.
-  const mm = String(month).padStart(2, "0");
-  const dd = String(daysCurrent).padStart(2, "0");
-  const firstDay = `${year}-${mm}-01`;
-  const cutoffDate = `${year}-${mm}-${dd}`;
+  // Cutoffs al-día (idéntico a clientes-por-producto): mismo número de días
+  // hábiles entre años.
+  const elapsedBizDays = countBizDays(year, month, daysCurrent);
+  const cutoffByYear: Record<number, number> = {
+    [year]: daysCurrent,
+    [year - 1]: findCalendarDayForBizDays(year - 1, month, elapsedBizDays),
+    [year - 2]: findCalendarDayForBizDays(year - 2, month, elapsedBizDays),
+  };
 
+  // 1 query: ventas del cliente en el mes, los 3 años, por SKU.
   let query = supabase
     .from("sales_rows")
-    .select("grupo, sku, venta, kg, margen")
+    .select("sku, fecha, anio, venta, kg, margen")
     .eq("cliente", cliente)
-    .gte("fecha", firstDay)
-    .lte("fecha", cutoffDate);
+    .eq("mes", month)
+    .in("anio", [year - 2, year - 1, year]);
   if (territoriosFilter !== null) {
     query = query.in("territorio", territoriosFilter);
   }
@@ -83,56 +88,58 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: `Error: ${error.message}` }, { status: 500 });
   }
 
-  // Agregar por grupo → SKU.
-  interface Acc {
-    venta: number;
-    kg: number;
-    margen: number;
+  // Agregar por SKU: cierre (todo el mes) + al-día (dia <= cutoff del año).
+  interface Agg {
+    name: string;
+    v24: number; v25: number; v26: number;
+    k24: number; k25: number; k26: number;
+    m24: number; m25: number; m26: number;
+    v24_alDia: number; v25_alDia: number; v26_alDia: number;
+    k24_alDia: number; k25_alDia: number; k26_alDia: number;
+    m24_alDia: number; m25_alDia: number; m26_alDia: number;
   }
-  const grupos = new Map<string, { agg: Acc; skus: Map<string, Acc> }>();
+  const bySku = new Map<string, Agg>();
+  const blank = (name: string): Agg => ({
+    name,
+    v24: 0, v25: 0, v26: 0,
+    k24: 0, k25: 0, k26: 0,
+    m24: 0, m25: 0, m26: 0,
+    v24_alDia: 0, v25_alDia: 0, v26_alDia: 0,
+    k24_alDia: 0, k25_alDia: 0, k26_alDia: 0,
+    m24_alDia: 0, m25_alDia: 0, m26_alDia: 0,
+  });
+
   for (const r of data ?? []) {
-    const grupo = r.grupo ?? "(sin grupo)";
-    const sku = r.sku ?? "(sin sku)";
+    const name = r.sku ?? "(sin sku)";
+    const anio = Number(r.anio);
     const venta = Number(r.venta) || 0;
     const kg = Number(r.kg) || 0;
     const margen = Number(r.margen) || 0;
+    const dia = new Date(r.fecha + "T12:00:00").getDate();
 
-    let g = grupos.get(grupo);
-    if (!g) {
-      g = { agg: { venta: 0, kg: 0, margen: 0 }, skus: new Map() };
-      grupos.set(grupo, g);
+    let agg = bySku.get(name);
+    if (!agg) {
+      agg = blank(name);
+      bySku.set(name, agg);
     }
-    g.agg.venta += venta;
-    g.agg.kg += kg;
-    g.agg.margen += margen;
 
-    const s = g.skus.get(sku) ?? { venta: 0, kg: 0, margen: 0 };
-    s.venta += venta;
-    s.kg += kg;
-    s.margen += margen;
-    g.skus.set(sku, s);
+    const isAlDia = dia <= (cutoffByYear[anio] ?? 0);
+    if (anio === year - 2) {
+      agg.v24 += venta; agg.k24 += kg; agg.m24 += margen;
+      if (isAlDia) { agg.v24_alDia += venta; agg.k24_alDia += kg; agg.m24_alDia += margen; }
+    } else if (anio === year - 1) {
+      agg.v25 += venta; agg.k25 += kg; agg.m25 += margen;
+      if (isAlDia) { agg.v25_alDia += venta; agg.k25_alDia += kg; agg.m25_alDia += margen; }
+    } else if (anio === year) {
+      agg.v26 += venta; agg.k26 += kg; agg.m26 += margen;
+      if (isAlDia) { agg.v26_alDia += venta; agg.k26_alDia += kg; agg.m26_alDia += margen; }
+    }
   }
 
-  const pct = (m: number, v: number) => (v > 0 ? (m / v) * 100 : 0);
+  // Ordenar por venta al-día del año actual (el componente re-ordena igual).
+  const rows = Array.from(bySku.values()).sort(
+    (a, b) => b.v26_alDia - a.v26_alDia
+  );
 
-  const gruposOut = Array.from(grupos.entries())
-    .map(([grupo, { agg, skus }]) => ({
-      grupo,
-      venta: agg.venta,
-      kg: agg.kg,
-      margen: agg.margen,
-      margen_pct: pct(agg.margen, agg.venta),
-      skus: Array.from(skus.entries())
-        .map(([sku, a]) => ({
-          sku,
-          venta: a.venta,
-          kg: a.kg,
-          margen: a.margen,
-          margen_pct: pct(a.margen, a.venta),
-        }))
-        .sort((a, b) => b.venta - a.venta),
-    }))
-    .sort((a, b) => b.venta - a.venta);
-
-  return NextResponse.json({ grupos: gruposOut });
+  return NextResponse.json({ rows });
 }
