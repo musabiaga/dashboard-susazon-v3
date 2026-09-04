@@ -1,4 +1,4 @@
-# Continuación en Nueva Conversación — Dashboard Comercial Susazón V4.2
+# Continuación en Nueva Conversación — Dashboard Comercial Susazón V4.3
 
 > **Para Claude / Agente AI que está retomando el proyecto.**
 > Lee este archivo primero (toma 5 min), luego pasa a los recursos específicos según lo que vayas a hacer.
@@ -13,9 +13,11 @@
 
 **Stack:** Next.js 16 + Supabase Postgres + Vercel. Frontend React 19, Tailwind 4 CSS-first, Recharts 3.x.
 
-**Estado:** EN PRODUCCIÓN versión **4.2.0** (deploy 2026-04-28; Fases 1-16 cerradas). **V4.2** (2026-07-19) agregó el **6º Insight "Crecimiento x Vendedor"**: comparativa Año Anterior vs Año Actual (Mes + Acumulado) por cliente o producto, filtrable por vendedor y capada al mismo día, con 6 mediciones (Kg · $ · Margen % · Margen $ · Variedad · Ticket Promedio) y **fila TOTAL con totalizador REAL**. V4.1 (2026-07-05) había agregado el 5º Insight Penetración/Canasta, el módulo Agrupadores completo (territorios virtuales, Fase 1→3) y el histograma mensual de las pastillas de Tracking.
+**Estado:** EN PRODUCCIÓN versión **4.3.0** (deploy 2026-04-28; Fases 1-17 cerradas). **V4.3** (2026-07-30 → 2026-09-03, Fase 17) profundizó el tab **Clientes y Productos** — gráfica **Meses (3 años)**, **expand mensual bidireccional** "campo minado" (con **territorio(s)** cuando el scope es "Todos"), **orden por columna**, **buscador con universo de AÑO COMPLETO** (antes solo listaba items con venta en el mes seleccionado), **desglose Año-vs-Año de 3 años** al expandir producto o cliente, y la 4ª vista de tabla **"Meses Hist."** (matriz Años×Meses expandible con heatmap) — y agregó el modo **"Comparar vs año anterior (al día)"** en Tracking Diario (+ fix Ptto Linear), el 4º KPI **"Prom. Venta Diario"** (con ACUM consolidada) y el **cruce de dimensiones** ("Filtrar por" + Familias) en Insights·Concentración. Migraciones **041-045** (total 45); datos Ene 2024 – Sep 2026 (~384K filas). El refresh de datos sigue **MANUAL**: la sincronización automática se diseñó, construyó y **parqueó** a petición de Mauricio (`docs/parked/idea1-sync-auto/`). V4.2 (2026-07-19) había agregado el 6º Insight "Crecimiento x Vendedor" (comparativa AA vs Actual capada al mismo día, 6 mediciones, totalizador REAL); V4.1 (2026-07-05) el 5º Insight Penetración/Canasta, el módulo Agrupadores completo y el histograma de las pastillas.
 
-> 🆕 **Si vienes de antes de Fase 10 (≤ 2026-05-23):** Lee primero `LO_NUEVO.md` — resume V4.0-4.2 (Fases 10-16) en una página.
+> 🆕 **Si vienes de una sesión previa:** Lee primero `LO_NUEVO.md` — resume V4.3 (Fase 17) y, como histórico, V4.2/V4.1 en una página. Después la decisión D044 + bugs 51-53 en `SESSION_LOG.md` y `<fase_17>` en `INSTRUCTIVO_AGENTE.xml`.
+>
+> ⚠️ **Regla de diseño V4.3 (aplicar en cualquier función nueva):** replicar el scoping *territorios + rama de agrupador* de `insights_concentracion_cruzada` y usar `SECURITY INVOKER`; si una función cambia de firma, crearla con **nombre nuevo** (o `DROP+CREATE`) para no romper consumidores; cargar los detalles (expands, universo del buscador, matriz multi-año) **lazy por territorio** desde el cliente, nunca en el payload inicial de `page.tsx` (tope de 1000 filas de PostgREST).
 
 **URL canonical:** `https://www.dashboardcomercialsusazon.com`
 

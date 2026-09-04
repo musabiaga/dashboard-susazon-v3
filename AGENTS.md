@@ -4,13 +4,13 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# Dashboard Comercial Susazón V4.2 — Project Context
+# Dashboard Comercial Susazón V4.3 — Project Context
 
 **Owner:** Mauricio Usabiaga (Director de Operaciones, Grupo Susazón). Habla español. **Regla absoluta: NUNCA alucinar. Ante cualquier duda, preguntar antes de implementar (AskUserQuestion).**
 
 ## Estado actual
 
-**EN PRODUCCIÓN — versión 4.2.0** — deployado desde 2026-04-28. Última versión: 2026-07-19.
+**EN PRODUCCIÓN — versión 4.3.0** — deployado desde 2026-04-28. Última versión: 2026-09-03.
 
 - **URL canonical:** `https://www.dashboardcomercialsusazon.com` (custom domain en GoDaddy)
 - **URL fallback:** `https://dashboard-susazon-v3-44sp.vercel.app`
@@ -20,7 +20,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - ✅ **V4.0 (Fases 10-12, Jun 2026):** Tracking +2 cards (Variedad SKUs, Clientes Activos); tabs Productos+Clientes fusionados en "Clientes y Productos"; **Insights ampliado a 4 sub-análisis** (Concentración con Pareto+Territorios, Precio $/kg, Cuadrante BCG, Estacionalidad).
 - ✅ **V4.1 (Fases 13-15, Jun–Jul 2026):** 5º Insight **Penetración/Canasta** (migr 028); módulo **Agrupadores** — territorios virtuales (Fase 1→3: seguridad KAM por RLS, vista enfocada en los 7 tabs, meta manual + export; migr 029-037); **histograma mensual** interactivo en las pastillas de Tracking (Venta/Margen/KG).
 - ✅ **V4.2 (Fase 16, Jul 2026):** 6º Insight **Crecimiento x Vendedor** (migr 038-040) — comparativa Año Anterior vs Actual (Mes + Acumulado) por cliente/producto, filtrable por vendedor y capada al mismo día; 6 mediciones (Kg · $ · Margen % · Margen $ · Variedad · Ticket Promedio); **fila TOTAL con totalizador REAL** (Σ pura en aditivas, COUNT DISTINCT en variedad/tickets, Margen % = Σmargen÷Σventa).
-- ✅ **40 migraciones SQL**, 337K+ filas (Ene 2024 – Jul 2026), 15/15 usuarios en prod.
+- ✅ **V4.3 (Fase 17, Jul 30 – Sep 3 2026):** profundización del tab **Clientes y Productos** — gráfica **Meses (3 años)** (12 meses × 2024/25/26), **expand mensual bidireccional** "campo minado" con "sin comprar desde" / **territorio(s)** en "Todos" (migr 041+044), **orden por columna** en las 3 vistas, **buscador con universo de AÑO COMPLETO** (migr 043; antes solo listaba items con venta en el mes), **desglose Año-vs-Año de 3 años** al expandir producto o cliente (`DesgloseYoYTable`), y **4ª vista de tabla "Meses Hist."** (matriz Años×Meses expandible con heatmap, migr 045). **Tracking Diario**: modo **Comparar vs año anterior (al día)** + fix Ptto Linear cierra en su total. **KPI header**: 4º KPI **Prom. Venta Diario** + ACUM consolidada en una pastilla. **Insights · Concentración**: **cruzar dimensiones** ("Filtrar por" + dimensión Familias, migr 042). **Parqueado**: sync automática de datos (diseñada, revertida; `docs/parked/`). El refresh sigue MANUAL.
+- ✅ **45 migraciones SQL**, ~384K filas (Ene 2024 – Sep 2026; 2024 y 2025 completos, 2026 Ene–Sep), 15/15 usuarios en prod.
 - 📌 **Lee `docs/LO_NUEVO.md` + `docs/CONTINUACION_NUEVA_CONVERSACION.md` primero** para retomar.
 
 **Fase 2 (2026-04-29 / 2026-04-30):**

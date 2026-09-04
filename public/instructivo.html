@@ -804,7 +804,7 @@
   <div class="cover-logo">
     <span class="cover-logo-text">S</span>
   </div>
-  <div class="cover-eyebrow">Grupo Susazón · InCom V4.2</div>
+  <div class="cover-eyebrow">Grupo Susazón · InCom V4.3</div>
   <h1>Dashboard Comercial</h1>
   <p class="cover-subtitle">
     Guía visual para entender tu dashboard.
@@ -816,7 +816,7 @@
   <div class="cover-meta">
     <div class="cover-meta-item">
       <span class="cover-meta-label">Versión</span>
-      <span class="cover-meta-value">4.2.0</span>
+      <span class="cover-meta-value">4.3.0</span>
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">Actualizado</span>
@@ -830,16 +830,42 @@
 </section>
 
 <!-- ====================================================
-     NOVEDADES V4.2
+     NOVEDADES V4.3
      ==================================================== -->
 <section>
   <div class="section-header">
     <div class="section-number">🆕</div>
     <div>
-      <div class="section-title">Novedades V4.2</div>
-      <div class="section-subtitle">Lo nuevo desde la V4.1</div>
+      <div class="section-title">Novedades V4.3</div>
+      <div class="section-subtitle">Lo nuevo desde la V4.2</div>
     </div>
   </div>
+  <p><strong>Clientes y Productos — análisis mucho más profundo.</strong>
+    La gráfica <strong>"Meses (3 años)"</strong> muestra los 12 meses con 3 barras por mes
+    (2024, 2025, 2026) y sus líneas de margen %. En la tabla, <strong>expande cualquier fila</strong>
+    en "Meses 2026": un producto te enseña sus clientes mes a mes y un cliente sus productos; los
+    meses en rojo tenue son meses <strong>sin compra</strong> ("campo minado") y verás
+    <strong>"sin comprar desde …"</strong> para quien dejó de comprar — o, si estás en
+    <strong>"Todos"</strong> los territorios, <strong>en qué territorio(s)</strong> compró. Ahora
+    <strong>ordenas cualquier columna</strong> con un clic en su encabezado, el <strong>buscador
+    encuentra cualquier producto o cliente con venta en el año</strong> (aunque no haya comprado
+    este mes), y al expandir en "Año vs Año" cada renglón trae <strong>los 3 años completos</strong>
+    (venta, Var %, kilos, margen y Δ en puntos). Nueva vista <strong>"Meses Hist."</strong>: cada
+    producto o cliente con el total de los 3 años por mes; expándelo para ver 2024, 2025 y 2026
+    uno debajo del otro y comparar cada mes entre años.</p>
+  <p><strong>Tracking Diario — compara contra el año pasado, al día.</strong>
+    Un interruptor <strong>"Comparar vs año anterior"</strong> pone las barras de cada día del año
+    pasado junto a las de este año, la tabla lado a lado con su Δ% en color, y al dar clic en un
+    día ves qué clientes compraron ese mismo día este año y el pasado (Nuevo / Perdido).</p>
+  <p><strong>KPI "Promedio de Venta Diario".</strong>
+    Una cuarta card grande: cuánto vendes en promedio por día hábil, comparado con el año pasado
+    en el mismo tramo y con el objetivo diario del presupuesto. Las 3 cards de Acumulado ahora van
+    juntas en una sola pastilla vertical.</p>
+  <p><strong>Insights · Concentración — cruza dimensiones.</strong>
+    Nueva opción <strong>"Filtrar por"</strong>: elige un producto, cliente, grupo o familia y el
+    Pareto se recalcula solo sobre eso (ej. qué territorio vende más arrachera). Y ahora también
+    puedes hacer el Pareto por <strong>Familias</strong>.</p>
+  <p style="margin-top: 28px;"><strong>También reciente (V4.2):</strong></p>
   <p><strong>Insights — Crecimiento x Vendedor (6º análisis).</strong>
     Para evaluar cómo va cada vendedor: dos tablas lado a lado, <strong>Año Anterior</strong> y
     <strong>Año Actual</strong>, cada una con <strong>Mes</strong> y <strong>Acumulado</strong> de su
@@ -1107,7 +1133,7 @@
     <div class="section-number">4</div>
     <div>
       <div class="section-title">KPIs principales explicados</div>
-      <div class="section-subtitle">Las 3 cards grandes arriba del dashboard</div>
+      <div class="section-subtitle">Las 4 cards grandes arriba del dashboard + la pastilla de Acumulados</div>
     </div>
   </div>
 
@@ -1161,7 +1187,19 @@
     </p>
   </div>
 
-  <h3 style="margin-top: 32px;">Cards de Acumulado (las 3 chicas a la derecha)</h3>
+  <div class="glass-card">
+    <h3>Prom. Venta Diario <span class="pill green">🆕 V4.3</span></h3>
+    <p>
+      Cuarta card grande: cuánto vendes <strong>en promedio por día hábil</strong>
+      (venta al día ÷ días hábiles transcurridos — lunes a sábado sin feriados).
+      El comparativo va contra el año anterior <strong>en el mismo tramo de días</strong>
+      y <strong>vs PTTO</strong> compara contra el objetivo diario (presupuesto ÷ días hábiles
+      del mes). Ábrela para ver el promedio de cada mes.
+    </p>
+  </div>
+
+  <h3 style="margin-top: 32px;">Pastilla de Acumulado (los 3 años apilados a la derecha) <span class="pill blue">V4.3</span></h3>
+  <p style="color: var(--text-secondary);">Antes eran 3 cards separadas; ahora van juntas en una sola pastilla vertical a mitad de ancho, para dar más espacio a los 4 KPIs.</p>
   <div class="kpi-grid">
     <div class="kpi-card">
       <div class="kpi-card-label">Acum 2024</div>
@@ -1324,7 +1362,7 @@
     <li class="tab-item">
       <div class="tab-icon" style="background: linear-gradient(135deg, var(--accent-yellow), var(--accent-orange)); color: #1a1a2e;">💡</div>
       <div class="tab-content">
-        <div class="tab-name">Insights · Suite de inteligencia comercial <span class="pill green">6 análisis V4.2</span></div>
+        <div class="tab-name">Insights · Suite de inteligencia comercial <span class="pill green">6 análisis · V4.3</span></div>
         <div class="tab-summary">
           Tab dedicado a análisis avanzados, no operativos. <strong>Hoy son
           6 sub-análisis</strong> (toggle arriba): <strong>Concentración · Precio $/kg ·
@@ -1461,6 +1499,18 @@
     (azul sólido), <strong>PTTO Linear</strong> (violeta punteado, lo que deberías llevar),
     <strong>año anterior</strong> (gris punteado). Pasa el cursor para ver el tooltip con todos
     los valores del día.
+  </p>
+
+  <h3>Comparar vs año anterior (al día) <span class="pill green">🆕 V4.3</span></h3>
+  <p>
+    Arriba del tab hay un interruptor <strong>"Comparar vs año anterior"</strong> (apagado por
+    defecto; se recuerda en tu navegador). Al activarlo, la gráfica muestra las <strong>barras de
+    cada día del año pasado junto a las de este año</strong>, y la tabla pone lado a lado Venta,
+    Margen $ y Margen % de cada día con su <strong>Δ% en color</strong> y una fila TOTAL al día.
+    Da clic en un día para ver <strong>qué clientes compraron ese mismo día</strong> este año y el
+    pasado (marca <span class="pill green">Nuevo</span> / <span class="pill" style="background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">Perdido</span>).
+    Respeta tu territorio y el toggle Pesos/Kilos. La línea de PTTO Linear ahora llega siempre a
+    su total en el último día hábil del mes.
   </p>
 
   <h3>Tabla diaria con TOTAL</h3>
@@ -1611,7 +1661,7 @@
 
   <!-- B · Tab Insights · Concentración -->
   <div class="glass-card featured">
-    <h3>💡 Tab Insights · Suite de inteligencia comercial <span class="pill green">6 análisis V4.2</span></h3>
+    <h3>💡 Tab Insights · Suite de inteligencia comercial <span class="pill green">6 análisis · V4.3</span></h3>
     <p>
       Espacio dedicado a análisis avanzados, no operativos. <strong>Hoy son
       6 sub-análisis</strong>, seleccionables con el toggle de arriba. 💡 <strong>Pasa el
@@ -1619,14 +1669,17 @@
       cómo interpretar el análisis activo.
     </p>
 
-    <h4>1 · Concentración (Pareto) <span class="pill blue">Actualizado</span></h4>
+    <h4>1 · Concentración (Pareto) <span class="pill green">🆕 Cruza dimensiones V4.3</span></h4>
     <p>
       ¿Qué tan dependientes somos del top X? Elige periodo (Date Range Picker),
-      <strong>dimensión</strong> (Grupos / Clientes / Productos / <strong>🆕 Territorios</strong>)
+      <strong>dimensión</strong> (Grupos / Clientes / Productos / Territorios / <strong>🆕 Familias</strong>)
       y métrica (Pesos / Kilos / Margen $ / Margen %). Visualiza con <strong>Treemap</strong>
-      o <strong>🆕 Pareto</strong> (barras de mayor a menor + línea de <strong>% acumulado</strong>
-      → lees "el top N cubre X% del total"; reemplaza al Radar). Tabla expandible por fila +
+      o <strong>Pareto</strong> (barras de mayor a menor + línea de <strong>% acumulado</strong>
+      → lees "el top N cubre X% del total"). Tabla expandible por fila +
       botón <span class="pill">Excluir</span> para recalcular el 100% sin items atípicos.
+      🆕 <strong>"Filtrar por"</strong>: elige un producto, cliente, grupo o familia y el Pareto se
+      recalcula <strong>solo sobre eso</strong>. Ejemplo: vista Territorios + Filtrar por Producto =
+      ARRACHERA → <strong>qué territorio vende más arrachera</strong>.
     </p>
 
     <h4>2 · Precio $/kg — Dispersión <span class="pill green">Nuevo V4.0</span></h4>
@@ -1750,46 +1803,63 @@
 
   <!-- E · Análisis profundo de Clientes (V3.9) -->
   <div class="glass-card featured">
-    <h3>👥 Análisis profundo de Clientes (dentro del tab "Clientes y Productos") <span class="pill green">V3.9 · sigue en V4.0</span></h3>
+    <h3>👥 Análisis profundo de Clientes y Productos <span class="pill green">🆕 Ampliado en V4.3</span></h3>
     <p>
-      El tab Clientes recibió 4 mejoras para analizar tu cartera a profundidad. Todas respetan
-      el toggle Pesos/Kilos, el filtro de territorios del sidebar y tu rol (RLS).
+      El tab "Clientes y Productos" es hoy el más profundo del dashboard. Todo respeta el toggle
+      Pesos/Kilos, el filtro de territorios del sidebar y tu rol (RLS).
     </p>
 
-    <h4>1 · Toggle de gráfica: "Mismo mes (3 años)" / "Evolución {año}"</h4>
+    <h4>1 · Toggle de gráfica: "Meses (3 años)" / "Evolución {año}" <span class="pill blue">V4.3</span></h4>
     <p style="margin-bottom: 8px;">
-      Arriba de la gráfica. <strong>Mismo mes (3 años)</strong> = la vista clásica (barras Abr 24/25/26).
-      <strong>Evolución</strong> = barras de volumen mes a mes del año en curso + línea de margen %
-      (agregado de los clientes visibles, solo meses transcurridos). Ideal para ver estacionalidad.
+      Arriba de la gráfica. <strong>Meses (3 años)</strong> = los 12 meses del año con 3 barras
+      por mes (2024 gris, 2025 azul, 2026 verde) + 3 líneas de margen % — compara cada mes contra
+      los años anteriores de un vistazo (antes solo mostraba 1 mes). <strong>Evolución</strong> =
+      barras de volumen mes a mes del año en curso + línea de margen %.
     </p>
 
-    <h4>2 · Buscar por Clientes o Productos</h4>
+    <h4>2 · Buscar por Clientes o Productos — ahora con TODO el año <span class="pill blue">V4.3</span></h4>
     <p style="margin-bottom: 8px;">
       El buscador tiene un toggle <span class="pill blue">Clientes</span> /
       <span class="pill blue">Productos</span>. En modo <strong>Productos</strong> eliges SKUs y
-      el chart + tabla muestran <strong>los clientes que más compran esos productos</strong> (suma
-      si eliges varios). En modo Productos + Evolución eliges <strong>un cliente</strong> (de un
-      dropdown con TODOS los que compran ese SKU, ordenados de mayor a menor con su monto) y ves
-      su compra mensual de esos productos.
+      el chart + tabla muestran <strong>los clientes que más compran esos productos</strong>.
+      🆕 El buscador ahora encuentra <strong>cualquier producto o cliente con venta en el año</strong>,
+      aunque no haya comprado en el mes que estás viendo: selecciónalo y verás su año completo
+      en "Meses {año}" (en "Año vs Año" aparece en 0 para ese mes, que es lo correcto).
     </p>
 
-    <h4>3 · Tabla con 3 vistas</h4>
+    <h4>3 · Tabla con 4 vistas <span class="pill blue">V4.3</span></h4>
     <p style="margin-bottom: 8px;">
       Toggle arriba de la tabla:
       <span class="pill">Año vs Año</span> (la clásica, 3 años + Var %),
-      <span class="pill">Meses {año}</span> (una columna por mes transcurrido + Total YTD), y
-      <span class="pill">vs Prom. 90d</span> (ritmo diario del mes en curso vs el de los últimos
-      90 días hábiles facturados, con <strong style="color:#10b981;">▲</strong>/<strong style="color:#ef4444;">▼</strong>
-      para detectar quién <strong>acelera o desacelera</strong> su compra).
+      <span class="pill">Meses {año}</span> (una columna por mes + Total YTD),
+      🆕 <span class="pill">Meses Hist.</span> (matriz Años × Meses: cada producto/cliente con el
+      total de los 3 años por mes; <strong>expándelo</strong> para ver 2024, 2025 y 2026 mes a mes
+      uno debajo del otro, con colores más intensos en los meses fuertes — lee una columna hacia
+      abajo para comparar ese mes entre años), y
+      <span class="pill">vs Prom. 90d</span> (ritmo diario del mes vs los últimos 90 días hábiles,
+      <strong style="color:#10b981;">▲</strong>/<strong style="color:#ef4444;">▼</strong> para ver
+      quién <strong>acelera o desacelera</strong>).
+      🆕 En cualquier vista, <strong>da clic en el encabezado de una columna</strong> para ordenar
+      (una vez de mayor a menor, otra de menor a mayor).
     </p>
 
-    <h4>4 · Desglose por línea de producto (dropdown por cliente)</h4>
+    <h4>4 · Expand mensual "campo minado" en "Meses {año}" <span class="pill green">🆕 V4.3</span></h4>
+    <p style="margin-bottom: 8px;">
+      Click en cualquier fila (chevron ▸): un <strong>producto</strong> te muestra sus
+      <strong>clientes mes a mes</strong>; un <strong>cliente</strong>, sus <strong>productos</strong>.
+      Los meses en rojo tenue son meses <strong>sin compra</strong> ("campo minado") y verás
+      <strong>"sin comprar desde …"</strong> para quien dejó de comprar → detectas churn de un
+      vistazo. Si estás viendo <strong>"Todos"</strong> los territorios, en su lugar verás
+      <strong>en qué territorio(s)</strong> compró cada cliente.
+    </p>
+
+    <h4>5 · Desglose "Año vs Año" con los 3 años <span class="pill green">🆕 V4.3</span></h4>
     <p style="margin-bottom: 0;">
-      En la vista "Año vs Año", click en cualquier cliente (chevron ▸) para expandir su
-      <strong>facturación por grupo de producto</strong>, y cada grupo se sub-expande a sus
-      <strong>SKUs</strong> (Venta / KG / Margen $ / Margen %). El desglose es al-día (hasta el
-      día de corte que tengas en el selector de día). Útil para ver de un vistazo qué le vendes
-      a cada cliente sin salir de la tabla.
+      En la vista "Año vs Año", click en un <strong>producto</strong> para ver sus clientes, o en
+      un <strong>cliente</strong> para ver sus SKUs. Cada renglón trae ahora <strong>la misma
+      información que el encabezado</strong>: venta de los 3 años con su Var %, kilos, margen $ y %
+      y la diferencia en puntos porcentuales — comparación al día, hasta el día de corte del
+      selector de día.
     </p>
   </div>
 </section>

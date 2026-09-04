@@ -1,17 +1,20 @@
-# Índice Maestro — Dashboard Comercial Susazón V4.2
+# Índice Maestro — Dashboard Comercial Susazón V4.3
 
-**Proyecto:** Dashboard Comercial Susazón V4.2 — **InCom** (Inteligencia Comercial Susazón®)
+**Proyecto:** Dashboard Comercial Susazón V4.3 — **InCom** (Inteligencia Comercial Susazón®)
 **Empresa:** Grupo Susazón (Susazón + Suve)
 **Owner:** Mauricio Usabiaga (Director de Operaciones)
-**Estado:** En producción (versión 4.2.0)
+**Estado:** En producción (versión 4.3.0)
 **URL canonical:** `https://www.dashboardcomercialsusazon.com`
-**Última actualización:** 2026-07-24
+**Última actualización:** 2026-09-03
 
 > 🆕 **Lee primero `LO_NUEVO.md`** si vienes de una sesión previa — te ahorra leer todo el
-> SESSION_LOG. **V4.2** agregó el 6º Insight **Crecimiento x Vendedor** (comparativa Año
-> Anterior vs Actual por vendedor, con totalizador REAL y Ticket Promedio). V4.1 había
-> agregado el módulo **Agrupadores** (territorios virtuales, Fase 1→3), el 5º Insight
-> **Penetración/Canasta** y el **histograma** de las pastillas de Tracking.
+> SESSION_LOG. **V4.3** (Fase 17) profundizó el tab **Clientes y Productos** (gráfica Meses
+> 3 años, expand mensual "campo minado" con territorio, orden por columna, buscador de año
+> completo, desglose Año-vs-Año de 3 años y la 4ª vista **"Meses Hist."**), agregó el modo
+> **Comparar vs año anterior (al día)** en Tracking, el 4º KPI **Prom. Venta Diario** y el
+> **cruce de dimensiones** en Insights·Concentración (migraciones 041-045). V4.2 había
+> agregado el 6º Insight **Crecimiento x Vendedor**; V4.1 el módulo **Agrupadores**, el 5º
+> Insight **Penetración/Canasta** y el **histograma** de las pastillas de Tracking.
 
 ---
 
@@ -19,25 +22,27 @@
 
 | # | Archivo | Tipo | Propósito | Versión | Última actualización |
 |---|---------|------|-----------|---------|---------------------|
-| 1 | `01_Arquitectura_Tecnica.docx` | Word | Diseño del sistema, stack tecnológico, flujo de información, decisiones arquitectónicas | **4.2.0** | **2026-07-24** |
-| 2 | `02_Diccionario_Datos.docx` | Word | Schemas de DB, contratos de APIs, estructura de objetos, mapeo de columnas, funciones SQL | **4.2.0** | **2026-07-24** |
-| 3 | `03_ChangeLog_Release_Notes.docx` | Word | Evolución V2.2 → V4.2 (incluye Fases 1-16) | **4.2.0** | **2026-07-24** |
-| 4 | `04_Manual_Usuario.docx` | Word | Manual para usuarios finales — incluye Agrupadores, Insights (**6 sub-análisis**, incl. Crecimiento x Vendedor), histograma de pastillas, tab Clientes y Productos | **4.2.0** | **2026-07-24** |
-| 5 | `05_Guia_TI_Despliegue.docx` | Word | Guía para ingeniero de TI: despliegue, env vars, troubleshooting, monitoreo | **4.2.0** | **2026-07-24** |
-| 6 | `06_Guia_Reconstruccion.docx` | Word | Reconstrucción desde cero: paso a paso, algoritmos, dependencias, verificación | **4.2.0** | **2026-07-24** |
-| 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude. **Incluye Fases 6-16** | **4.2** | **2026-07-24** |
-| 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones D001-D043, bugs 1-50, backlog. **Incluye Fases 6-16** | **4.2** | **2026-07-24** |
-| 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | **4.2** | **2026-07-24** |
-| 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | Contexto compacto para retomar el proyecto en otra sesión Claude | **4.2** | **2026-07-24** |
-| 11 | `Instructivo_Usuario_Visual.html` / `.pdf` | HTML/PDF | Manual visual para usuarios finales (el HTML es el que se abre desde el dashboard). **V4.2 con secciones nuevas marcadas** | **4.2** | **2026-07-24** |
+| 1 | `01_Arquitectura_Tecnica.docx` | Word | Diseño del sistema, stack tecnológico, flujo de información, decisiones arquitectónicas | **4.3.0** | **2026-09-03** |
+| 2 | `02_Diccionario_Datos.docx` | Word | Schemas de DB, contratos de APIs, estructura de objetos, mapeo de columnas, funciones SQL (incl. 041-045) | **4.3.0** | **2026-09-03** |
+| 3 | `03_ChangeLog_Release_Notes.docx` | Word | Evolución V2.2 → V4.3 (incluye Fases 1-17) | **4.3.0** | **2026-09-03** |
+| 4 | `04_Manual_Usuario.docx` | Word | Manual para usuarios finales — incluye Novedades V4.3 (Clientes y Productos a profundidad, Comparar vs año anterior, Prom. Venta Diario, cruce en Concentración), Agrupadores, Insights (6 sub-análisis) | **4.3.0** | **2026-09-03** |
+| 5 | `05_Guia_TI_Despliegue.docx` | Word | Guía para ingeniero de TI: despliegue, env vars, troubleshooting, monitoreo | **4.3.0** | **2026-09-03** |
+| 6 | `06_Guia_Reconstruccion.docx` | Word | Reconstrucción desde cero: paso a paso, algoritmos, dependencias, verificación | **4.3.0** | **2026-09-03** |
+| 7 | `INSTRUCTIVO_AGENTE.xml` | XML | Instructivo completo para futuros agentes Claude. **Incluye Fases 6-17** | **4.3** | **2026-09-03** |
+| 8 | `SESSION_LOG.md` | Markdown | Bitácora viva: decisiones D001-D044, bugs 1-53, backlog. **Incluye Fases 6-17** | **4.3** | **2026-09-03** |
+| 9 | `00_INDICE_MAESTRO.md` | Markdown | Este archivo — índice de toda la documentación | **4.3** | **2026-09-03** |
+| 10 | `CONTINUACION_NUEVA_CONVERSACION.md` | Markdown | Contexto compacto para retomar el proyecto en otra sesión Claude | **4.3** | **2026-09-03** |
+| 11 | `Instructivo_Usuario_Visual.html` / `.pdf` | HTML/PDF | Manual visual para usuarios finales (el HTML es el que se abre desde el dashboard). **V4.3 con secciones nuevas marcadas** | **4.3** | **2026-09-03** |
 | 12 | `AUTH_FLOWS.md` | Markdown | Documentación técnica del sistema de auth. Diagramas de los 3 flows | 1.0 | 2026-05-01 |
 | 12b | `GUIA_OBTENER_SECRETS.md` | Markdown | **Cómo obtener CADA credencial** (Supabase, Vercel, GitHub, APIs, Resend, GoDaddy) para reconstruir desde cero. Sin valores reales (committeable) | **1.0** | **2026-07-05** |
-| 13 | `LO_NUEVO.md` | Markdown | **Resumen ejecutivo de V4.2 (Fase 16: Crecimiento x Vendedor) y V4.1 (Fases 10-15).** Lee primero si vienes de una sesión previa | **3.0** | **2026-07-05** |
-| 14 | `_backups/2026-05-10_pre-update/` | Snapshot | Snapshot inmutable de los docs antes de la actualización del 10-may | — | 2026-05-10 |
+| 13 | `LO_NUEVO.md` | Markdown | **Resumen ejecutivo de V4.3 (Fase 17) y, como histórico, V4.2 (Fase 16) y V4.1 (Fases 10-15).** Lee primero si vienes de una sesión previa | **4.0** | **2026-09-03** |
+| 14 | `parked/idea1-sync-auto/` | Parqueado | Sincronización automática de datos: diseñada y construida en V4.3, **revertida** a petición de Mauricio (el refresh sigue manual). SQL de pg_cron fuera de `supabase/migrations/` para que no se aplique por error | — | 2026-08-25 |
+| 15 | `_backups/2026-05-10_pre-update/` | Snapshot | Snapshot inmutable de los docs antes de la actualización del 10-may | — | 2026-05-10 |
 
-> **Sobre los `.docx` y el PDF:** en V4.2 se regeneraron los 6 `.docx` a la versión **4.2.0**
-> vía `scripts/gen_docs.py`, y el PDF visual se regeneró desde `public/instructivo.html`.
-> Todos reflejan el estado al **2026-07-24** (Fases 1-16, incluye Crecimiento x Vendedor).
+> **Sobre los `.docx` y el PDF:** en V4.3 se regeneraron los 6 `.docx` a la versión **4.3.0**
+> vía `scripts/gen_docs.py`, y el PDF visual se regeneró desde `public/instructivo.html`
+> (chrome-headless-shell de Playwright). Todos reflejan el estado al **2026-09-03**
+> (Fases 1-17).
 
 ---
 
@@ -66,9 +71,9 @@ código + docs con renombre kebab-case + sesiones).
 El código vive en este repo (`github.com/musabiaga/dashboard-susazon-v3`). Carpetas críticas:
 
 - `app/` — Páginas Next.js (App Router) · **7 tabs** en `app/dashboard/`
-- `components/` — Componentes React (incl. `components/dashboard/insights/` con **6 sub-análisis**)
+- `components/` — Componentes React (incl. `components/dashboard/insights/` con **6 sub-análisis**; en V4.3: `TrackingCompareYoY`, `ClientesTresAniosChart`, `DesgloseYoYTable`, `MesesHistTable`)
 - `lib/` — Utilidades server-side y cliente
-- `supabase/migrations/` — Schemas SQL aplicados (**40 migraciones**)
+- `supabase/migrations/` — Schemas SQL aplicados (**45 migraciones**)
 - `docs/` — Esta documentación
 
 ## Dónde está deployado
@@ -98,3 +103,4 @@ El código vive en este repo (`github.com/musabiaga/dashboard-susazon-v3`). Carp
 - El respaldo Plan Z se sincroniza con `scripts/respaldar.sh`
 - **Cero información sensible** en este repo — los secretos viven en `SECRETS_DASHBOARD_V3.txt` (privado)
 - El predecesor V2.2 (single-page HTML) sigue vivo en paralelo en Netlify — NO tocar
+- El refresh de datos es **manual** (Cargar Datos, admin/director). La sync automática está **parqueada** en `docs/parked/` — no está desplegada

@@ -1,4 +1,4 @@
-# Session Log — Dashboard Comercial Susazón V4.2
+# Session Log — Dashboard Comercial Susazón V4.3
 
 ## Metadata
 
@@ -20,11 +20,12 @@
 - **Cierre fase 13:** 2026-06-07 (Documentación V4.0 completa: docs vivos + 6 .docx regenerados + manual HTML/PDF + sync a Plan Z + auditoría de reconstrucción desde cero)
 - **Cierre fases 14-15 (V4.1):** 2026-07-05 (Insight #5 Penetración/Canasta + módulo Agrupadores completo Fase 1→3 + histograma mensual en las pastillas de Tracking + fixes D033-D035/D037)
 - **Cierre fase 16 (V4.2):** 2026-07-19 (Insights: 6º sub-análisis "Crecimiento x Vendedor" — comparativa AA vs Actual capada al mismo día, mediciones Kg/$/Margen %/Margen $/Variedad/Ticket Promedio + totalizador REAL)
-- **Versión actual:** 4.2.0 (en producción)
+- **Cierre fase 17 (V4.3):** 2026-09-03 (Clientes y Productos a profundidad: Meses 3 años, expand mensual "campo minado" + territorio, sort por columna, buscador de año completo, desglose Año-vs-Año de 3 años, vista Meses Hist. · Tracking "Comparar vs año anterior" · 4º KPI Prom. Venta Diario · Concentración cruza dimensiones · migraciones 041-045 · sync automática parqueada)
+- **Versión actual:** 4.3.0 (en producción)
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
 - **URL prod canonical:** `https://www.dashboardcomercialsusazon.com`
 - **URL prod fallback:** `https://dashboard-susazon-v3.vercel.app`
-- **Última actualización:** 2026-07-23
+- **Última actualización:** 2026-09-03
 
 ---
 
@@ -665,6 +666,36 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 
 **Estado:** Vigente. **Insights = 6 sub-análisis.** Migraciones 038-040. Commits `7cc5122` + `2d8abc7` + `cb1793d`. tsc + build OK en cada entrega. Release **V4.2.0**.
 
+### D044 — 2026-07-30 → 2026-09-03 | V4.3: profundización de Clientes y Productos + comparativos año-vs-año + cruce en Concentración (Fase 17)
+
+**Contexto:** tras cerrar V4.2, Mauricio pidió una serie de mejoras iterativas —cada una rebotada primero (`AskUserQuestion`), construida, verificada y desplegada por separado (regla de commits chunkeados)— centradas en analizar la cartera a mayor profundidad y comparar contra el año anterior "al día". 14 commits, migraciones 041-045. La sesión de trabajo se reanudó dos veces por compactación de contexto (micro-cortes de Starlink); el trabajo no se perdió.
+
+**Entrega 1 — Tracking Diario "Comparar vs año anterior (al día)" (`5057048`) + KPI "Prom. Venta Diario" (`d292431`):**
+1. Toggle on-demand (off por defecto, localStorage) que transforma el tab en 2026 vs 2025 respetando scope y Pesos/Kilos. Gráfica: barras diarias 2025 agrupadas con 2026 + acumulados; tabla pareada por día (Venta día/acum, Margen $, Margen %) con Δ% + TOTAL al día; **expandible por día** → clientes 2026 vs 2025 (mismo día del mes) cruzados por NOMBRE, etiqueta Nuevo/Perdido. **Cero queries nuevas** (2 fetches a `clientes-dia` + merge). Componente `TrackingCompareYoY`.
+2. 4º KPI grande "Prom. Diario" = venta al día ÷ días hábiles transcurridos (L-S menos LFT); delta vs AA **al día** (mismo tramo — difiere del delta de Venta, que va vs cierre); VS PTTO = objetivo diario (PTTO ÷ días hábiles totales); histograma desplegable mes a mes. **ACUM 2024/25/26** consolidada en UNA pastilla vertical a mitad de ancho; los 4 KPIs crecen (grid 9 col: 4×2+1). `KpiData` gana `ventaAlDia/prevYearVentaAlDia/elapsedBizDays/totalBizDays`.
+
+**Entrega 2 — Gráfica "Meses (3 años)" (`dd4f11b` + `23ae3f4`):** el toggle "Mismo mes (3 años)" pasa de "1 mes × 3 años" a "**12 meses × 3 años**": barras agrupadas 2024/2025/2026 por mes + 3 líneas de Margen %. Multi-SKU agrega en una serie por año. Reusa `/clientes-evolution` con 3 llamadas lazy (sin endpoint nuevo). Leyenda (`ChartLegend` por secciones) y tooltip **homologados al tab Ventas**. Nuevo `ClientesTresAniosChart`.
+
+**Entrega 3 — Fix Ptto Linear (`800113a`, bug 51):** ver Bugs Resueltos.
+
+**Entrega 4 — Expand mensual bidireccional "campo minado" (`05ee073` + `b99fcb6`, migr 041):** en "Meses {año}" cada fila se expande: SKU → clientes por mes / cliente → SKUs por mes; meses sin compra en rojo tenue + "sin comprar desde MMM". **No existía una vista cliente×SKU×mes** (las `kpi_*` son por una sola dimensión) → función `insights_cliente_sku_mensual` que agrega de `sales_rows` (SECURITY INVOKER → RLS). Endpoint `cliente-sku-mensual` con la **misma forma** que `clientes-evolution` para reusar el render.
+
+**Entrega 5 — Sort por columna + fix dropdown congelado (`588e5a9`, bug 52):** clic en header ordena en las 3 vistas (Meses por mes/Total YTD incl. sub-filas; Año vs Año por todas sus columnas; Prom 90d por ritmos y Δ); se resetea al cambiar vista/dimensión. Fix: ver Bugs Resueltos.
+
+**Entrega 6 — Insights·Concentración cruza dimensiones (`f4faba8`, migr 042):** fila "Filtrar por" (Producto/Cliente/Grupo/Familia + items) acota el universo del Pareto; + dimensión **Familias**. **Decisión clave:** función **nueva** `insights_concentracion_cruzada` (replica territorios + rama de agrupador + filtros opcionales) en vez de modificar `insights_concentracion` — que tiene 2 overloads (3-arg y 5-arg con agrupador) — para **no romper el módulo Agrupadores**.
+
+**Entrega 7 — Buscador con universo de AÑO COMPLETO (`608a20f`, migr 043, bug 53):** ver Bugs Resueltos. `dim_universe_year` consulta `sales_rows` directo (no las vistas por mes) para devolver nombres distintos del año **sin el tope de 1000 filas** de PostgREST; `DimensionTab.fullYearSearchContext` hace fetch lazy por territorio y **une** mes + año sin quitar ningún item; los seleccionados sin venta en el mes se sintetizan como **fila-cero** para fluir a las vistas.
+
+**Entrega 8 — Territorio(s) en el expand cuando el scope es "Todos" (`f7a3f7c`, migr 044):** cada sub-fila muestra el/los territorio(s) donde vendió (con +N y tooltip) **en lugar** del "sin comprar desde"; con un solo territorio se conserva el churn (Mauricio eligió "reemplaza" entre 3 opciones). Cambio de firma → **DROP+CREATE** de `insights_cliente_sku_mensual` agregando `territorios[]` (`array_agg DISTINCT` por name×mes; el endpoint los une entre meses).
+
+**Entrega 9 — Desglose "Año vs Año" con 3 años, ambos lados (`d8c9e2a` + `0b970ca`):** al expandir producto → clientes y cliente → SKUs, cada sub-fila replica **todas** las columnas del header (Mauricio eligió "todas" y "aplanar grupo" para el lado cliente). Hallazgo: `clientes-por-producto` **ya devolvía** los 3 años al-día — solo faltaba renderizarlos. Se extrajo `DesgloseYoYTable` (presentacional compartido) para no duplicar; `ProductoDesglose`/`ClienteDesglose` quedan como wrappers; `cliente-desglose` reescrito "por SKU, 3 años al-día" (espejo del anterior; único consumidor verificado).
+
+**Entrega 10 — Vista "Meses Hist." (`a4f136d`, migr 045):** diseño rebotado (3 layouts + métrica de celda) → Mauricio eligió **expandible** (fila = total 3 años/mes; expand = sub-filas por año × 12 meses) y **celda según Pesos/Kilos**. `dim_mensual_multianio` + endpoint + `MesesHistTable` con heatmap; 4º `tableView` `"meses-hist"` en `DimensionTab`. Datos confirmados: 2024 y 2025 completos, 2026 Ene–Sep.
+
+**Decisión — Sincronización automática PARQUEADA:** se diseñó y construyó (endpoint con `CRON_SECRET`, reintento, `app_settings.sync_schedule`, UI Manual/Automático + hora, banner de fallo, migración pg_cron cada 15 min con dedupe y secreto en Vault). Al explicar que el modo a hora fija exige un secreto manual (Vercel + Vault), Mauricio decidió **dejarlo manual por ahora**. Se revirtió todo (working tree limpio, producción intacta); el SQL quedó parqueado en `docs/parked/idea1-sync-auto/043_sync_auto_cron.sql.parked` (fuera de `supabase/migrations/`). Alternativa sin secreto documentada (auto-al-abrir).
+
+**Estado:** Vigente. Migraciones 041-045 (total **45**). Release **V4.3.0**. tsc + build prod OK en cada entrega; verificación visual en producción por Mauricio (el Browser pane no tiene su sesión y no se capturan credenciales).
+
 ---
 
 ## Bugs Resueltos
@@ -722,6 +753,9 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 | 46 | 2026-06-16 | Tabs Grupo/Vendedores/Productos/Perdidos/Insights vacíos: gráficas con nombres pero venta/margen en 0 (intermitente) | La política RLS de `sales_rows` (`territorio = ANY(visible_territories_for_current_user())`) evaluaba la función SECURITY DEFINER **por fila** (28,939×/consulta). Las vistas `_summary` y `kpi_cliente_perdidos` promediaban 2.7–3.4s con picos de 7.9s → cruzaban el `statement_timeout` de `authenticated` (8s) → la app recibía null → tabs en 0. Confirmado con `pg_stat_statements` (máximos clavados en ~7.9s). Preexistente, agravado por crecimiento de datos; NO por cambios de código. | Migración **027**: envolver la función en subconsulta `territorio IN (SELECT unnest(func()))` → evaluación única (1× vs 28,939×). Verificado: 1,612ms → 29ms (56×); seguridad intacta; datos idénticos. No se subió el timeout (sería parche). | migración 027 |
 | 45 | 2026-06-14 | Tab Perdidos: el mismo cliente aparecía repetido en varias filas | La vista `kpi_cliente_perdidos` agrupaba por `no_cliente` *case-sensitive*: (1) mismo ID con distinto casing (`CL-`/`cl-`/`Cl-`, **artefacto histórico** del export del ERP — 1,520 filas / 40 clientes, solo 2024-01→2025-09, 0 desde oct-2025) salía como clientes distintos → variante minúscula sin venta 2026 = PERDIDO falso; (2) mismo cliente en cuentas Sus + Suve (`no_cliente` distinto) salía 2 veces. | Migración **026**: la vista agrupa por NOMBRE `(anio, cliente, vendedor, territorio)` con `no_cliente = MIN(UPPER(...))` (UPPER solo al leer). Pivot de `page.tsx` + keys de `PerdidosTab` por `cliente\|vendedor`. **Decisión de gobernanza:** NO se transforma el dato de origen (se revirtió el `.toUpperCase()` del import, `8a0f48c`) ni se mutan las filas históricas; la unificación por nombre resuelve el síntoma. Verificado: VICTORIA HANUN SALUM → 1 fila/año activa; HECTOR VEGA → 2 filas legítimas (2 vendedores). | `6625f20` + `8a0f48c` + migr. 026 |
 | 50 | 2026-07-07 | Histograma de las pastillas (Tracking) en modo **Timeline**: el hover mostraba el mes equivocado — quedaba pegado en inicio-2024 ("solo se veían los extremos, no el medio") | El eje X usaba `dataKey='label'` (nombre del mes), que **se repite entre años** (Feb/Mar/… existen en 2024, 2025 y 2026). Recharts **colapsa las categorías duplicadas** de un eje categórico → las 31 barras se mapeaban sobre ~14 posiciones; solo Ene'24/Ene'26 eran únicos. | Eje X con clave **ÚNICA** por punto (`xkey = 'AAAA-MM'`) + `tickFormatter` que la vuelve a mostrar como nombre de mes. El modo Comparativo no se afecta (Ene–Dic ya eran únicos). Verificado con hover real (CDP): x=12%→Abr2024, x=50%→Abr2025, x=88%→Mar2026 (antes las tres caían en 2024). | `52c141b` |
+| 51 | 2026-08-20 | Tracking Diario: la línea de **Ptto Linear** no llegaba al 100% del presupuesto — se quedaba en 25/26 ($57.98M de $60.30M) | El eje X del chart se armaba solo con los días **con dato**, así que se cortaba en el último día con venta (Ago: día 30, domingo) y la línea nunca alcanzaba el último día hábil (31). | Extender el eje a **TODOS los días hábiles del mes** (`listBizDays`) aunque aún no haya venta → el día 31 sí se dibuja y Ptto Linear cierra en su total. Cálculos intactos; solo cambia el rango del eje X. Bonus: se ve la "pista" de días hábiles restantes. | `800113a` |
+| 52 | 2026-08-22 | Clientes y Productos: al abrir el dropdown del expand mensual y **cambiar de territorio** (usuario multi-territorio), la parte de abajo se "congelaba" con el detalle del territorio anterior mientras el header ya cambiaba | El cache del expand (`subData`) se llaveaba **solo por nombre** de la entidad, no por scope → al cambiar territorio servía el detalle cacheado del territorio previo. | Cache llaveado por scope `${año}|${dimensión}|${territorios}::${nombre}` → nunca sirve otro territorio; además un `useEffect` **cierra los expandidos** al cambiar de scope. Volver a un territorio da cache-hit. | `588e5a9` |
+| 53 | 2026-09-03 | Clientes y Productos: al buscar un SKU en **Productos** decía "Sin resultados", pero el mismo SKU **sí aparecía** al expandir un cliente en "Meses 2026" (TOP SIRLOIN SELECT AA: Ago 731, Sep 0) | El universo del buscador salía de `kpi_sku_summary` filtrado por `.eq("mes", currentMonth)` para los 3 años → solo items con venta en el mes seleccionado (en algún año). Un SKU que nunca vendió en Septiembre quedaba fuera; OKASH sí salía (con Sep = —) porque vendió en Sep de un año previo. El expand por cliente usa año completo, por eso sí lo mostraba. | Migración **043** `dim_universe_year` (nombres distintos con venta en cualquier mes del año, scoping territorio/agrupador/RLS, consulta `sales_rows` directo para evitar el tope de 1000 filas) + endpoint `dim-universe` + `fullYearSearchContext` en `DimensionTab`: el buscador **une** mes + año sin quitar ninguno; un item seleccionado sin venta en el mes se sintetiza como **fila-cero** (0 en Año vs Año/gráfica — correcto — y desglose real en Meses). Verificado: 289 SKUs / 1,100 clientes en 2026, encuentra el SKU. Mauricio eligió "todo el año, Productos y Clientes". | `608a20f` |
 
 ---
 
@@ -862,6 +896,22 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 - [x] **Medición "Variedad" (No. de SKUs)** + alineación exacta de las 2 tablas. Migración **039**. Commit `2d8abc7`.
 - [x] **Totalizador REAL** (fila TOTAL fija al pie de ambas tablas): Σ pura en aditivas, `COUNT(DISTINCT)` en variedad/tickets, Margen % = Σmargen÷Σventa, Δ calculado de los totales — **nunca** promediando renglones. Migración **040**. Commit `cb1793d`.
 - [x] **Medición "Ticket Promedio"**: ticket = fecha + cliente (junta Sus+Suve); Clientes → $/ticket, Productos → kg/ticket. Commit `cb1793d`.
+
+### Completados en V4.3 — fase 17 (2026-07-30 a 2026-09-03) · Clientes y Productos a profundidad + comparativos año-vs-año
+
+- [x] **Tracking Diario "Comparar vs año anterior (al día)"** (D044-1): toggle on-demand, barras 2025 + 2026, tabla pareada con Δ% + TOTAL, expandible por día → clientes Nuevo/Perdido. `TrackingCompareYoY`. Commit `5057048`.
+- [x] **4º KPI "Prom. Venta Diario"** + ACUM 2024/25/26 consolidada en una pastilla (D044-1). Commit `d292431`.
+- [x] **Gráfica "Meses (3 años)"** (12 meses × 3 años + 3 líneas de margen %), leyenda/tooltip homologados a Ventas (D044-2). `ClientesTresAniosChart`. Commits `dd4f11b` + `23ae3f4`.
+- [x] **Fix Ptto Linear** cierra en su total en el último día hábil (bug 51). Commit `800113a`.
+- [x] **Expand mensual bidireccional "campo minado"** en "Meses {año}" (D044-4). Migración **041** `insights_cliente_sku_mensual` + endpoint `cliente-sku-mensual`. Commits `05ee073` + `b99fcb6`.
+- [x] **Orden por columna** en las 3 vistas + **fix dropdown congelado** al cambiar territorio (bug 52). Commit `588e5a9`.
+- [x] **Insights·Concentración cruza dimensiones** ("Filtrar por" + Familias) (D044-6). Migración **042** `insights_concentracion_cruzada` (nombre nuevo, no toca Agrupadores). Commit `f4faba8`.
+- [x] **Buscador con universo de AÑO COMPLETO** (bug 53). Migración **043** `dim_universe_year` + endpoint `dim-universe`. Commit `608a20f`.
+- [x] **Territorio(s) en el expand mensual** cuando el scope es "Todos" (D044-8). Migración **044** (`territorios[]`). Commit `f7a3f7c`.
+- [x] **Desglose "Año vs Año" con 3 años** al expandir producto → clientes y cliente → SKUs (D044-9). `DesgloseYoYTable` compartido; `cliente-desglose` reescrito. Commits `d8c9e2a` + `0b970ca`.
+- [x] **Vista "Meses Hist."** — matriz Años×Meses expandible con heatmap (D044-10). Migración **045** `dim_mensual_multianio` + `MesesHistTable`. Commit `a4f136d`.
+- [x] **Docs V4.3**: LO_NUEVO, CONTINUACION, INSTRUCTIVO_AGENTE fase_17, SESSION_LOG (D044 + bugs 51-53), índice maestro, AGENTS.md, .docx a v4.3.0 (`gen_docs.py`), instructivo visual HTML/PDF, sync a Plan Z.
+- [~] **Sincronización automática de datos** — diseñada y construida (pg_cron+Vault / auto-al-abrir), **parqueada** a petición de Mauricio; refresh sigue manual. Artefacto en `docs/parked/idea1-sync-auto/`.
 
 ### Próximo a venir (acordado con Mauricio)
 

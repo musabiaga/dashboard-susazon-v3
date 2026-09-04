@@ -1,4 +1,23 @@
-# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.2
+# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.3
+
+**Periodo cubierto (V4.3):** 2026-07-30 al 2026-09-03 (Fase 17)
+**Versión:** 4.2.0 → **4.3.0**
+**Bloques:** Profundización del tab **Clientes y Productos** · Tracking **Comparar vs año anterior** · 4º KPI **Prom. Venta Diario** · Insights·Concentración **cruzar dimensiones**
+**Migraciones:** 041-045 (total **45**) · **Datos:** Ene 2024 – Sep 2026 (~384K filas)
+
+## 🚀 V4.3 en una línea
+
+- **Clientes y Productos, a profundidad** — (1) gráfica **"Meses (3 años)"**: 12 meses × 3 años agrupados + 3 líneas de margen %, homologada al tab Ventas (`ClientesTresAniosChart`, commits `dd4f11b` `23ae3f4`). (2) **Expand mensual bidireccional** en "Meses {año}": SKU → clientes por mes / cliente → SKUs por mes; meses sin compra en rojo tenue ("**campo minado**") + "sin comprar desde MMM" (migr **041** `insights_cliente_sku_mensual`, endpoint `cliente-sku-mensual`, `05ee073`). (3) **Territorio(s)** en ese expand cuando el scope es "Todos" (reemplaza el churn; migr **044**, `f7a3f7c`). (4) **Orden por columna** en las 3 vistas + fix del dropdown "congelado" al cambiar territorio (cache llaveado por scope, `588e5a9`). (5) **Buscador con universo de AÑO COMPLETO** — antes solo listaba items con venta en el mes seleccionado (migr **043** `dim_universe_year`, endpoint `dim-universe`, `fullYearSearchContext`, `608a20f`). (6) **Desglose "Año vs Año" con 3 años** al expandir producto → clientes y cliente → SKUs (`DesgloseYoYTable` compartido; `cliente-desglose` reescrito por SKU; `d8c9e2a` `0b970ca`). (7) **4ª vista "Meses Hist."**: matriz Años×Meses expandible con heatmap, celda según Pesos/Kilos (migr **045** `dim_mensual_multianio`, `MesesHistTable`, `a4f136d`).
+- **Tracking Diario — "Comparar vs año anterior (al día)"** — toggle on-demand: barras del año anterior junto a las actuales, tabla pareada por día con Δ% + TOTAL al día, y expandible por día → clientes actual vs anterior (Nuevo/Perdido). Cero backend (`TrackingCompareYoY`, `5057048`). **Fix:** la línea de Ptto Linear cierra en su total en el último día hábil (eje X extendido a todos los días hábiles, `800113a`).
+- **KPI header — 4º KPI "Prom. Venta Diario"** = venta al día ÷ días hábiles transcurridos, delta vs AA al día, VS PTTO diario, histograma mensual; y **ACUM 2024/25/26 consolidada** en una pastilla vertical (grid 9 col, `d292431`).
+- **Insights · Concentración — cruzar dimensiones**: fila "Filtrar por" (Producto/Cliente/Grupo/Familia) acota el universo del Pareto; + dimensión **Familias** (migr **042** `insights_concentracion_cruzada`, nombre nuevo para no tocar Agrupadores; `f4faba8`).
+- **Parqueado (no desplegado):** sincronización automática de datos — diseñada con 2 motores (pg_cron+Vault con `CRON_SECRET` / auto-al-abrir sin secreto) y revertida a petición de Mauricio; el refresh sigue **100% manual**. Artefacto en `docs/parked/idea1-sync-auto/`.
+
+> **Regla de diseño V4.3:** las funciones nuevas replican el scoping *territorios + rama de agrupador* de `insights_concentracion_cruzada` y son `SECURITY INVOKER`; si una función cambia de firma se crea con **nombre nuevo** (o `DROP+CREATE`) para no romper consumidores; los detalles (expands, universo, matriz) se cargan **lazy por territorio** desde el cliente, nunca en el payload inicial (tope de 1000 filas de PostgREST).
+
+---
+
+# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.2 (histórico)
 
 **Periodo cubierto (V4.2):** 2026-07-12 al 2026-07-19
 **Versión:** 4.1.0 → **4.2.0**

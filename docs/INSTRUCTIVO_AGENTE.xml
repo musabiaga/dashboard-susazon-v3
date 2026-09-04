@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<instructivo version="4.2" fecha="2026-07-24" idioma="es-MX">
+<instructivo version="4.3" fecha="2026-09-03" idioma="es-MX">
 
   <contexto>
-    <proyecto>Dashboard Comercial Susazón V4.2 — InCom (versión 4.2.0)</proyecto>
+    <proyecto>Dashboard Comercial Susazón V4.3 — InCom (versión 4.3.0)</proyecto>
     <propietario>Mauricio Usabiaga, Director de Operaciones, Grupo Susazón</propietario>
     <empresa>Grupo Susazón (incluye marca Susazón y marca Suve)</empresa>
     <usuarios_finales>15 personas internas (admin, director, gerente regional, vendedor)</usuarios_finales>
@@ -18,12 +18,39 @@
       el V3.0 esté siendo evaluado. Útil como referencia de fórmulas y lógica de negocio.
     </predecesor>
     <estado_actual>
-      EN PRODUCCIÓN versión 4.2.0. Deploy live en Vercel desde repo privado
+      EN PRODUCCIÓN versión 4.3.0. Deploy live en Vercel desde repo privado
       github.com/musabiaga/dashboard-susazon-v3. URL canonical:
       https://www.dashboardcomercialsusazon.com (custom domain GoDaddy → Vercel).
 
-      40 migraciones Supabase, 337K+ filas de datos comerciales (Ene 2024 - Jul 2026).
-      15/15 usuarios autorizados en prod. Insights = 6 sub-análisis.
+      45 migraciones Supabase, ~384K filas de datos comerciales (Ene 2024 - Sep 2026;
+      2024 y 2025 completos, 2026 Ene-Sep). 15/15 usuarios autorizados en prod.
+      Insights = 6 sub-análisis. El refresh de datos es MANUAL (Cargar Datos); la
+      sincronización automática se diseñó y quedó PARQUEADA en docs/parked/.
+
+      === V4.3 (Fase 17 · 2026-07-30 al 2026-09-03) ===
+      Profundización analítica del tab Clientes y Productos + comparativos año-vs-año
+      en Tracking y KPIs + cruce de dimensiones en Insights·Concentración. 14 commits,
+      migraciones 041-045. (1) Tracking Diario: modo "Comparar vs año anterior (al día)"
+      — toggle on-demand, barras 2025 junto a 2026, tabla pareada por día con Δ% + TOTAL
+      al día, expandible por día → clientes actual vs anterior (Nuevo/Perdido); cero
+      backend (TrackingCompareYoY). Fix: Ptto Linear cierra en su total (eje X extendido a
+      todos los días hábiles). (2) KPI header: 4º KPI "Prom. Venta Diario" (venta al día ÷
+      días hábiles transcurridos, delta vs AA al día, VS PTTO diario, histograma mensual)
+      + ACUM 2024/25/26 consolidada en una pastilla vertical (grid 9 col). (3) Clientes y
+      Productos: gráfica "Meses (3 años)" (12 meses × 3 años, ClientesTresAniosChart);
+      expand mensual bidireccional "campo minado" en "Meses {año}" (migr 041
+      insights_cliente_sku_mensual + endpoint cliente-sku-mensual) con territorio(s) en
+      lugar del churn cuando el scope es "Todos" (migr 044, territorios[]); orden por
+      columna en las 3 vistas + fix dropdown congelado (cache por scope); buscador con
+      universo de AÑO COMPLETO (migr 043 dim_universe_year + endpoint dim-universe +
+      DimensionTab.fullYearSearchContext, fila-cero para seleccionados sin venta en el
+      mes); desglose "Año vs Año" con 3 años al expandir producto → clientes y cliente →
+      SKUs (DesgloseYoYTable compartido; cliente-desglose reescrito por SKU); 4ª vista
+      de tabla "Meses Hist." = matriz Años×Meses expandible con heatmap (migr 045
+      dim_mensual_multianio + endpoint dim-mensual-multianio + MesesHistTable). (4)
+      Insights·Concentración: fila "Filtrar por" (Producto/Cliente/Grupo/Familia) acota el
+      Pareto + dimensión Familias (migr 042 insights_concentracion_cruzada, nombre NUEVO
+      para no tocar insights_concentracion ni Agrupadores). Ver &lt;fase_17&gt;.
 
       === V4.2 (Fase 16 · 2026-07-12 al 2026-07-19) ===
       Insights gana su 6º sub-análisis: "Crecimiento x Vendedor". Objetivo: evaluar el
@@ -383,7 +410,7 @@
       </cambio>
       <cambio tipo="feature">
         Treemap manual con algoritmo Squarify (Bruls, Huijsen, van Wijk, 2000). Reemplazo
-        completo del `<Treemap>` de Recharts. Componente `ConcentracionGrid` (~500 líneas) con
+        completo del `&lt;Treemap&gt;` de Recharts. Componente `ConcentracionGrid` (~500 líneas) con
         layout CSS Grid posicionado vía squarify. Garantiza bloques con áreas proporcionales al
         valor PERO con aspect ratio cercano a 1:1 (cuadrados) — NUNCA produce rectángulos amorfos
         delgados. ResizeObserver API para tiers adaptativos: tamaño de bloque ajusta padding/
@@ -483,7 +510,7 @@
         Scatter tamaño (venta, eje log) vs crecimiento YoY %, burbuja = margen. 4 cuadrantes (Estrella/En riesgo/Apuesta/Marginal) con umbrales configurables (tamaño default = mediana, crecimiento = 0%). Nuevos (sin base año anterior) aparte. Eje Y acotado por p95 (outliers). Comparación YoY justa: capa el periodo actual a la última fecha con datos y compara contra el mismo tramo de fechas calendario del año anterior (no días hábiles — decisión D031). Migración 023 + endpoint cuadrante + componente CuadranteAnalysis.
       </cambio>
       <cambio nombre="Estacionalidad (heatmap)">
-        Heatmap mes × dimensión. Celda = índice de estacionalidad (valor del mes ÷ promedio mensual del item × 100; 100 = típico, frío<100, cálido>100) o valor absoluto (toggle). Selector de año (2024/2025/2026; año parcial marcado). Kg default (toggle Pesos). Dimensiones chicas (grupos/territorios) completas; clientes/SKUs con Top N. Migración 024 + endpoint estacionalidad + componente EstacionalidadAnalysis.
+        Heatmap mes × dimensión. Celda = índice de estacionalidad (valor del mes ÷ promedio mensual del item × 100; 100 = típico, frío&lt;100, cálido&gt;100) o valor absoluto (toggle). Selector de año (2024/2025/2026; año parcial marcado). Kg default (toggle Pesos). Dimensiones chicas (grupos/territorios) completas; clientes/SKUs con Top N. Migración 024 + endpoint estacionalidad + componente EstacionalidadAnalysis.
       </cambio>
       <cambio nombre="Popover de ayuda Cómo leer esto">
         Hover/focus sobre el foco 💡 del header de Insights abre un popover que explica cómo interpretar el sub-análisis activo. Texto distinto por sub-análisis (cada entrada de SUB_ANALYSES tiene un campo `help`). Badge "?" para señalar interactividad.
@@ -507,8 +534,8 @@
       "Agrupador como territorio sintético": como las vistas kpi_* están agregadas por territorio, se crearon funciones SQL agrupador_* que agregan la UNIÓN de los miembros y devuelven territorio = nombre del agrupador (1 bucket) → el render client-side se reutiliza entero. Disciplina de riesgo cero: en page.tsx «agrupadorId ? nuevo : original exacto» y en las funciones insights_* un branch `CASE WHEN p_agrupador_id IS NULL THEN filtro-territorios ELSE filtro-union-miembros END` (cortocircuita → cero overhead en modo normal). El modo territorios queda byte-idéntico; el modo agrupador es opt-in por ?agrupador / p_agrupador_id.
     </patron_clave>
     <fase_1>Seguridad/KAM. Migraciones 029-032: tablas agrupadores + agrupador_members + users_permissions.allowed_agrupadores + agrupadores.meta_mensual. RLS de sales_rows extendida (territorio visible OR casa con agrupadores asignados; propaga vía security_invoker). Admin: AgrupadoresManager en /admin/territorios + asignación en /admin/usuarios. Sidebar con sección Agrupadores + vista limpia (oculta territorios $0) para restringidos.</fase_1>
-    <fase_2>Vista enfocada. Migración 033: 9 funciones agrupador_* (member_arrays SECURITY DEFINER gateado + monthly/daily/grupo/sku/cliente summary+diario, SECURITY INVOKER). page.tsx: helpers coreSrc()/emptyIfAgrupador(); sidebar clickeable → ?agrupador=<id> + "← Volver a Territorios"; DashboardTabs.hiddenTabs.</fase_2>
-    <fase_2b>Todos los tabs. Migr 034 (agrupador_vendedor_summary/diario, incluye empresa para toggle Sus/Suve), 035 (agrupador_cliente_perdidos + lifecycle), 036 (las 6 insights_* reciben p_agrupador_id con branch CASE; 2 rutas que leen sales_rows directo — precio-dispersion, item-detail — usan lib/insightsAgrupador.agrupadorOrFilter = filtro PostgREST .or() por miembros). InsightsTab + 5 componentes mandan &agrupador. NONCORE_TABS=[] → todos los tabs disponibles.</fase_2b>
+    <fase_2>Vista enfocada. Migración 033: 9 funciones agrupador_* (member_arrays SECURITY DEFINER gateado + monthly/daily/grupo/sku/cliente summary+diario, SECURITY INVOKER). page.tsx: helpers coreSrc()/emptyIfAgrupador(); sidebar clickeable → ?agrupador=&lt;id&gt; + "← Volver a Territorios"; DashboardTabs.hiddenTabs.</fase_2>
+    <fase_2b>Todos los tabs. Migr 034 (agrupador_vendedor_summary/diario, incluye empresa para toggle Sus/Suve), 035 (agrupador_cliente_perdidos + lifecycle), 036 (las 6 insights_* reciben p_agrupador_id con branch CASE; 2 rutas que leen sales_rows directo — precio-dispersion, item-detail — usan lib/insightsAgrupador.agrupadorOrFilter = filtro PostgREST .or() por miembros). InsightsTab + 5 componentes mandan &amp;agrupador. NONCORE_TABS=[] → todos los tabs disponibles.</fase_2b>
     <fase_3>Meta manual + export. Migración 037: my_agrupadores() devuelve meta_mensual; page.tsx la inyecta como ventaBudget del territorio sintético → cumplimiento del header. reportInput (PDF Avance Comercial) con rama modo-agrupador que salta REPORT_TERRITORIES; Excel por-tab ya servía. Meta = solo venta mensual.</fase_3>
     <validacion>Cross-consistencia (Chef Leo): penetración = precio_items = $32.68M por distintos GROUP BY. Modo normal intacto (penetración 1059 cli/$753M). Commits 48f6d82…c48bc31 (F1), 56b8e6d/6b58cb3/c0e2563 (F2), 9c42a46/bed8ab1/1308920/c3ea0b1 (F2b), 19aba43 (F3).</validacion>
   </fase_14>
@@ -534,6 +561,54 @@
     <frontend>components/dashboard/insights/CrecimientoVendedorAnalysis.tsx. Tablas con alturas fijas por fila (título 26 / encabezado 32 / fila 34) para que cuadren renglón a renglón. Toggles Dimensión (Clientes|Productos) + Medición; dropdown Vendedor; buscador.</frontend>
     <validacion>COSTCO Mes 2025 $24.06M vs 2026 $20.58M (capado justo), Acum +19%; SABOR E HIGIENE 139 SKUs, COSTCO Variedad=1 (solo Arrachera Kirkland); 44 vendedores; corte 2026-07-12. tsc + build OK en cada entrega. Commits 7cc5122 (base) + 2d8abc7 (Variedad+alineación) + cb1793d (totalizador+ticket).</validacion>
   </fase_16>
+
+  <fase_17 fecha="2026-07-30 al 2026-09-03" titulo="V4.3 · Clientes y Productos a profundidad + comparativos año-vs-año + cruce en Concentración">
+    <resumen>
+      Serie de mejoras iterativas, cada una rebotada con Mauricio (AskUserQuestion), construida, verificada (tsc + build prod) y desplegada por separado (commits chunkeados). 14 commits, migraciones 041-045 (total 45). Datos: Ene 2024 - Sep 2026 (~384K filas). El refresh sigue MANUAL; la sincronización automática se diseñó y quedó parqueada.
+    </resumen>
+    <tracking_compare_yoy commit="5057048">
+      Toggle "Comparar vs año anterior (al día)" en Tracking Diario (off por defecto, localStorage). Gráfica: barras diarias del año anterior agrupadas con las actuales + líneas de acumulado (mismo look: leyenda custom). Tabla: columnas pareadas por día (Venta día/acum, Margen $, Margen %) con Δ% coloreado + fila TOTAL al día. Expandible por día → clientes actual vs anterior (mismo día del mes) cruzados por NOMBRE; Nuevo (anterior=0) / Perdido (actual=0). Cero queries nuevas: 2 fetches al endpoint clientes-dia existente + merge. Componente components/dashboard/TrackingCompareYoY.tsx (tabla + expandible; el chart vive en TrackingDiarioTab).
+    </tracking_compare_yoy>
+    <fix_ptto_linear commit="800113a">
+      El eje X del chart se armaba solo con los días con dato → se cortaba en el último día con venta (ej. día 30 domingo) y Ptto Linear no llegaba al 100%. Fix: eje extendido a TODOS los días hábiles del mes (lib/business-days listBizDays). Cálculos intactos.
+    </fix_ptto_linear>
+    <kpi_prom_diario commit="d292431">
+      4º KPI grande "Prom. Diario" = venta al día ÷ días hábiles transcurridos (L-S menos feriados LFT). Delta vs año anterior AL DÍA (mismo tramo; difiere del delta de Venta que va vs cierre). VS PTTO = objetivo diario (PTTO ÷ días hábiles totales). Histograma desplegable con el promedio mes a mes. ACUM 2024/2025/2026 consolidada en UNA pastilla vertical (AcumCardStacked) a mitad de ancho; grid lg:grid-cols-9 (4 cards col-span-2 + ACUM col-span-1). KpiData gana ventaAlDia/prevYearVentaAlDia/elapsedBizDays/totalBizDays. Sin backend nuevo. Componente components/dashboard/KpiCardsRow.tsx.
+    </kpi_prom_diario>
+    <meses_3_anios commits="dd4f11b 23ae3f4">
+      Toggle de gráfica "Mismo mes (3 años)" → "Meses (3 años)": 12 meses × 3 años — barras agrupadas 2024 (#94a3b8) / 2025 (#3b82f6) / 2026 (#10b981) + 3 líneas de Margen % (eje derecho). 2024/2025 completos; 2026 hasta el mes en curso. Multi-SKU agrega todos los items en una serie por año. Reusa /api/dashboard/clientes-evolution con 3 llamadas lazy (una por año). Leyenda ChartLegend por secciones + tooltip custom homologados al tab Ventas. Componente components/dashboard/ClientesTresAniosChart.tsx; se monta en DimensionTab cuando chartView==="mismo-mes".
+    </meses_3_anios>
+    <expand_mensual commits="05ee073 b99fcb6" migracion="041">
+      En la vista "Meses {año}" cada fila se expande: dim=sku → CLIENTES que lo compraron por mes; dim=cliente → SKUs que compró por mes. Meses sin compra en rojo tenue ("campo minado") + "sin comprar desde MMM" (último mes con venta + 1, calculado client-side). Backend: función insights_cliente_sku_mensual(p_year, p_anchor_dim, p_anchor_value, p_territorios) → (name, mes, venta, kg, margen), SECURITY INVOKER; agrega de sales_rows porque no existía una vista cliente×sku×mes. Endpoint /api/dashboard/cliente-sku-mensual devuelve {meses, clientes:[{name, monthly}]} — misma forma que clientes-evolution para reusar el render. Cache del expand en ClientesTableViews llaveado por scope (ver fix_dropdown).
+    </expand_mensual>
+    <territorio_en_expand commit="f7a3f7c" migracion="044">
+      Cuando el scope abarca varios territorios (context.territorios === null → "Todos", o subset con más de 1), cada sub-fila del expand muestra el/los territorio(s) donde esa entidad hizo la venta en el año (hasta 2 visibles, +N y tooltip con todos) EN LUGAR del "sin comprar desde"; con un solo territorio se conserva el churn. Mauricio eligió "reemplaza" (vs "ambos" / "churn en hover"). Migración 044: DROP+CREATE de insights_cliente_sku_mensual con columna territorios text[] = array_agg(DISTINCT territorio) por (name, mes); el endpoint une los territorios por entidad entre meses y los expone como territorios[] en cada serie.
+    </territorio_en_expand>
+    <sort_columnas commit="588e5a9">
+      Clic en header ordena (▼ mayor→menor, ▲ menor→mayor, flecha en la columna activa). Meses: por cualquier mes (índice) o Total YTD; las sub-filas del expand también se reordenan por el mes clickeado. Año vs Año: v24/v25/v26, varv, k24/k25/k26, varkg, mg26, mgpct26, mgpct25, dpp (con fallback al-día → cierre). Prom 90d: r90, rmes, delta. Estado sortCol/sortDir en ClientesTableViews (Meses/Prom90) y anioSortKey/anioSortDir en DimensionTab (Año vs Año); se resetea al cambiar vista/dimensión. Th sortable con onClick/active/dir.
+    </sort_columnas>
+    <fix_dropdown_congelado commit="588e5a9">
+      Bug: al cambiar de territorio con un expand abierto, la parte de abajo mostraba el detalle del territorio anterior. Causa: subData cacheado solo por nombre. Fix: subCacheKey = `${año}|${dim}|${territorios}::${nombre}` + useEffect que cierra los expandidos al cambiar de scopeKey. Volver a un territorio da cache-hit.
+    </fix_dropdown_congelado>
+    <concentracion_cruzada commit="f4faba8" migracion="042">
+      Insights·Concentración gana la fila "Filtrar por": ChipToggle de dimensión de cruce (Producto/Cliente/Grupo/Familia) + MultiSelectChips de items; el Pareto de la dimensión activa se recalcula solo sobre ese universo. Se agrega la dimensión "familias" al Pareto. Backend: función NUEVA insights_concentracion_cruzada(p_from, p_to, p_dimension, p_territorios, p_agrupador_id, p_clientes, p_skus, p_grupos, p_familias) que replica la lógica de insights_concentracion (territorios + rama de agrupador via agrupador_member_arrays) + 4 filtros cruzados opcionales. DECISIÓN: no modificar insights_concentracion (tiene 2 overloads: 3-arg y 5-arg con agrupador) para no romper el módulo Agrupadores. Endpoint /api/insights/concentracion: ALLOWED_DIMENSIONS + 'familias', params fcliente/fsku/fgrupo/ffamilia (CSV), llama a la función cruzada. Frontend en ConcentracionAnalysis: crossDim/crossItems/crossOptions, fetch de opciones, UI "Filtrar por".
+    </concentracion_cruzada>
+    <buscador_universo_anual commit="608a20f" migracion="043">
+      Bug 53: el buscador de Productos/Clientes solo listaba items con venta en el mes seleccionado — los datasets skus/clientes de page.tsx salen de kpi_*_summary con .eq("mes", currentMonth) para los 3 años. Un SKU sin venta en ese mes en ningún año no aparecía (aunque sí en el expand por cliente, que usa año completo). Fix (Mauricio eligió "todo el año, Productos y Clientes"): función dim_universe_year(p_dimension 'productos'|'clientes', p_year, p_territorios, p_agrupador_id) → nombres distintos con venta en cualquier mes del año, consultando sales_rows directo (sin el tope de 1000 filas de PostgREST), mismo scoping que 042. Endpoint /api/dashboard/dim-universe. DimensionTab: prop fullYearSearchContext {year, territorios, agrupadorId} → fetch lazy del universo (re-fetch al cambiar territorio); availableItems = UNIÓN de los nombres del mes (orden por venta) + los del año que no estén (no se quita ninguno, incluidos los que solo vendieron en el mes de años previos); en isCustomMode, un nombre seleccionado que no está en rows se sintetiza como fila-cero {name, v24:0, v25:0, v26:0} para fluir a chart/Año vs Año (0, correcto) y a ClientesTableViews (que fetchea el año real por nombre). Wire en las 2 instancias (cliente y sku) del tab unificado en DashboardClient. Verificado: 289 SKUs / 1,100 clientes distintos en 2026.
+    </buscador_universo_anual>
+    <desglose_yoy_3_anios commits="d8c9e2a 0b970ca">
+      Al expandir un PRODUCTO (→ clientes) o un CLIENTE (→ SKUs) en "Año vs Año", cada sub-fila replica TODAS las columnas del header: v24/v25/v26 (al-día con fallback a cierre) + Var %, k24/k25/k26 + Var % KG (si showKg), Mg $ 26, Mg % 26, Mg % 25 (subtle), Δpp — mismas fórmulas que la fila padre. Mauricio eligió "todas las columnas" y, para el lado cliente, "aplanar grupo" (antes grupo→SKU con solo el periodo actual). Hallazgo: clientes-por-producto YA devolvía los 3 años al-día por cliente — solo faltaba renderizarlos. Refactor: componente presentacional compartido components/dashboard/DesgloseYoYTable.tsx (recibe rows crudas + title/entityLabel/monthLabels/showKg/colSpan); ProductoDesglose y ClienteDesglose → wrappers que fetchean y delegan. Endpoint /api/dashboard/cliente-desglose REESCRITO: de {grupos:[{grupo, skus}]} (año en curso) a {rows:[{name=sku, v/k/m 24/25/26 + _alDia}]} (espejo de clientes-por-producto, cutoffs al-día por año con countBizDays/findCalendarDayForBizDays). Único consumidor verificado (ClienteDesglose). DimensionTab pasa monthLabel24/25/26 + showKg a ambos desgloses.
+    </desglose_yoy_3_anios>
+    <meses_hist commit="a4f136d" migracion="045">
+      4º toggle de tabla "Meses Hist." junto a Año vs Año / Meses {año} / vs Prom. 90d (tableView "meses-hist", persistido en localStorage clientes-table-view). Diseño rebotado con 3 layouts (expandible / siempre visible / matriz agregada) y métrica de celda → Mauricio eligió EXPANDIBLE y celda según Pesos/Kilos. Cada entidad = fila con el total de los 3 años por mes + Total; al expandirla, sub-filas por año (2024/2025/2026 × 12 meses) con Total del año; heatmap por intensidad relativo al máximo de la entidad (rgba verde alpha 0.06-0.40); celdas 0 y meses futuros = "—". Backend: función dim_mensual_multianio(p_dimension 'cliente'|'sku', p_names text[], p_territorios, p_agrupador_id) → (name, anio, mes, venta, kg), mismo scoping que 042/044; endpoint /api/dashboard/dim-mensual-multianio (dim, items CSV, territorios, agrupador) → {years, meses, entities:[{name, byYear:{"2024":{venta[12],kg[12]},...}, total:{venta[12],kg[12]}}]} ordenado por venta 3 años desc. Componente components/dashboard/MesesHistTable.tsx (RowGroup devuelve fragmentos de tr — NO envolver en tr). DimensionTab rutea: "meses-hist" → MesesHistTable; "meses"|"prom90" → ClientesTableViews (cast); "anio" → tabla año.
+    </meses_hist>
+    <sync_automatica_parqueada>
+      Idea 1 (rebotada y elegida por Mauricio: pg_cron configurable + reintento + banner in-app, ambas fuentes, solo mes en curso). Se construyó: endpoint /api/data/refresh con auth por CRON_SECRET (bearer) además de sesión admin/director + reintento 1 vez por mes (no en 401) + trigger cron|manual en sync_history.details; lib/app-settings SyncSchedule {mode, hour} + parseSyncSchedule; ruta /api/admin/settings/sync-schedule (admin+director); UI en Cargar Datos (tarjeta Manual/Automático + selector de hora + banner si la última sync automática falló, detectada por sync_history.details->>'trigger'='cron'); migración 043_sync_auto_cron (pg_cron cada 15 min: mode=auto AND hora CDMX==configurada AND dedupe por app_settings.sync_last_auto_dispatch → net.http_post con secreto de vault.decrypted_secrets name='cron_secret', timeout 290s). Al explicar que el modo a hora fija exige el paso manual del secreto (Vercel env + Supabase Vault; el secreto NUNCA pasa por Claude), Mauricio decidió dejarlo MANUAL por ahora. Se revirtió TODO (git checkout de los 4 archivos, borrado de la ruta, working tree limpio en f4faba8); el SQL quedó en docs/parked/idea1-sync-auto/043_sync_auto_cron.sql.parked (fuera de supabase/migrations/ para que no se aplique por error). pg_cron 1.6.4 y pg_net 0.20.0 están disponibles pero NO instalados; supabase_vault sí. Columnas sync_history.triggered_by, audit_log.user_id/user_email son nulables. Alternativa sin secreto documentada: auto-al-abrir el dashboard con la sesión del admin (no garantiza hora fija).
+    </sync_automatica_parqueada>
+    <validacion>
+      Cada entrega: tsc --noEmit (strict, noUnusedLocals) + next build prod exit 0 + RPCs probadas con execute_sql sobre datos reales (ej. dim_universe_year: 289 SKUs / 1,100 clientes en 2026 y encuentra TOP SIRLOIN SELECT AA; insights_cliente_sku_mensual con territorios; dim_mensual_multianio 2024-2026 por mes). Verificación visual en producción por Mauricio en su navegador logueado (el Browser pane redirige a /login y no se capturan credenciales). Gotcha: al revertir una ruta borrada, .next/types/validator.ts queda stale → rm -rf .next antes de tsc.
+    </validacion>
+  </fase_17>
 
   <archivos>
     <directorio nombre="app/" descripcion="Páginas Next.js 16 (App Router)">
@@ -623,7 +698,7 @@
       <archivo path="020_insights_concentracion_territorios.sql" descripcion="(Fase 8) Recreate insights_concentracion con parámetro opcional p_territorios text[] para filtrar por sidebar" />
       <archivo path="021_insights_concentracion_dim_territorios.sql" descripcion="(Fase 12) Agrega 'territorios' como dimensión de agrupación a insights_concentracion (WHEN territorios → territorio)" />
       <archivo path="022_insights_precio_items.sql" descripcion="(Fase 12) insights_precio_items(p_from,p_to,p_level,p_territorios): lista items por nivel sku/grupo/familia con kg+venta, ordenados por volumen. Alimenta el selector de Precio $/kg" />
-      <archivo path="023_insights_cuadrante.sql" descripcion="(Fase 12) insights_cuadrante(p_from,p_to,p_from_prev,p_to_prev,p_dimension,p_territorios): venta/kg/margen actual + venta del mismo rango año anterior, por item. Solo items con venta_actual>0. Para el BCG" />
+      <archivo path="023_insights_cuadrante.sql" descripcion="(Fase 12) insights_cuadrante(p_from,p_to,p_from_prev,p_to_prev,p_dimension,p_territorios): venta/kg/margen actual + venta del mismo rango año anterior, por item. Solo items con venta_actual&gt;0. Para el BCG" />
       <archivo path="024_insights_estacionalidad.sql" descripcion="(Fase 12) insights_estacionalidad(p_year,p_dimension,p_metric,p_territorios,p_topn): valor mensual (kg/venta) por item del Top N, para un año. Para el heatmap" />
     </directorio>
 
@@ -837,7 +912,7 @@
 
     <bloque nombre="Theme system">
       6 themes: clean, editorial, warm-neo, supabase-orange, stock-market, liquid-glass.
-      Aplicación: data-theme attribute en <html> + CSS vars cascadean.
+      Aplicación: data-theme attribute en &lt;html&gt; + CSS vars cascadean.
       Persistence: localStorage key "dashboard-susazon-theme".
       Liquid Glass requiere body::before con aurora gradient + backdrop-filter en cards.
       Safari fix: isolation: isolate + transform: translateZ(0) en elementos rounded.
@@ -880,8 +955,8 @@
     <pantalla path="/admin/configuracion" rol="admin" descripcion="(Fase 7) Configuración global de timeout de sesión: Sin límite / 35 / 45 / 60 / 90 / 120 min" />
     <pantalla path="/login?reason=idle" rol="público" descripcion="(Fase 7) Banner amarillo: sesión expirada por inactividad" />
     <pantalla path="/login?reason=admin" rol="público" descripcion="(Fase 7) Banner rojo: sesión cerrada por administrador" />
-    <componente global nombre="IdleTimeoutModal (Fase 7)" descripcion="Modal '¿Sigues ahí?' con countdown 60s. Aparece a los X-60s donde X = timeout configurado" />
-    <componente global nombre="SessionMonitor (Fase 7)" descripcion="Hookea useIdleTimeout + useSessionPolling. Montado en root layout" />
+    <componente global="true" nombre="IdleTimeoutModal (Fase 7)" descripcion="Modal '¿Sigues ahí?' con countdown 60s. Aparece a los X-60s donde X = timeout configurado" />
+    <componente global="true" nombre="SessionMonitor (Fase 7)" descripcion="Hookea useIdleTimeout + useSessionPolling. Montado en root layout" />
   </interfaz>
 
   <dependencias>

@@ -1,0 +1,129 @@
+-- 043_sync_auto_cron.sql
+-- =====================================================================
+-- Sincronización automática de datos (Idea 1) vía pg_cron + pg_net.
+--
+-- Un job corre cada 15 min. Si el horario configurado en
+-- app_settings.sync_schedule está en modo "auto" Y la hora actual (CDMX)
+-- coincide con la hora elegida Y no se ha disparado ya hoy, hace un POST
+-- asíncrono a /api/data/refresh (solo mes en curso, Susazón + Suve) usando
+-- el CRON_SECRET guardado en Supabase Vault.
+--
+-- REQUISITO PREVIO (manual, lo hace el humano — el secreto NUNCA pasa por
+-- el asistente):
+--   1. Vercel → env var CRON_SECRET = <valor largo aleatorio> (Production).
+--   2. Supabase → Vault → nuevo secret con name = 'cron_secret' y el MISMO
+--      valor. (Dashboard → Project Settings → Vault, o vault.create_secret).
+-- Sin el secreto en Vault, el job registra un fallo diario visible en el
+-- banner de Cargar Datos.
+-- =====================================================================
+
+-- 1. Extensiones ------------------------------------------------------
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+-- 2. Función del job --------------------------------------------------
+-- SECURITY DEFINER: corre como owner (postgres) para poder leer Vault y
+-- escribir app_settings/sync_history saltando RLS.
+create or replace function public.run_scheduled_sync()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_schedule      jsonb;
+  v_mode          text;
+  v_hour          int;
+  v_now_mx        timestamp;   -- "ahora" en horario CDMX (sin tz)
+  v_cur_hour      int;
+  v_today_mx      text;        -- fecha CDMX 'YYYY-MM-DD'
+  v_last_dispatch text;
+  v_secret        text;
+  v_month         text;        -- mes en curso 'YYYY-MM'
+  v_url           text := 'https://www.dashboardcomercialsusazon.com/api/data/refresh';
+begin
+  -- (a) Leer configuración de horario
+  select value into v_schedule
+  from public.app_settings where key = 'sync_schedule';
+
+  v_mode := coalesce(v_schedule->>'mode', 'manual');
+  if v_mode <> 'auto' then
+    return;  -- modo manual → no hacemos nada
+  end if;
+  v_hour := coalesce((v_schedule->>'hour')::int, 6);
+
+  -- (b) ¿Es la hora configurada (CDMX)?
+  v_now_mx   := now() at time zone 'America/Mexico_City';
+  v_cur_hour := extract(hour from v_now_mx)::int;
+  v_today_mx := to_char(v_now_mx, 'YYYY-MM-DD');
+  if v_cur_hour <> v_hour then
+    return;
+  end if;
+
+  -- (c) Dedupe síncrono: ¿ya se disparó hoy? (evita doble disparo entre los
+  --     4 ticks de la misma hora). Marca de "último disparo" en app_settings.
+  select value->>'date' into v_last_dispatch
+  from public.app_settings where key = 'sync_last_auto_dispatch';
+  if v_last_dispatch = v_today_mx then
+    return;
+  end if;
+
+  -- Marcar el disparo de hoy ANTES de llamar (idempotencia atómica).
+  insert into public.app_settings(key, value)
+  values ('sync_last_auto_dispatch', jsonb_build_object('date', v_today_mx))
+  on conflict (key) do update set value = excluded.value;
+
+  -- (d) Secreto desde Vault
+  select decrypted_secret into v_secret
+  from vault.decrypted_secrets
+  where name = 'cron_secret'
+  limit 1;
+
+  if v_secret is null then
+    -- Sin secreto no podemos autenticar. Registramos el fallo (1 vez hoy,
+    -- porque el dispatch ya quedó marcado) para que el banner lo muestre.
+    insert into public.sync_history(status, source, details, completed_at)
+    values (
+      'failed',
+      'susazon+suve',
+      jsonb_build_object(
+        'trigger', 'cron',
+        'error', 'CRON_SECRET no está en Supabase Vault (name = cron_secret)'
+      ),
+      now()
+    );
+    return;
+  end if;
+
+  -- (e) Mes en curso (CDMX) y disparo asíncrono del refresh.
+  v_month := to_char(v_now_mx, 'YYYY-MM');
+
+  perform net.http_post(
+    url := v_url,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_secret
+    ),
+    body := jsonb_build_object(
+      'dateFrom', v_month,
+      'dateTo',   v_month,
+      'sources',  jsonb_build_array('susazon', 'suve')
+    ),
+    -- pg_net debe esperar a que el endpoint termine (Suve es lento). El
+    -- endpoint tiene maxDuration=300s en Vercel; damos 290s de margen.
+    timeout_milliseconds := 290000
+  );
+end;
+$$;
+
+-- 3. Agendar el job (cada 15 min). La verificación de hora/CDMX se hace
+--    dentro de la función, así que el timezone del cron expression no importa.
+--    Reprogramable: si ya existe, lo re-crea con el mismo nombre.
+select cron.unschedule('scheduled-data-sync')
+where exists (select 1 from cron.job where jobname = 'scheduled-data-sync');
+
+select cron.schedule(
+  'scheduled-data-sync',
+  '*/15 * * * *',
+  $cron$ select public.run_scheduled_sync(); $cron$
+);

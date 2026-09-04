@@ -29,11 +29,11 @@ from docx.oxml import OxmlElement
 # ============================================================
 # Constantes del proyecto
 # ============================================================
-PROYECTO = "Dashboard Comercial Susazón V4.2 — InCom"
+PROYECTO = "Dashboard Comercial Susazón V4.3 — InCom"
 EMPRESA = "Grupo Susazón (Susazón + Suve)"
 OWNER = "Mauricio Usabiaga, Director de Operaciones"
-VERSION = "4.2.0"
-FECHA = "2026-07-24"
+VERSION = "4.3.0"
+FECHA = "2026-09-03"
 REPO = "github.com/musabiaga/dashboard-susazon-v3"
 URL_PROD = "www.dashboardcomercialsusazon.com"
 URL_FALLBACK = "dashboard-susazon-v3-44sp.vercel.app"
@@ -191,8 +191,8 @@ def gen_arquitectura():
     doc = Document()
 
     add_cover(doc, "Arquitectura Técnica", "Diseño del sistema, stack y flujo de información")
-    add_h2(doc, "Estado de este documento (V4.2)")
-    add_para(doc, "El núcleo describe la arquitectura base (Fases 0-5). Las Fases 6-16 (versiones 3.5.0 → 4.2.0) — Insights con 6 sub-análisis (Concentración, Precio $/kg, Cuadrante BCG, Estacionalidad, Penetración y Crecimiento x Vendedor), tab Clientes y Productos combinado, cards de Tracking, seguridad de sesión, PDF Avance Comercial, el módulo Agrupadores (territorios virtuales, Fase 1→3) y el histograma mensual de las pastillas — están resumidas en el ChangeLog (doc 03) y a detalle en LO_NUEVO.md, SESSION_LOG.md e INSTRUCTIVO_AGENTE.xml. Estado actual: 7 tabs (todos operan también en modo agrupador), 40 migraciones SQL. Nota clave de arquitectura: 'agrupador como territorio sintético' — funciones SQL que agregan la unión de miembros del agrupador y devuelven territorio = nombre, reutilizando el render entero; el modo territorios normal queda byte-idéntico (opt-in por ?agrupador / p_agrupador_id). El totalizador de Crecimiento x Vendedor (V4.2) usa una RPC de agregación aparte (insights_crecimiento_totales) — nunca la suma de renglones — para que Variedad (COUNT DISTINCT), Margen % (Σmargen÷Σventa) y Ticket Promedio (Σventa÷#tickets) sean el total REAL del negocio.")
+    add_h2(doc, "Estado de este documento (V4.3)")
+    add_para(doc, "El núcleo describe la arquitectura base (Fases 0-5). Las Fases 6-17 (versiones 3.5.0 → 4.3.0) — Insights con 6 sub-análisis (Concentración con cruce de dimensiones, Precio $/kg, Cuadrante BCG, Estacionalidad, Penetración y Crecimiento x Vendedor), tab Clientes y Productos combinado con análisis profundo (gráfica Meses 3 años, expand mensual 'campo minado' con territorio, orden por columna, buscador de año completo, desglose Año-vs-Año de 3 años y matriz Meses Hist.), Tracking con comparativo año-vs-año al día, 4º KPI Prom. Venta Diario, seguridad de sesión, PDF Avance Comercial, el módulo Agrupadores (territorios virtuales, Fase 1→3) y el histograma mensual de las pastillas — están resumidas en el ChangeLog (doc 03) y a detalle en LO_NUEVO.md, SESSION_LOG.md e INSTRUCTIVO_AGENTE.xml. Estado actual: 7 tabs (todos operan también en modo agrupador), 45 migraciones SQL, datos Ene 2024 – Sep 2026. Nota clave de arquitectura: 'agrupador como territorio sintético' — funciones SQL que agregan la unión de miembros del agrupador y devuelven territorio = nombre, reutilizando el render entero; el modo territorios normal queda byte-idéntico (opt-in por ?agrupador / p_agrupador_id). El totalizador de Crecimiento x Vendedor (V4.2) usa una RPC de agregación aparte (insights_crecimiento_totales) — nunca la suma de renglones — para que Variedad (COUNT DISTINCT), Margen % (Σmargen÷Σventa) y Ticket Promedio (Σventa÷#tickets) sean el total REAL del negocio. Patrón V4.3: las funciones nuevas (migr 041-045) replican el scoping 'territorios + rama de agrupador' de insights_concentracion_cruzada y son SECURITY INVOKER (heredan la RLS); cuando una función cambia de firma se crea con nombre NUEVO (o DROP+CREATE) para no romper consumidores existentes; los datos de detalle (expands, universo del buscador, matriz multi-año) se cargan de forma LAZY por territorio desde el cliente, nunca en el payload inicial de page.tsx (evita el tope de 1000 filas de PostgREST).")
 
     add_h1(doc, "Resumen Ejecutivo")
     add_para(
@@ -368,8 +368,8 @@ Supabase Postgres
 def gen_diccionario():
     doc = Document()
     add_cover(doc, "Diccionario de Datos", "Schemas de DB, contratos de APIs y estructuras internas")
-    add_h2(doc, "Estado de este documento (V4.2)")
-    add_para(doc, "El núcleo describe los schemas base. En V4.0-4.2 se agregaron: las funciones de Insights (migr 021-024) + insights_penetracion/_detalle (028) + insights_crecimiento_vendedor/_meta/_totales (038-040, Crecimiento x Vendedor); el módulo Agrupadores (migr 029-037): tablas agrupadores, agrupador_members, users_permissions.allowed_agrupadores + agrupadores.meta_mensual, y ~15 funciones agrupador_* (member_arrays gateado SECURITY DEFINER, monthly/daily/grupo/sku/cliente/vendedor/perdidos, y el branch p_agrupador_id en las 6 insights_*). Total 40 migraciones. Ver detalle en el ChangeLog (doc 03) e INSTRUCTIVO_AGENTE.xml. REGLA CLAVE: un cliente se identifica por NOMBRE, no por no_cliente (cada ERP Sus/Suve numera aparte). El totalizador de Crecimiento x Vendedor usa insights_crecimiento_totales (RPC aparte, no suma de renglones) para que Variedad/Margen %/Ticket Promedio sean el total REAL.")
+    add_h2(doc, "Estado de este documento (V4.3)")
+    add_para(doc, "El núcleo describe los schemas base. En V4.0-4.2 se agregaron: las funciones de Insights (migr 021-024) + insights_penetracion/_detalle (028) + insights_crecimiento_vendedor/_meta/_totales (038-040, Crecimiento x Vendedor); el módulo Agrupadores (migr 029-037): tablas agrupadores, agrupador_members, users_permissions.allowed_agrupadores + agrupadores.meta_mensual, y ~15 funciones agrupador_* (member_arrays gateado SECURITY DEFINER, monthly/daily/grupo/sku/cliente/vendedor/perdidos, y el branch p_agrupador_id en las 6 insights_*). En V4.3 (migr 041-045, todas SECURITY INVOKER con scoping territorio + rama de agrupador): insights_cliente_sku_mensual(p_year, p_anchor_dim 'sku'|'cliente', p_anchor_value, p_territorios) → (name, mes, venta, kg, margen, territorios[]) — cruce cliente × SKU × mes para el expand mensual (044 agregó territorios[] vía DROP+CREATE); insights_concentracion_cruzada(p_from, p_to, p_dimension, p_territorios, p_agrupador_id, p_clientes, p_skus, p_grupos, p_familias) → Pareto acotado por filtros cruzados + dimensión 'familias' (nombre nuevo; NO modifica insights_concentracion ni sus 2 overloads); dim_universe_year(p_dimension 'productos'|'clientes', p_year, p_territorios, p_agrupador_id) → nombres distintos con venta en cualquier mes del año (universo del buscador; consulta sales_rows directo para evitar el tope de 1000 filas); dim_mensual_multianio(p_dimension 'cliente'|'sku', p_names[], p_territorios, p_agrupador_id) → (name, anio, mes, venta, kg) para la matriz Meses Hist. Endpoints nuevos: /api/dashboard/cliente-sku-mensual, /dim-universe, /dim-mensual-multianio; /api/dashboard/cliente-desglose reescrito a 'por SKU, 3 años al-día' ({rows} con v/k/m 24/25/26 + _alDia, espejo de clientes-por-producto); /api/insights/concentracion acepta fcliente/fsku/fgrupo/ffamilia. Total 45 migraciones; datos Ene 2024 – Sep 2026 (~384K filas; 2024 y 2025 completos, 2026 Ene–Sep). Ver detalle en el ChangeLog (doc 03) e INSTRUCTIVO_AGENTE.xml. REGLA CLAVE: un cliente se identifica por NOMBRE, no por no_cliente (cada ERP Sus/Suve numera aparte). El totalizador de Crecimiento x Vendedor usa insights_crecimiento_totales (RPC aparte, no suma de renglones) para que Variedad/Margen %/Ticket Promedio sean el total REAL.")
 
     add_h1(doc, "Tablas de Postgres")
 
@@ -608,7 +608,45 @@ Body:
 # ============================================================
 def gen_changelog():
     doc = Document()
-    add_cover(doc, "ChangeLog & Release Notes", "Evolución V2.2 → V4.2 + historial de commits")
+    add_cover(doc, "ChangeLog & Release Notes", "Evolución V2.2 → V4.3 + historial de commits")
+
+    # ===== V4.3 (Fase 17) =====
+    add_h1(doc, "Versión 4.3.0 — V4.3 (2026-09-03)")
+    add_para(doc, "Profundización analítica del tab Clientes y Productos + comparativos año-vs-año en Tracking y en los KPIs + cruce de dimensiones en Insights · Concentración. 14 commits (2026-07-30 → 2026-09-03), migraciones 041-045 (total 45); datos Ene 2024 – Sep 2026 (~384K filas).")
+
+    add_h2(doc, "Tracking Diario — modo 'Comparar vs año anterior (al día)'")
+    add_bullet(doc, "Toggle on-demand (apagado por defecto, persiste en localStorage) que transforma el tab en una comparación año actual vs anterior, respetando scope y Pesos/Kilos. Gráfica: barras diarias del año anterior agrupadas con las actuales + líneas de acumulado. Tabla: columnas pareadas por día (Venta día/acum, Margen $, Margen %) con Δ% coloreado + fila TOTAL al día. Expandible por día → clientes actual vs anterior (mismo día del mes), cruzados por NOMBRE; etiqueta Nuevo/Perdido. Cero queries nuevas (2 fetches al endpoint clientes-dia ya existente). Componente TrackingCompareYoY. Commit 5057048.")
+    add_bullet(doc, "Fix: la línea de Ptto Linear no cerraba en su total cuando el último día con venta no era el último día hábil (ej. día 30 domingo → se quedaba en 25/26 del presupuesto). El eje X ahora se extiende a TODOS los días hábiles del mes (listBizDays) → la línea alcanza el 100% y se ve la 'pista' de días hábiles restantes. Cálculos intactos. Commit 800113a.")
+
+    add_h2(doc, "KPI header — 4º KPI 'Prom. Venta Diario' + ACUM consolidada")
+    add_bullet(doc, "Nuevo KPI grande: venta al día ÷ días hábiles transcurridos (L-S menos feriados LFT, los del dashboard). Delta vs año anterior AL DÍA (mismo tramo; difiere del delta de Venta, que va vs cierre). VS PTTO = objetivo diario (PTTO ÷ días hábiles totales). Histograma desplegable con el promedio mes a mes. Sin backend nuevo (KpiData gana ventaAlDia/prevYearVentaAlDia/elapsedBizDays/totalBizDays).")
+    add_bullet(doc, "Las 3 pastillas ACUM 2024/2025/2026 se consolidan en UNA sola con los años apilados en vertical, a mitad de ancho; los 4 KPIs crecen (grid de 9 columnas: 4×2 + 1). Commit d292431.")
+
+    add_h2(doc, "Clientes y Productos — gráfica 'Meses (3 años)'")
+    add_bullet(doc, "El toggle 'Mismo mes (3 años)' pasa a 'Meses (3 años)': de '1 mes × 3 años' a '12 meses × 3 años' — por cada mes, barras agrupadas 2024 (gris) / 2025 (azul) / 2026 (verde) + 3 líneas de Margen % por año (eje derecho). 2024/2025 completos; 2026 hasta el mes en curso. Multi-SKU agrega todos los items en una serie por año (igual que Evolución). Reusa /clientes-evolution con 3 llamadas lazy, sin endpoint nuevo. Leyenda (ChartLegend por secciones) y tooltip homologados al tab Ventas. Componente ClientesTresAniosChart. Commits dd4f11b + 23ae3f4.")
+
+    add_h2(doc, "Clientes y Productos — expand mensual bidireccional ('campo minado')")
+    add_bullet(doc, "En la vista 'Meses {año}' cada fila se expande (antes solo 'Año vs Año'): un SKU → todos los CLIENTES que lo compraron, por mes; un cliente → los SKUs que compró, por mes. Los meses sin compra se resaltan en rojo tenue ('campo minado') y se marca 'sin comprar desde MMM' para quien dejó de comprar → churn de un vistazo. Migración 041: función insights_cliente_sku_mensual (cruce cliente × SKU × mes; no existía una vista con ambas dimensiones; SECURITY INVOKER → RLS). Endpoint /api/dashboard/cliente-sku-mensual con la misma forma que clientes-evolution para reusar el render. Commits 05ee073 + b99fcb6.")
+    add_bullet(doc, "Territorio(s) en el expand cuando el scope es 'Todos' (o varios territorios): cada sub-fila muestra el/los territorio(s) donde esa entidad hizo la venta en el año (con +N y tooltip), en lugar del 'sin comprar desde'; con un solo territorio seleccionado se conserva el churn. Migración 044: DROP+CREATE de insights_cliente_sku_mensual agregando territorios[] (array_agg DISTINCT por name×mes; el endpoint los une entre meses). Commit f7a3f7c.")
+
+    add_h2(doc, "Clientes y Productos — orden por columna + fix dropdown congelado")
+    add_bullet(doc, "Clic en el header ordena (▼ mayor→menor, ▲ menor→mayor, flecha en la columna activa) en las 3 vistas: Meses (por cualquier mes o Total YTD; las sub-filas del expand también se reordenan), Año vs Año (venta 24/25/26, Var %, KG + Var %, Mg $, Mg % 26/25, Δpp), Prom 90d (ritmo 90d, ritmo mes, Δ %). El orden se resetea al cambiar de vista/dimensión.")
+    add_bullet(doc, "Fix (bug reportado): el dropdown del expand mensual se 'congelaba' mostrando el detalle del territorio anterior al cambiar de territorio (solo el header cambiaba). El cache ahora se llavea por scope (año|dimensión|territorio) → nunca sirve otro territorio, y los dropdowns abiertos se cierran al cambiar de scope. Commit 588e5a9.")
+
+    add_h2(doc, "Clientes y Productos — buscador con universo de AÑO COMPLETO")
+    add_bullet(doc, "Fix: el buscador de Productos/Clientes solo listaba items con venta en el MES seleccionado (los datasets kpi_*_summary se filtran por mes en page.tsx), así que un SKU vendido en otro mes del año con 0 en el mes en curso 'no existía' en el buscador — aunque sí aparecía en el desglose por cliente (año completo). Ahora el buscador UNE los items del mes (orden por venta) + todos los del año que no estén (sin quitar ninguno, incluidos los que solo vendieron en el mes de años previos). Al seleccionar un item sin venta en el mes: fila-cero sintética en Año vs Año/gráfica (0, correcto) y su desglose REAL en 'Meses {año}'. Migración 043: función dim_universe_year (nombres distintos del año, scoping territorio/agrupador/RLS); endpoint /api/dashboard/dim-universe; DimensionTab.fullYearSearchContext (fetch lazy por territorio). Commit 608a20f.")
+
+    add_h2(doc, "Clientes y Productos — desglose 'Año vs Año' con comparación de 3 años")
+    add_bullet(doc, "Al expandir un PRODUCTO (→ sus clientes) o un CLIENTE (→ sus SKUs) en la vista 'Año vs Año', cada sub-fila replica TODAS las columnas del encabezado: venta 24/25/26 + Var %, KG 24/25/26 + Var % KG, Mg $, Mg % actual y anterior, Δpp — comparación al-día de 3 años (antes solo Venta/KG/Margen del mes). El lado cliente aplana el antiguo agrupamiento grupo→SKU. Componente presentacional compartido DesgloseYoYTable (para no duplicar la tabla); ProductoDesglose y ClienteDesglose quedan como wrappers que fetchean y delegan. El endpoint clientes-por-producto ya devolvía los 3 años al-día (solo faltaba renderizarlos); cliente-desglose se reescribió 'por SKU, 3 años al-día' (espejo del anterior). Commits d8c9e2a + 0b970ca.")
+
+    add_h2(doc, "Clientes y Productos — vista 'Meses Hist.' (matriz Años × Meses)")
+    add_bullet(doc, "4º toggle de tabla junto a Año vs Año / Meses {año} / Prom 90d. Cada entidad (cliente o SKU) muestra una fila con el total de los 3 años por mes; al expandirla aparecen sub-filas por año (2024 / 2025 / 2026 × 12 meses) para comparar el mismo mes entre años leyendo una columna hacia abajo. Celda = venta o kg según el toggle Pesos/Kilos; sombreado heatmap por intensidad (relativo al máximo de cada entidad); meses futuros del año en curso = '—'. Migración 045: función dim_mensual_multianio (venta/kg por entidad × año × mes para los nombres del top, scoping territorio/agrupador/RLS); endpoint /api/dashboard/dim-mensual-multianio (arma byYear + total por mes); componente MesesHistTable. Commit a4f136d.")
+
+    add_h2(doc, "Insights · Concentración — cruzar dimensiones")
+    add_bullet(doc, "Nueva fila 'Filtrar por': eliges una dimensión de cruce (Producto / Cliente / Grupo / Familia) y sus items, y el Pareto de la dimensión activa se recalcula solo sobre ese universo. Ej: Vista = Territorios + Filtrar por Producto (ARRACHERA) → qué territorio la desplaza más. También se agrega 'Familias' como dimensión del Pareto. Migración 042: función insights_concentracion_cruzada — replica la lógica actual (territorios + rama de agrupador) + filtros cruzados opcionales p_clientes/p_skus/p_grupos/p_familias; se creó con nombre NUEVO para no tocar insights_concentracion (2 overloads) y no romper Agrupadores. Endpoint /api/insights/concentracion acepta fcliente/fsku/fgrupo/ffamilia. Commit f4faba8.")
+
+    add_h2(doc, "Parqueado — diseñado, no desplegado")
+    add_bullet(doc, "Sincronización automática de datos: se diseñaron y construyeron dos motores — (A) pg_cron + pg_net con CRON_SECRET en Supabase Vault (hora fija configurable, requiere un paso manual del secreto) y (B) auto-al-abrir el dashboard sin secreto — y a petición de Mauricio se revirtió todo: el refresh sigue 100% manual desde Cargar Datos. El artefacto SQL quedó en docs/parked/idea1-sync-auto/ (fuera de supabase/migrations/). Producción intacta.")
 
     # ===== V4.2 (Fase 16) =====
     add_h1(doc, "Versión 4.2.0 — V4.2 (2026-07-19)")
@@ -828,7 +866,23 @@ def gen_manual():
     doc = Document()
     add_cover(doc, "Manual de Usuario", "Guía no-técnica para los 15 usuarios del sistema")
 
-    add_h1(doc, "🆕 Novedades V4.2 (lo más reciente)")
+    add_h1(doc, "🆕 Novedades V4.3 (lo más reciente)")
+    add_para(doc, "Lo nuevo desde la V4.2:")
+    add_h2(doc, "Tracking Diario — compara contra el año pasado, al día")
+    add_para(doc, "Arriba del tab hay un interruptor 'Comparar vs año anterior'. Al activarlo, la gráfica muestra las barras de cada día del año pasado junto a las de este año, y la tabla pone lado a lado Venta, Margen $ y Margen % de cada día con su Δ% en color (verde crece, rojo cae) y una fila TOTAL al día. Puedes dar clic en un día para ver qué clientes compraron ese mismo día este año y el pasado (marca 'Nuevo' o 'Perdido'). Respeta tu territorio y el toggle Pesos/Kilos, y queda guardado en tu navegador.")
+    add_h2(doc, "KPI 'Promedio de Venta Diario'")
+    add_para(doc, "Una cuarta card grande arriba: cuánto vendes en promedio por día hábil (venta al día ÷ días hábiles transcurridos — lunes a sábado sin feriados). Te dice si vas arriba o abajo del año pasado en el mismo tramo, y contra el objetivo diario del presupuesto. Ábrela para ver el promedio de cada mes. Además, las 3 cards de Acumulado 2024/2025/2026 ahora van juntas en una sola pastilla vertical, para dar más espacio a los 4 KPIs.")
+    add_h2(doc, "Clientes y Productos — análisis mucho más profundo")
+    add_bullet(doc, "Gráfica 'Meses (3 años)': los 12 meses del año con 3 barras por mes (2024, 2025 y 2026) y sus líneas de margen %. Compara cada mes contra los años anteriores de un vistazo.")
+    add_bullet(doc, "Expande cualquier fila en 'Meses 2026': un producto te muestra sus clientes mes a mes; un cliente, sus productos. Los meses en rojo tenue son meses sin compra ('campo minado') y verás 'sin comprar desde …' para quien dejó de comprar. Si estás viendo 'Todos' los territorios, en su lugar verás en qué territorio(s) compró cada cliente.")
+    add_bullet(doc, "Ordena cualquier tabla dando clic en el encabezado de la columna (una vez de mayor a menor, otra de menor a mayor).")
+    add_bullet(doc, "El buscador ahora encuentra cualquier producto o cliente con venta en el año, aunque no haya comprado en el mes que estás viendo. Selecciónalo y verás su año completo en 'Meses 2026' (en 'Año vs Año' aparecerá en 0 para ese mes, que es lo correcto).")
+    add_bullet(doc, "Al expandir un producto o un cliente en 'Año vs Año', cada renglón trae la misma información que el encabezado: venta de los 3 años con su Var %, kilos, margen $ y % y la diferencia en puntos porcentuales.")
+    add_bullet(doc, "Nueva vista de tabla 'Meses Hist.': cada producto o cliente con el total de los 3 años por mes; expándelo para ver 2024, 2025 y 2026 mes a mes uno debajo del otro, con colores más intensos en los meses fuertes. Lee una columna hacia abajo para comparar ese mes entre años. Respeta Pesos/Kilos.")
+    add_h2(doc, "Insights · Concentración — cruza dimensiones")
+    add_para(doc, "Nueva opción 'Filtrar por': elige un producto, cliente, grupo o familia y el Pareto se recalcula solo sobre eso. Ejemplo: vista Territorios + Filtrar por Producto = ARRACHERA → qué territorio vende más arrachera. También puedes hacer el Pareto por Familias.")
+
+    add_h1(doc, "Novedades V4.2")
     add_para(doc, "Lo nuevo desde la V4.1:")
     add_h2(doc, "Insights — Crecimiento x Vendedor (6º análisis)")
     add_para(doc, "Para evaluar cómo va cada vendedor: dos tablas lado a lado, Año Anterior y Año Actual, cada una con Mes y Acumulado de su cartera — por cliente o por producto. Eliges al vendedor en el menú y el sistema compara al mismo día (recorta el año en curso hasta la última fecha con datos) para que el crecimiento sea justo. Puedes ver 6 mediciones: Kg, $, Margen %, Margen $, Variedad (No. de SKUs) y Ticket Promedio. Cada renglón trae su Δ% del Mes y Δ% Acumulado con color (verde si crece, rojo si cae; 'Nuevo' si no había el año pasado). Al pie de cada tabla hay una fila TOTAL real: no es la suma de los renglones, es el total correcto del negocio (la Variedad cuenta SKUs distintos sin duplicar, el Margen % es ponderado y el Ticket Promedio pondera por número de tickets).")
@@ -992,8 +1046,8 @@ def gen_manual():
 def gen_guia_ti():
     doc = Document()
     add_cover(doc, "Guía de TI y Despliegue", "Para ingenieros que mantienen, deployan o continúan el sistema")
-    add_h2(doc, "Estado de este documento (V4.2)")
-    add_para(doc, "Los procesos de despliegue (Vercel + Supabase + Resend) siguen vigentes. En V4.2 el dashboard tiene 7 tabs (todos operan también en modo agrupador), Insights con 6 sub-análisis y 40 migraciones SQL. El respaldo profesional (Plan Z) se sincroniza con scripts/respaldar.sh; los .docx se regeneran con scripts/gen_docs.py; el PDF visual, desde public/instructivo.html. Ver ChangeLog (doc 03) para el historial completo.")
+    add_h2(doc, "Estado de este documento (V4.3)")
+    add_para(doc, "Los procesos de despliegue (Vercel + Supabase + Resend) siguen vigentes. En V4.3 el dashboard tiene 7 tabs (todos operan también en modo agrupador), Insights con 6 sub-análisis y 45 migraciones SQL (las 041-045 se aplicaron vía el MCP de Supabase y se guardan en supabase/migrations/; en una reconstrucción se aplican en orden en el SQL Editor). El refresh de datos sigue siendo MANUAL desde Cargar Datos (admin/director); la sincronización automática se diseñó y quedó parqueada en docs/parked/. El respaldo profesional (Plan Z) se sincroniza con scripts/respaldar.sh; los .docx se regeneran con scripts/gen_docs.py; el PDF visual, desde public/instructivo.html (chrome-headless-shell de Playwright). Ver ChangeLog (doc 03) para el historial completo.")
 
     add_h1(doc, "Quién debe leer esto")
     add_para(doc, "Este documento está pensado para un ingeniero de TI que necesite:")
@@ -1200,8 +1254,8 @@ git push origin main""")
 def gen_reconstruccion():
     doc = Document()
     add_cover(doc, "Guía de Reconstrucción", "Cómo rebuildear el sistema desde cero")
-    add_h2(doc, "Estado de este documento (V4.2)")
-    add_para(doc, "El procedimiento de reconstrucción base (Fases 0-5) sigue válido. Para reconstruir el estado completo V4.2 hay que aplicar las 40 migraciones SQL (incluidas 021-024 y 028 de Insights, 029-037 del módulo Agrupadores y 038-040 de Crecimiento x Vendedor) y construir los 7 tabs (incluido Clientes y Productos combinado, Insights con 6 sub-análisis y el histograma de pastillas de Tracking), más el módulo Agrupadores que opera en todos los tabs vía las funciones agrupador_* (territorio sintético). Ver el inventario completo de archivos/componentes/endpoints en INSTRUCTIVO_AGENTE.xml (secciones fase_10 a fase_16) y el ChangeLog (doc 03).")
+    add_h2(doc, "Estado de este documento (V4.3)")
+    add_para(doc, "El procedimiento de reconstrucción base (Fases 0-5) sigue válido. Para reconstruir el estado completo V4.3 hay que aplicar las 45 migraciones SQL (incluidas 021-024 y 028 de Insights, 029-037 del módulo Agrupadores, 038-040 de Crecimiento x Vendedor y 041-045 de la profundización de Clientes y Productos + cruce de dimensiones en Concentración) y construir los 7 tabs (incluido Clientes y Productos combinado con sus 4 vistas de tabla — Año vs Año, Meses {año}, Meses Hist., vs Prom 90d — y sus expands; Tracking con el modo Comparar vs año anterior; el 4º KPI Prom. Venta Diario; Insights con 6 sub-análisis y el histograma de pastillas), más el módulo Agrupadores que opera en todos los tabs vía las funciones agrupador_* (territorio sintético). Componentes clave V4.3: TrackingCompareYoY, ClientesTresAniosChart, ClientesTableViews (expand mensual + sort + territorio), DesgloseYoYTable (+ ProductoDesglose/ClienteDesglose como wrappers), MesesHistTable, y en DimensionTab el prop fullYearSearchContext (buscador de año completo) y el 4º tableView 'meses-hist'. Ver el inventario completo de archivos/componentes/endpoints en INSTRUCTIVO_AGENTE.xml (secciones fase_10 a fase_17) y el ChangeLog (doc 03).")
 
     add_h1(doc, "Cuándo usar esta guía")
     add_para(doc, "Esta es la guía CRÍTICA — debe permitir a un ingeniero competente reconstruir el sistema completo desde cero, asumiendo que solo tiene esta documentación + acceso a las APIs externas.")
