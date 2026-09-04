@@ -80,11 +80,15 @@ export async function GET(request: NextRequest) {
     venta: number;
     kg: number;
     margen: number;
+    territorios: string[] | null;
   }[];
 
   // Agregar por (name, mes) + total por name para ordenar.
   const byName = new Map<string, Map<number, { venta: number; kg: number; margen: number }>>();
   const totalByName = new Map<string, number>();
+  // Territorios distintos donde cada entidad hizo venta (unión entre meses),
+  // para la Mejora 1: mostrar el/los territorio(s) en la vista "Todos".
+  const terrByName = new Map<string, Set<string>>();
   for (const r of rows) {
     const mes = Number(r.mes);
     if (mes < 1 || mes > 12) continue;
@@ -99,6 +103,14 @@ export async function GET(request: NextRequest) {
     cur.margen += Number(r.margen) || 0;
     perMonth.set(mes, cur);
     totalByName.set(r.name, (totalByName.get(r.name) ?? 0) + (Number(r.venta) || 0));
+    if (Array.isArray(r.territorios)) {
+      let set = terrByName.get(r.name);
+      if (!set) {
+        set = new Set();
+        terrByName.set(r.name, set);
+      }
+      for (const t of r.territorios) if (t) set.add(t);
+    }
   }
 
   const meses = [];
@@ -123,7 +135,8 @@ export async function GET(request: NextRequest) {
         margen_pct: cell.venta > 0 ? (cell.margen / cell.venta) * 100 : 0,
       });
     }
-    return { name, monthly };
+    const territorios = Array.from(terrByName.get(name) ?? []).sort();
+    return { name, monthly, territorios };
   });
 
   return NextResponse.json({ meses, clientes: series });

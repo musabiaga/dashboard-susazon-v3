@@ -30,6 +30,9 @@ interface MonthlyCell {
 interface ClienteEvolution {
   name: string;
   monthly: MonthlyCell[];
+  /** Territorios distintos donde esta entidad hizo venta en el año (Mejora 1).
+   *  Se muestra en lugar de "sin comprar desde" cuando el scope es "Todos". */
+  territorios?: string[];
 }
 interface EvolutionResponse {
   meses: { mes: number; label: string }[];
@@ -94,6 +97,13 @@ export function ClientesTableViews({
       : context.territorios.slice().sort().join(",")
   }`;
   const subCacheKey = (name: string) => `${scopeKey}::${name}`;
+
+  // Mejora 1: cuando el scope abarca varios territorios ("Todos" = null, o un
+  // subset con >1), el expand muestra el/los territorio(s) donde cada entidad
+  // hizo la venta EN LUGAR del "sin comprar desde …". Con un solo territorio
+  // seleccionado, el territorio es obvio → se conserva el churn.
+  const isMultiTerritorio =
+    context.territorios === null || context.territorios.length > 1;
 
   async function toggleExpand(name: string) {
     if (expandedRows.has(name)) {
@@ -416,10 +426,27 @@ export function ClientesTableViews({
                             <tr key={c.name} style={{ background: "var(--bg-surface-muted)" }}>
                               <td className="py-1 pl-8 pr-2 text-xs">
                                 <span style={{ color: "var(--text-secondary)" }}>{c.name}</span>
-                                {stopped && (
-                                  <span className="ml-2 text-[10px] font-medium" style={{ color: "var(--danger)" }}>
-                                    · sin comprar desde {evolution.meses[lastIdx + 1]?.label ?? ""}
-                                  </span>
+                                {isMultiTerritorio ? (
+                                  // "Todos" / varios territorios → territorio(s) donde vendió.
+                                  c.territorios && c.territorios.length > 0 ? (
+                                    <span
+                                      className="ml-2 text-[10px] font-medium"
+                                      style={{ color: "var(--accent)" }}
+                                      title={c.territorios.join(", ")}
+                                    >
+                                      ·{" "}
+                                      {c.territorios.length <= 2
+                                        ? c.territorios.join(", ")
+                                        : `${c.territorios.slice(0, 2).join(", ")} +${c.territorios.length - 2}`}
+                                    </span>
+                                  ) : null
+                                ) : (
+                                  // Territorio individual → churn "sin comprar desde".
+                                  stopped && (
+                                    <span className="ml-2 text-[10px] font-medium" style={{ color: "var(--danger)" }}>
+                                      · sin comprar desde {evolution.meses[lastIdx + 1]?.label ?? ""}
+                                    </span>
+                                  )
                                 )}
                               </td>
                               {cells.map((v, i) => (
