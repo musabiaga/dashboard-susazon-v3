@@ -30,11 +30,11 @@
 | Paso | Archivo | Para qué |
 |------|---------|----------|
 | 1 | `AGENTS.md` (raíz del repo) | Auto-cargado al `cd`. Stack, gotchas críticos, reglas absolutas. |
-| 2 | **🆕 `docs/LO_NUEVO.md`** | **Si la última sesión fue antes de 2026-05-23.** Resumen ejecutivo de V4.0-4.1 (Fases 10-15: Agrupadores, Penetración, histograma). |
+| 2 | **🆕 `docs/LO_NUEVO.md`** | **Si vienes de cualquier sesión previa.** Resumen ejecutivo de V4.3 (Fase 17) + V4.2 / V4.1 / V4.0 como histórico. |
 | 3 | Este archivo (`CONTINUACION_NUEVA_CONVERSACION.md`) | Estás aquí. Contexto compacto. |
-| 4 | `docs/SESSION_LOG.md` | **Todas** las decisiones (D001-D043) + bugs resueltos (1-50). Lee si vas a tocar algo relacionado. |
-| 5 | `docs/INSTRUCTIVO_AGENTE.xml` | Inventario estructurado (v4.2, fecha 2026-07-24). Lee si vas a hacer cambios estructurales. |
-| 6 | `docs/01_Arquitectura_Tecnica.docx` | Diseño del sistema y decisiones arquitectónicas (regenerado a v4.2.0). |
+| 4 | `docs/SESSION_LOG.md` | **Todas** las decisiones (D001-D044) + bugs resueltos (1-53). Lee si vas a tocar algo relacionado. |
+| 5 | `docs/INSTRUCTIVO_AGENTE.xml` | Inventario estructurado (v4.3, fecha 2026-09-03; XML bien formado). Lee si vas a hacer cambios estructurales. |
+| 6 | `docs/01_Arquitectura_Tecnica.docx` | Diseño del sistema y decisiones arquitectónicas (regenerado a v4.3.0). |
 | 7 | `~/Downloads/SECRETS_DASHBOARD_V3.txt` | Tokens, API keys, credenciales (privado, no en repo). |
 
 **Memoria persistente del usuario** (auto-cargada): `~/.claude/projects/-Users-mauusabiaga-Desktop-Claude-Code-PROJECTS-/memory/MEMORY.md` y archivos relacionados.
