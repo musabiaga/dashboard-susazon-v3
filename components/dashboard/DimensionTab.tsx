@@ -16,6 +16,7 @@ import {
   ClientesTableViews,
   type TableViewsContext,
 } from "@/components/dashboard/ClientesTableViews";
+import { MesesHistTable } from "@/components/dashboard/MesesHistTable";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
 import { ReportButton } from "@/components/dashboard/ReportButton";
 import type { BuildReportInput } from "@/lib/report-pdf/data";
@@ -233,22 +234,30 @@ export function DimensionTab({
     });
   };
   // ============ Toggle de vistas de tabla (Mejora 4) ============
-  // "anio" (default) | "meses" (12 meses + Total YTD) | "prom90" (ritmo vs 90d).
-  const [tableView, setTableView] = useState<"anio" | "meses" | "prom90">(
-    "anio"
-  );
+  // "anio" (default) | "meses" (12 meses del año en curso + Total YTD) |
+  // "meses-hist" (matriz Años×Meses, 3 años, Mejora 3 V4.3) | "prom90".
+  const [tableView, setTableView] = useState<
+    "anio" | "meses" | "meses-hist" | "prom90"
+  >("anio");
   useEffect(() => {
     if (!enableTableViews) return;
     try {
       const saved = window.localStorage.getItem("clientes-table-view");
-      if (saved === "anio" || saved === "meses" || saved === "prom90") {
+      if (
+        saved === "anio" ||
+        saved === "meses" ||
+        saved === "meses-hist" ||
+        saved === "prom90"
+      ) {
         setTableView(saved);
       }
     } catch {
       // ignore
     }
   }, [enableTableViews]);
-  const switchTableView = (next: "anio" | "meses" | "prom90") => {
+  const switchTableView = (
+    next: "anio" | "meses" | "meses-hist" | "prom90"
+  ) => {
     setTableView(next);
     try {
       window.localStorage.setItem("clientes-table-view", next);
@@ -1204,6 +1213,7 @@ export function DimensionTab({
                     [
                       ["anio", "Año vs Año"],
                       ["meses", `Meses ${tableViewsContext.year}`],
+                      ["meses-hist", "Meses Hist."],
                       ["prom90", "vs Prom. 90d"],
                     ] as const
                   ).map(([key, label]) => (
@@ -1250,8 +1260,28 @@ export function DimensionTab({
             </div>
           )}
 
-          {/* Vistas alternativas (Meses / Prom 90d) */}
+          {/* Vista Meses Hist. (matriz Años×Meses, Mejora 3) */}
           {enableTableViews &&
+          tableViewsContext &&
+          tableView === "meses-hist" ? (
+            <div
+              className="rounded-[var(--radius-lg)] border"
+              style={{
+                background: "var(--bg-surface)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <MesesHistTable
+                clientes={tableRows.map((r) => r.name)}
+                context={tableViewsContext}
+                mode={effectiveMode}
+                dimensionLabel={dimensionLabel}
+                dim={dimension}
+                agrupadorId={fullYearSearchContext?.agrupadorId ?? null}
+              />
+            </div>
+          ) : /* Vistas alternativas (Meses / Prom 90d) */
+          enableTableViews &&
           tableViewsContext &&
           tableView !== "anio" ? (
             <div
@@ -1262,7 +1292,7 @@ export function DimensionTab({
               }}
             >
               <ClientesTableViews
-                view={tableView}
+                view={tableView as "meses" | "prom90"}
                 clientes={tableRows.map((r) => r.name)}
                 context={{ ...tableViewsContext, currentByClient }}
                 mode={effectiveMode}
