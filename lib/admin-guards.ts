@@ -38,6 +38,40 @@ export async function requireAdmin() {
   return { supabase, user, perms };
 }
 
+/**
+ * Verifica sesión y rol ∈ {admin, director}. Mismo permiso que el refresh
+ * manual de datos y el editor de PTTO.
+ */
+export async function requireAdminOrDirector() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      error: NextResponse.json({ error: "No autorizado" }, { status: 401 }),
+    };
+  }
+
+  const { data: perms } = await supabase
+    .from("users_permissions")
+    .select("role, full_name, email")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!perms || !["admin", "director"].includes(perms.role)) {
+    return {
+      error: NextResponse.json(
+        { error: "Solo admin/director pueden ejecutar esta acción" },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { supabase, user, perms };
+}
+
 export function isValidRole(r: unknown): r is RoleKey {
   return typeof r === "string" && (ROLES as readonly string[]).includes(r);
 }

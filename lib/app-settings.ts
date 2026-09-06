@@ -18,11 +18,15 @@ export interface AppSettings {
    *  Valores válidos UI: 35, 45, 60, 90, 120. El timeout NO aplica a
    *  usuarios con session_timeout_exempt=true. */
   sessionIdleTimeoutMinutes: number | null;
+  /** V4.4: si true, Vercel Cron refresca el mes en curso cada día
+   *  (06:00 CDMX). Se enciende desde Cargar Datos (admin/director). */
+  syncAutoEnabled: boolean;
 }
 
 const DEFAULTS: AppSettings = {
   instructivoVisible: true,
   sessionIdleTimeoutMinutes: null,
+  syncAutoEnabled: false,
 };
 
 /**
@@ -56,9 +60,14 @@ export async function getAppSettings(): Promise<AppSettings> {
         ? rawMinutes
         : null;
 
+    const syncAuto = byKey.get("sync_auto") as
+      | { enabled?: boolean }
+      | undefined;
+
     return {
       instructivoVisible: instructivo?.enabled ?? DEFAULTS.instructivoVisible,
       sessionIdleTimeoutMinutes: validMinutes,
+      syncAutoEnabled: syncAuto?.enabled === true,
     };
   } catch {
     return DEFAULTS;
