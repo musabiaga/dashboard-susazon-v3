@@ -36,7 +36,7 @@
 | 12 | `AUTH_FLOWS.md` | Markdown | Documentación técnica del sistema de auth. Diagramas de los 3 flows | 1.0 | 2026-05-01 |
 | 12b | `GUIA_OBTENER_SECRETS.md` | Markdown | **Cómo obtener CADA credencial** (Supabase, Vercel, GitHub, APIs, Resend, GoDaddy) para reconstruir desde cero. Sin valores reales (committeable) | **1.0** | **2026-07-05** |
 | 13 | `LO_NUEVO.md` | Markdown | **Resumen ejecutivo de V4.3 (Fase 17) y, como histórico, V4.2 (Fase 16) y V4.1 (Fases 10-15).** Lee primero si vienes de una sesión previa | **4.0** | **2026-09-03** |
-| 14 | `parked/idea1-sync-auto/` | Parqueado | Sincronización automática de datos: diseñada y construida en V4.3, **revertida** a petición de Mauricio (el refresh sigue manual). SQL de pg_cron fuera de `supabase/migrations/` para que no se aplique por error | — | 2026-08-25 |
+| 14 | `parked/idea1-sync-auto/` | Superado (V4.4) | Sincronización automática de datos: diseñada y construida en V4.3, **revertida** a petición de Mauricio (el refresh sigue manual). SQL de pg_cron fuera de `supabase/migrations/` para que no se aplique por error | — | 2026-08-25 |
 | 15 | `_backups/2026-05-10_pre-update/` | Snapshot | Snapshot inmutable de los docs antes de la actualización del 10-may | — | 2026-05-10 |
 
 > **Sobre los `.docx` y el PDF:** en V4.3 se regeneraron los 6 `.docx` a la versión **4.3.0**
@@ -103,4 +103,4 @@ El código vive en este repo (`github.com/musabiaga/dashboard-susazon-v3`). Carp
 - El respaldo Plan Z se sincroniza con `scripts/respaldar.sh`
 - **Cero información sensible** en este repo — los secretos viven en `SECRETS_DASHBOARD_V3.txt` (privado)
 - El predecesor V2.2 (single-page HTML) sigue vivo en paralelo en Netlify — NO tocar
-- El refresh de datos es **manual** (Cargar Datos, admin/director). La sync automática está **parqueada** en `docs/parked/` — no está desplegada
+- El refresh de datos puede ser **manual** (Cargar Datos, admin/director) o **automático diario** desde V4.4 (Vercel Cron 06:00 CDMX, switch Manual/Automático; requiere `CRON_SECRET` en Vercel). El artefacto pg_cron de `docs/parked/` quedó superado

@@ -21,11 +21,12 @@
 - **Cierre fases 14-15 (V4.1):** 2026-07-05 (Insight #5 Penetración/Canasta + módulo Agrupadores completo Fase 1→3 + histograma mensual en las pastillas de Tracking + fixes D033-D035/D037)
 - **Cierre fase 16 (V4.2):** 2026-07-19 (Insights: 6º sub-análisis "Crecimiento x Vendedor" — comparativa AA vs Actual capada al mismo día, mediciones Kg/$/Margen %/Margen $/Variedad/Ticket Promedio + totalizador REAL)
 - **Cierre fase 17 (V4.3):** 2026-09-03 (Clientes y Productos a profundidad: Meses 3 años, expand mensual "campo minado" + territorio, sort por columna, buscador de año completo, desglose Año-vs-Año de 3 años, vista Meses Hist. · Tracking "Comparar vs año anterior" · 4º KPI Prom. Venta Diario · Concentración cruza dimensiones · migraciones 041-045 · sync automática parqueada)
-- **Versión actual:** 4.3.0 (en producción)
+- **Trabajo en curso (V4.4):** desde 2026-09-06 — sincronización automática diaria (Vercel Cron, migr 046) + editor de metas PTTO robusto (ver D045)
+- **Versión actual:** 4.3.0 (en producción) → 4.4.0 en desarrollo
 - **Repo:** `github.com/musabiaga/dashboard-susazon-v3` (privado)
 - **URL prod canonical:** `https://www.dashboardcomercialsusazon.com`
 - **URL prod fallback:** `https://dashboard-susazon-v3.vercel.app`
-- **Última actualización:** 2026-09-03
+- **Última actualización:** 2026-09-06
 
 ---
 
@@ -696,6 +697,21 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 
 **Estado:** Vigente. Migraciones 041-045 (total **45**). Release **V4.3.0**. tsc + build prod OK en cada entrega; verificación visual en producción por Mauricio (el Browser pane no tiene su sesión y no se capturan credenciales).
 
+### D045 — 2026-09-06 | V4.4: sincronización automática retomada (Vercel Cron) + editor de metas PTTO "más robusto"
+
+**Contexto:** Mauricio pidió retomar la Idea 1 (sync automática, parqueada en D044) y "elevar la funcionalidad/imagen" de la ventana Cargar Datos, en especial la tabla de metas. Diagnóstico previo con datos reales: sus syncs manuales eran **1/día, Susazón+Suve, solo mes en curso, 10-65 s, 25/25 exitosas**; pg_cron/pg_net no instalados; metas 2026 en 14 de 17 territorios (sin meta: Intercompañias Suve, Venta Detalle, Intercompañias Altamesa — los dos primeros por diseño, ver D003).
+
+**Decisión de motor (AskUserQuestion, 4 opciones):** **Vercel Cron** ganó a auto-al-abrir, a "ambos" y a pg_cron+Vault. Razón: hora fija sin instalar nada en Supabase y con **un solo secreto en un solo lugar** (`CRON_SECRET` en Vercel; Vercel agrega el header `Authorization: Bearer` automáticamente). Alcance: **solo mes en curso** (rechazó "mes anterior los días 1-5"). Hora: **06:00 CDMX** (`0 12 * * *` UTC; México sin horario de verano). Limitación Hobby: 1 corrida/día por job, ventana de hasta 1 h.
+
+**Implementación (3 commits chunkeados):**
+1. `d0b822e` backend — `lib/data-refresh.ts` (núcleo compartido, `trigger` manual|cron, user nulo en cron), `GET /api/cron/sync` (timing-safe compare, 503/401/skips/dedupe diario CDMX), `vercel.json`, `POST /api/admin/settings/sync-auto` + `requireAdminOrDirector`, `app-settings.syncAutoEnabled`, migr **046** (`sync_auto={enabled:false}`), `.env.example`.
+2. `b8366e9` UI — tarjeta "Sincronización automática" (switch Manual/Automático, próxima/última corrida auto, aviso Falta CRON_SECRET vía booleano server-side, banner de fallo) + tabla "Historial de sincronizaciones" (últimas 10, con Disparo Manual/Automático).
+3. `2b22e48` metas — fila Real {año-1} + % meta/real, menú ⋯ por territorio (copiar meta/real +X %, repartir total parejo/estacional, limpiar), paneles fijos, mes en curso resaltado, badge N/17 con meta, Descartar, beforeunload, última edición por, Excel 3 hojas. Mauricio **no** eligió "celdas con formato $ + navegación Excel" — queda como idea.
+
+**Seguridad:** el valor de `CRON_SECRET` nunca pasa por el asistente; al cliente solo llega `Boolean(process.env.CRON_SECRET)`. Sin secreto el cron responde 503 y no toca la DB.
+
+**Estado:** Código en prod (tsc + build OK). **Pendiente Mauricio:** crear `CRON_SECRET` en Vercel (Production) → Redeploy → activar el switch → verificar la primera corrida en el historial. Docs formales V4.4 (docx/instructivo/Apple Notes) al cerrar.
+
 ---
 
 ## Bugs Resueltos
@@ -912,7 +928,13 @@ Más popovers de ayuda "Cómo leer esto" en el foco del header (por sub-análisi
 - [x] **Vista "Meses Hist."** — matriz Años×Meses expandible con heatmap (D044-10). Migración **045** `dim_mensual_multianio` + `MesesHistTable`. Commit `a4f136d`.
 - [x] **Paneles congelados** en las 4 vistas de tabla (Año vs Año, Meses, Meses Hist., Prom 90d): contenedor con scroll propio (`max-h-[70vh] overflow-auto`), encabezado `sticky top-0`, primera columna `sticky left-0` con fondo opaco que respeta el rayado, esquina `z-30`, y en Meses la fila TOTAL `sticky bottom-0`. Mauricio eligió: las 4 vistas, scroll propio y TOTAL fijo. Solo CSS/markup, sin backend.
 - [x] **Docs V4.3**: LO_NUEVO, CONTINUACION, INSTRUCTIVO_AGENTE fase_17, SESSION_LOG (D044 + bugs 51-53), índice maestro, AGENTS.md, .docx a v4.3.0 (`gen_docs.py`), instructivo visual HTML/PDF, sync a Plan Z.
-- [~] **Sincronización automática de datos** — diseñada y construida (pg_cron+Vault / auto-al-abrir), **parqueada** a petición de Mauricio; refresh sigue manual. Artefacto en `docs/parked/idea1-sync-auto/`.
+- [x] **Sincronización automática de datos** — RETOMADA en V4.4 con Vercel Cron (D045, 2026-09-06). Historia: diseñada y construida (pg_cron+Vault / auto-al-abrir), **parqueada** a petición de Mauricio; refresh sigue manual. Artefacto en `docs/parked/idea1-sync-auto/`.
+
+### En curso — V4.4 (desde 2026-09-06) · Cargar Datos: sync automática + metas robustas
+- [x] Sync automática diaria vía Vercel Cron (06:00 CDMX, mes en curso, Susazón+Suve) — backend + UI + migr 046 (`d0b822e`, `b8366e9`)
+- [x] Editor de metas PTTO V4.4 — real año anterior + %, acciones por fila, paneles fijos, mes en curso, Descartar/beforeunload, última edición, Excel 3 hojas (`2b22e48`)
+- [ ] Mauricio: `CRON_SECRET` en Vercel + Redeploy + activar switch + verificar primera corrida
+- [ ] Hito docs V4.4 (gen_docs.py → docx 4.4.0, instructivo, índice, CONTINUACION, Plan Z, Apple Notes)
 
 ### Próximo a venir (acordado con Mauricio)
 

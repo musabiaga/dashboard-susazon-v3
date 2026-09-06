@@ -1,4 +1,19 @@
-# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.3
+# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.4 (en curso)
+
+**Periodo (V4.4, en curso):** desde 2026-09-06 · **Versión:** 4.3.0 → **4.4.0 (en desarrollo)**
+**Bloque:** Cargar Datos — **sincronización automática diaria** (Idea 1 retomada) + **editor de metas PTTO "más robusto"**
+**Migraciones:** 046 (total **46**)
+
+## 🚀 V4.4 en una línea
+
+- **Sincronización automática diaria (Vercel Cron)** — motor elegido por Mauricio entre 4 opciones (Vercel Cron / auto-al-abrir / ambos / pg_cron+Vault). `vercel.json` agenda `GET /api/cron/sync` a las **12:00 UTC = 06:00 CDMX** (Hobby: 1 vez/día, puede correr hasta 1 h después); refresca **solo el mes en curso**, Susazón + Suve (idéntico a lo que Mauricio hacía a mano cada día, 10-65 s). Único requisito externo: la env var **`CRON_SECRET`** en Vercel (la crea el humano; Vercel manda el header solo; nunca pasa por el asistente). Sin pg_cron ni Vault. Toggle **Manual/Automático** (`app_settings.sync_auto`, admin/director, ruta `settings/sync-auto`), default **Manual**. Reglas del cron: 503 sin secreto · 401 header inválido · skip si modo manual · dedupe 1 corrida auto/día CDMX · skip si hay una manual `running` < 10 min. Lógica del refresh extraída a `lib/data-refresh.ts` (compartida manual/cron; `sync_history.details.trigger` = `manual|cron`, `audit_log.user_id` nulo en cron). UI en Cargar Datos: tarjeta con switch, próxima/última corrida automática, aviso "Falta CRON_SECRET" (solo llega un booleano al cliente), banner si la última auto falló, e **historial de las últimas 10 corridas** (fecha, Manual/Automático, fuentes, meses, filas, duración, estado). Commits `d0b822e` (backend) + `b8366e9` (UI). El artefacto pg_cron de `docs/parked/` queda **superado**.
+- **Editor de metas (PTTO) V4.4** (`2b22e48`) — mejoras elegidas por Mauricio: (1) fila de referencia **"Real {año-1}"** bajo cada territorio (vista `kpi_monthly_summary`) con **% meta vs real** por mes y total, toggle Mostrar/Ocultar; (2) **menú ⋯ por territorio**: copiar meta {año-1} +X %, copiar real {año-1} +X %, repartir un total anual (parejo o con la **estacionalidad real** del año anterior, cierre exacto), limpiar fila; (3) **robustez**: paneles fijos (header + 1ª columna + fila TOTAL, alto máx 70 vh), **mes en curso resaltado**, badge "N/17 con meta" + lista de territorios sin meta, botón **Descartar**, aviso del navegador al salir con cambios sin guardar, "**última edición por … el …**"; (4) botón **Excel** presentable con 3 hojas (Metas {año} con resumen · Real {año-1} · Meta vs Real en %), vía `exportToExcelMultiSheet`. Se conservó todo lo anterior (inputs, guardado solo de celdas dirty, selector de año, RLS).
+
+> **Pendiente para cerrar V4.4:** Mauricio crea `CRON_SECRET` en Vercel → Redeploy → activa el switch → verificar la primera corrida (06:00-07:00 CDMX) en el historial. Después: hito de documentación V4.4 (gen_docs.py, instructivo, Plan Z, Apple Notes).
+
+---
+
+# 🆕 Lo Nuevo — Dashboard Comercial Susazón V4.3 (histórico)
 
 **Periodo cubierto (V4.3):** 2026-07-30 al 2026-09-03 (Fase 17)
 **Versión:** 4.2.0 → **4.3.0**
