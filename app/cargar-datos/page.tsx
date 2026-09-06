@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getMexicoCityDateParts } from "@/lib/business-days";
 import { getAppSettings } from "@/lib/app-settings";
 import { DashboardHeader } from "../dashboard/DashboardHeader";
-import { LoaderClient } from "./LoaderClient";
+import { LoaderClient, type SyncRow } from "./LoaderClient";
 import {
   BudgetEditorClient,
   type BudgetCell,
@@ -56,17 +56,19 @@ export default async function CargarDatosPage({
   // NO de distinct sobre sales_rows — esto evita el límite default de 1000
   // filas que Supabase aplica a SELECT.
   const [
-    { data: lastSync },
+    { data: historyRows },
     { count: totalRows },
     { data: stateRows },
     { data: budgetRows },
   ] = await Promise.all([
+    // Últimas 10 corridas (manuales + automáticas). La primera es "la última".
     supabase
       .from("sync_history")
-      .select("id, started_at, completed_at, status, rows_imported, source, errors")
+      .select(
+        "id, started_at, completed_at, status, rows_imported, source, errors, date_from, date_to, details"
+      )
       .order("started_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(10),
     supabase
       .from("sales_rows")
       .select("*", { count: "exact", head: true }),
@@ -81,6 +83,26 @@ export default async function CargarDatosPage({
   ]);
 
   const territories = (stateRows ?? []).map((r) => r.territory_name);
+
+  const syncHistory: SyncRow[] = (historyRows ?? []).map((r) => ({
+    id: r.id,
+    started_at: r.started_at,
+    completed_at: r.completed_at,
+    status: r.status,
+    rows_imported: r.rows_imported,
+    source: r.source,
+    errors: Array.isArray(r.errors) ? (r.errors as unknown[]) : null,
+    date_from: r.date_from,
+    date_to: r.date_to,
+    trigger:
+      (r.details as { trigger?: string } | null)?.trigger === "cron"
+        ? "cron"
+        : "manual",
+  }));
+  const lastSync = syncHistory[0] ?? null;
+
+  // Solo un booleano llega al cliente — nunca el valor del secreto.
+  const cronSecretConfigured = Boolean(process.env.CRON_SECRET);
 
   const initialBudgets: BudgetCell[] = (budgetRows ?? []).map((b) => ({
     territorio: b.territorio,
@@ -116,8 +138,11 @@ export default async function CargarDatosPage({
           </div>
 
           <LoaderClient
-            initialLastSync={lastSync ?? null}
+            initialLastSync={lastSync}
             initialTotalRows={totalRows ?? 0}
+            initialHistory={syncHistory}
+            syncAutoEnabled={appSettings.syncAutoEnabled}
+            cronSecretConfigured={cronSecretConfigured}
           />
 
           <BudgetEditorClient

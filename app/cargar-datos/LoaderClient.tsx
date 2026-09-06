@@ -11,10 +11,15 @@ import {
   Calendar,
   ArrowRight,
   AlertTriangle,
+  Clock,
+  History,
+  Zap,
+  User,
 } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 
-interface LastSync {
+/** Fila de sync_history normalizada por el Server Component. */
+export interface SyncRow {
   id: string;
   started_at: string;
   completed_at: string | null;
@@ -22,7 +27,13 @@ interface LastSync {
   rows_imported: number | null;
   source: string;
   errors: unknown[] | null;
+  date_from: string | null;
+  date_to: string | null;
+  /** "cron" = sincronización automática (Vercel Cron); "manual" = botón. */
+  trigger: "manual" | "cron";
 }
+
+type LastSync = SyncRow;
 
 interface RefreshResult {
   sync_id: string;
@@ -38,9 +49,21 @@ type ApiSource = "susazon" | "suve";
 interface Props {
   initialLastSync: LastSync | null;
   initialTotalRows: number;
+  /** Últimas 10 corridas (manuales + automáticas), más reciente primero. */
+  initialHistory: SyncRow[];
+  /** app_settings.sync_auto.enabled */
+  syncAutoEnabled: boolean;
+  /** true si la env var CRON_SECRET existe en Vercel (solo el booleano). */
+  cronSecretConfigured: boolean;
 }
 
-export function LoaderClient({ initialLastSync, initialTotalRows }: Props) {
+export function LoaderClient({
+  initialLastSync,
+  initialTotalRows,
+  initialHistory,
+  syncAutoEnabled,
+  cronSecretConfigured,
+}: Props) {
   const router = useRouter();
 
   // Por defecto, últimos 3 meses
@@ -67,6 +90,45 @@ export function LoaderClient({ initialLastSync, initialTotalRows }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState(initialLastSync);
   const [totalRows, setTotalRows] = useState(initialTotalRows);
+
+  // --- Sincronización automática (V4.4) ---
+  const [autoEnabled, setAutoEnabled] = useState(syncAutoEnabled);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [autoError, setAutoError] = useState<string | null>(null);
+  useEffect(() => {
+    setAutoEnabled(syncAutoEnabled);
+  }, [syncAutoEnabled]);
+
+  const lastAuto = initialHistory.find((h) => h.trigger === "cron") ?? null;
+  const lastAutoFailed =
+    lastAuto !== null && (lastAuto.status === "failed" || lastAuto.status === "partial");
+
+  async function handleToggleAuto(next: boolean) {
+    if (autoSaving) return;
+    const prev = autoEnabled;
+    setAutoEnabled(next); // optimista
+    setAutoSaving(true);
+    setAutoError(null);
+    try {
+      const res = await fetch("/api/admin/settings/sync-auto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAutoEnabled(prev);
+        setAutoError(json.error ?? `HTTP ${res.status}`);
+      } else {
+        router.refresh();
+      }
+    } catch (err) {
+      setAutoEnabled(prev);
+      setAutoError(err instanceof Error ? err.message : "Error de red");
+    } finally {
+      setAutoSaving(false);
+    }
+  }
 
   // Estimación de tiempo del refresh basado en costos observados:
   //   Susazón (SQL Enterprise): ~5 s/mes
@@ -184,6 +246,152 @@ export function LoaderClient({ initialLastSync, initialTotalRows }: Props) {
             }
           />
         </div>
+      </div>
+
+      {/* Card 1b: Sincronización automática (V4.4 — Vercel Cron) */}
+      <div
+        className="rounded-[var(--radius-lg)] border p-5"
+        style={{
+          background: "var(--bg-surface)",
+          borderColor: autoEnabled ? "var(--accent)" : "var(--border)",
+          boxShadow: "var(--shadow-card)",
+        }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Clock size={20} style={{ color: "var(--accent)" }} />
+            <h2
+              className="text-base font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Sincronización automática
+            </h2>
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+              style={{
+                background: autoEnabled ? "var(--success-soft)" : "var(--bg-surface-muted)",
+                color: autoEnabled ? "var(--success)" : "var(--text-muted)",
+              }}
+            >
+              {autoEnabled ? "Activa" : "Manual"}
+            </span>
+          </div>
+
+          {/* Switch Manual / Automático */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoEnabled}
+            disabled={autoSaving}
+            onClick={() => handleToggleAuto(!autoEnabled)}
+            className="flex items-center gap-2 text-xs font-medium disabled:opacity-60"
+            style={{ color: "var(--text-secondary)" }}
+            title={autoEnabled ? "Desactivar (volver a manual)" : "Activar sync diaria"}
+          >
+            <span>Manual</span>
+            <span
+              className="relative inline-block h-5 w-9 rounded-full transition-colors"
+              style={{ background: autoEnabled ? "var(--accent)" : "var(--border)" }}
+            >
+              <span
+                className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform"
+                style={{ left: 2, transform: autoEnabled ? "translateX(16px)" : "translateX(0)" }}
+              />
+            </span>
+            <span style={{ color: autoEnabled ? "var(--accent)" : undefined }}>
+              Automático
+            </span>
+            {autoSaving && <Loader2 size={12} className="animate-spin" />}
+          </button>
+        </div>
+
+        <p className="mt-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+          Cada día a las <strong>06:00 CDMX</strong> se refresca el{" "}
+          <strong>mes en curso</strong> de Susazón + Suve (lo mismo que haces a
+          mano). Vercel puede ejecutarla hasta 1 h después de la hora. El botón
+          manual de abajo sigue disponible siempre.
+        </p>
+
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Stat
+            label="Próxima corrida"
+            value={autoEnabled ? "Mañana 06:00" : "—"}
+            sublabel={
+              autoEnabled
+                ? "CDMX · ventana 06:00–07:00"
+                : "Activa el modo Automático para programarla"
+            }
+            tone={autoEnabled ? "success" : "neutral"}
+          />
+          <Stat
+            label="Última corrida automática"
+            value={lastAuto ? formatDateTime(lastAuto.completed_at ?? lastAuto.started_at) : "Aún no ha corrido"}
+            sublabel={
+              lastAuto
+                ? `${lastAuto.rows_imported?.toLocaleString("es-MX") ?? 0} filas · ${statusLabel(lastAuto.status)}`
+                : "Aparecerá aquí después de la primera corrida"
+            }
+            tone={
+              !lastAuto
+                ? "neutral"
+                : lastAuto.status === "success"
+                ? "success"
+                : lastAuto.status === "failed"
+                ? "danger"
+                : "warning"
+            }
+          />
+        </div>
+
+        {!cronSecretConfigured && (
+          <div
+            className="mt-3 flex items-start gap-2 rounded-[var(--radius)] border px-3 py-2.5 text-xs"
+            style={{
+              background: "var(--warning-soft)",
+              borderColor: "var(--warning)",
+              color: "var(--text-primary)",
+            }}
+          >
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" style={{ color: "var(--warning)" }} />
+            <div className="leading-relaxed">
+              <strong style={{ color: "var(--warning)" }}>Falta CRON_SECRET en Vercel.</strong>{" "}
+              Hasta que exista, el cron no puede autenticarse y no corre (aunque
+              el modo esté en Automático). Pasos: Vercel → Settings →
+              Environment Variables → nueva variable <code>CRON_SECRET</code>{" "}
+              (Production) con un valor largo aleatorio → Redeploy. Este aviso
+              desaparece solo.
+            </div>
+          </div>
+        )}
+
+        {lastAutoFailed && (
+          <div
+            className="mt-3 flex items-start gap-2 rounded-[var(--radius)] border px-3 py-2.5 text-xs"
+            style={{
+              background: "var(--danger-soft)",
+              borderColor: "var(--danger)",
+              color: "var(--text-primary)",
+            }}
+          >
+            <AlertCircle size={16} className="mt-0.5 shrink-0" style={{ color: "var(--danger)" }} />
+            <div className="leading-relaxed">
+              <strong style={{ color: "var(--danger)" }}>
+                La última sync automática {lastAuto?.status === "partial" ? "fue parcial" : "falló"}.
+              </strong>{" "}
+              Revisa el historial abajo o lanza un refresh manual del mes en curso.
+            </div>
+          </div>
+        )}
+
+        {autoError && (
+          <div
+            className="mt-3 flex items-start gap-2 rounded-[var(--radius)] border px-3 py-2 text-xs"
+            style={{ background: "var(--danger-soft)", borderColor: "var(--danger)", color: "var(--danger)" }}
+          >
+            <AlertCircle size={14} className="mt-0.5 shrink-0" />
+            <span>{autoError}</span>
+          </div>
+        )}
       </div>
 
       {/* Card 2: Refrescar */}
@@ -393,6 +601,107 @@ export function LoaderClient({ initialLastSync, initialTotalRows }: Props) {
           >
             <AlertCircle size={14} className="mt-0.5 shrink-0" />
             <span>{error}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Card 2b: Historial de sincronizaciones (últimas 10) */}
+      <div
+        className="rounded-[var(--radius-lg)] border p-5"
+        style={{
+          background: "var(--bg-surface)",
+          borderColor: "var(--border)",
+          boxShadow: "var(--shadow-card)",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <History size={20} style={{ color: "var(--accent)" }} />
+          <h2 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+            Historial de sincronizaciones
+          </h2>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            últimas {initialHistory.length}
+          </span>
+        </div>
+        {initialHistory.length === 0 ? (
+          <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
+            Aún no hay corridas registradas.
+          </p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-xs tabular-nums">
+              <thead>
+                <tr style={{ color: "var(--text-muted)" }}>
+                  {["Fecha", "Disparo", "Fuentes", "Meses", "Filas", "Duración", "Estado"].map((h, i) => (
+                    <th
+                      key={h}
+                      className={`border-b px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider ${i >= 4 && i <= 5 ? "text-right" : "text-left"}`}
+                      style={{ borderColor: "var(--border)" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {initialHistory.map((h, i) => (
+                  <tr
+                    key={h.id}
+                    style={{ background: i % 2 === 1 ? "var(--bg-surface-muted)" : undefined }}
+                  >
+                    <td className="px-2 py-1.5" style={{ color: "var(--text-primary)" }}>
+                      {formatDateTime(h.started_at)}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          background: h.trigger === "cron" ? "var(--accent-soft)" : "var(--bg-surface-muted)",
+                          color: h.trigger === "cron" ? "var(--accent)" : "var(--text-secondary)",
+                        }}
+                      >
+                        {h.trigger === "cron" ? <Zap size={10} /> : <User size={10} />}
+                        {h.trigger === "cron" ? "Automático" : "Manual"}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5" style={{ color: "var(--text-secondary)" }}>
+                      {sourceLabel(h.source)}
+                    </td>
+                    <td className="px-2 py-1.5" style={{ color: "var(--text-secondary)" }}>
+                      {rangeLabel(h.date_from, h.date_to)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right" style={{ color: "var(--text-primary)" }}>
+                      {(h.rows_imported ?? 0).toLocaleString("es-MX")}
+                    </td>
+                    <td className="px-2 py-1.5 text-right" style={{ color: "var(--text-secondary)" }}>
+                      {durationLabel(h.started_at, h.completed_at)}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <span
+                        className="font-semibold"
+                        style={{
+                          color:
+                            h.status === "success"
+                              ? "var(--success)"
+                              : h.status === "failed"
+                              ? "var(--danger)"
+                              : h.status === "partial"
+                              ? "var(--warning)"
+                              : "var(--text-muted)",
+                        }}
+                      >
+                        {statusLabel(h.status)}
+                      </span>
+                      {h.errors && h.errors.length > 0 && (
+                        <span className="ml-1" style={{ color: "var(--text-muted)" }}>
+                          · {h.errors.length} error(es)
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -610,6 +919,34 @@ function statusLabel(s: string): string {
       running: "En progreso",
     }[s] ?? s
   );
+}
+
+function sourceLabel(source: string): string {
+  return source
+    .split("+")
+    .map((p) => ({ susazon: "Susazón", suve: "Suve" }[p.replace(/_api|_csv/, "")] ?? p))
+    .join(" + ");
+}
+
+const MONTHS_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+function monthKeyLabel(d: string | null): string {
+  if (!d) return "—";
+  const [y, m] = d.split("-").map(Number);
+  if (!y || !m) return d;
+  return `${MONTHS_ES[m - 1]} ${y}`;
+}
+
+function rangeLabel(from: string | null, to: string | null): string {
+  const a = monthKeyLabel(from);
+  const b = monthKeyLabel(to);
+  return a === b ? a : `${a} → ${b}`;
+}
+
+function durationLabel(start: string, end: string | null): string {
+  if (!end) return "—";
+  const sec = Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000));
+  return sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}m ${sec % 60}s`;
 }
 
 function monthsBetween(from: string, to: string): number {
