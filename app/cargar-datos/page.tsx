@@ -7,6 +7,8 @@ import { LoaderClient, type SyncRow } from "./LoaderClient";
 import {
   BudgetEditorClient,
   type BudgetCell,
+  type RealCell,
+  type LastEdit,
 } from "./BudgetEditorClient";
 
 const AVAILABLE_YEARS = [2024, 2025, 2026, 2027];
@@ -55,11 +57,15 @@ export default async function CargarDatosPage({
   // OJO: territories vienen de territories_state (auto-poblado por trigger),
   // NO de distinct sobre sales_rows — esto evita el límite default de 1000
   // filas que Supabase aplica a SELECT.
+  const prevYear = safeEditorYear - 1;
   const [
     { data: historyRows },
     { count: totalRows },
     { data: stateRows },
     { data: budgetRows },
+    { data: realRows },
+    { data: prevBudgetRows },
+    { data: lastEditRow },
   ] = await Promise.all([
     // Últimas 10 corridas (manuales + automáticas). La primera es "la última".
     supabase
@@ -80,7 +86,53 @@ export default async function CargarDatosPage({
       .from("territory_budgets")
       .select("territorio, mes, venta_budget")
       .eq("anio", safeEditorYear),
+    // V4.4 — Real del año anterior por territorio/mes (≤ 17 × 12 filas) como
+    // referencia para fijar metas. Vista security_invoker → respeta RLS.
+    supabase
+      .from("kpi_monthly_summary")
+      .select("territorio, mes, total_venta")
+      .eq("anio", prevYear),
+    // Metas del año anterior (para "copiar meta año anterior +X%").
+    supabase
+      .from("territory_budgets")
+      .select("territorio, mes, venta_budget")
+      .eq("anio", prevYear),
+    // Última edición del año seleccionado.
+    supabase
+      .from("territory_budgets")
+      .select("updated_at, updated_by")
+      .eq("anio", safeEditorYear)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  const prevYearReal: RealCell[] = (realRows ?? []).map((r) => ({
+    territorio: r.territorio,
+    mes: r.mes,
+    venta: Number(r.total_venta) || 0,
+  }));
+  const prevYearBudgets: BudgetCell[] = (prevBudgetRows ?? []).map((b) => ({
+    territorio: b.territorio,
+    mes: b.mes,
+    venta_budget: Number(b.venta_budget) || 0,
+  }));
+
+  let lastEdit: LastEdit | null = null;
+  if (lastEditRow?.updated_at) {
+    let by: string | null = null;
+    if (lastEditRow.updated_by) {
+      const { data: editor } = await supabase
+        .from("users_permissions")
+        .select("full_name")
+        .eq("user_id", lastEditRow.updated_by)
+        .maybeSingle();
+      by = editor?.full_name ?? null;
+    }
+    lastEdit = { at: lastEditRow.updated_at, by };
+  }
+  const todayMx = getMexicoCityDateParts();
+  const currentMonth = safeEditorYear === todayMx.year ? todayMx.month : null;
 
   const territories = (stateRows ?? []).map((r) => r.territory_name);
 
@@ -150,6 +202,10 @@ export default async function CargarDatosPage({
             availableYears={AVAILABLE_YEARS}
             territories={territories}
             initialBudgets={initialBudgets}
+            prevYearReal={prevYearReal}
+            prevYearBudgets={prevYearBudgets}
+            lastEdit={lastEdit}
+            currentMonth={currentMonth}
           />
         </div>
       </main>
