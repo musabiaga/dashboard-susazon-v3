@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/cron/sync — sincronización AUTOMÁTICA diaria (V4.4, Idea 1).
  *
- * Lo invoca Vercel Cron (ver vercel.json: 12:00 UTC = 06:00 CDMX). Vercel
+ * Lo invoca Vercel Cron (ver vercel.json: 01:30 UTC = 19:30 CDMX del día
+ * anterior en UTC; en CDMX es el mismo día — así hay más captura del día). Vercel
  * manda solo el header `Authorization: Bearer <CRON_SECRET>` cuando la
  * variable de entorno CRON_SECRET existe en el proyecto. El valor lo define
  * el humano en Vercel; este código solo lo compara.

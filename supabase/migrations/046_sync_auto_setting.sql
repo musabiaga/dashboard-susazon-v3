@@ -3,7 +3,7 @@
 -- V4.4 — Sincronización automática diaria (Idea 1, retomada).
 --
 -- Motor elegido: Vercel Cron (vercel.json → GET /api/cron/sync a las
--- 12:00 UTC = 06:00 CDMX). NO usa pg_cron ni Vault: el único requisito
+-- 01:30 UTC = 19:30 CDMX). NO usa pg_cron ni Vault: el único requisito
 -- externo es la variable de entorno CRON_SECRET en Vercel (la define el
 -- humano; nunca pasa por el asistente).
 --

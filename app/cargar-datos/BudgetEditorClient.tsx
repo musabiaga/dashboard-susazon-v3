@@ -35,7 +35,7 @@ import {
   Divide,
   Eraser,
 } from "lucide-react";
-import { formatMoney, formatDateTime } from "@/lib/format";
+import { formatMoneyExact, formatDateTime } from "@/lib/format";
 import { exportToExcelMultiSheet, todayISO, type ExcelExportOptions } from "@/lib/export-excel";
 import { ExportExcelButton } from "@/components/dashboard/ExportExcelButton";
 
@@ -599,7 +599,7 @@ export function BudgetEditorClient({
       ) : (
         /* Paneles fijos: scroll propio → header arriba, 1ª columna izquierda, TOTAL abajo */
         <div className="mt-4 max-h-[70vh] overflow-auto rounded-[var(--radius)] border" style={{ borderColor: "var(--border)" }}>
-          <table className="w-full text-xs tabular-nums" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+          <table className="w-full text-[11px] tabular-nums" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
             <thead>
               <tr>
                 <th
@@ -611,7 +611,7 @@ export function BudgetEditorClient({
                 {MONTHS_SHORT.map((m, i) => (
                   <th
                     key={m}
-                    className="sticky top-0 z-20 border-b px-2 py-2 text-center font-semibold uppercase tracking-wider"
+                    className="sticky top-0 z-20 border-b px-1 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider"
                     style={{
                       background: isCurrent(i + 1) ? "var(--accent-soft)" : stickyHeadBg,
                       borderColor: "var(--border)",
@@ -683,7 +683,7 @@ export function BudgetEditorClient({
                       {MESES.map((mes) => (
                         <td
                           key={mes}
-                          className="border-b px-1 py-1"
+                          className="border-b px-0.5 py-0.5"
                           style={{
                             borderColor: "var(--border)",
                             background: isCurrent(mes) ? "var(--accent-soft)" : undefined,
@@ -700,7 +700,7 @@ export function BudgetEditorClient({
                         className="border-b border-l px-3 py-1.5 text-right font-semibold"
                         style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
                       >
-                        {formatMoney(mTotal)}
+                        {formatMoneyExact(mTotal)}
                       </td>
                     </tr>
                     {showReal && hasReal && (
@@ -718,14 +718,14 @@ export function BudgetEditorClient({
                           return (
                             <td
                               key={mes}
-                              className="border-b px-2 py-1 text-right"
+                              className="border-b px-1 py-0.5 text-right text-[10px]"
                               style={{
                                 borderColor: "var(--border)",
                                 background: isCurrent(mes) ? "var(--accent-soft)" : undefined,
                               }}
                             >
                               <div style={{ color: rv > 0 ? "var(--text-secondary)" : "var(--text-muted)" }}>
-                                {rv > 0 ? formatMoney(rv) : "—"}
+                                {rv > 0 ? formatMoneyExact(rv) : "—"}
                               </div>
                               <PctBadge p={p} />
                             </td>
@@ -735,7 +735,7 @@ export function BudgetEditorClient({
                           className="border-b border-l px-3 py-1 text-right"
                           style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
                         >
-                          <div>{rTotal > 0 ? formatMoney(rTotal) : "—"}</div>
+                          <div>{rTotal > 0 ? formatMoneyExact(rTotal) : "—"}</div>
                           <PctBadge p={rTotal > 0 && mTotal > 0 ? mTotal / rTotal - 1 : null} />
                         </td>
                       </tr>
@@ -760,18 +760,18 @@ export function BudgetEditorClient({
                 {colTotals.map((v, i) => (
                   <td
                     key={i}
-                    className="sticky bottom-0 z-20 border-t px-2 py-2 text-center font-semibold"
+                    className="sticky bottom-0 z-20 border-t px-1 py-1.5 text-right font-semibold"
                     style={{
                       background: isCurrent(i + 1) ? "var(--accent-soft)" : stickyHeadBg,
                       borderColor: "var(--border)",
                       color: "var(--text-secondary)",
-                      fontSize: "11px",
+                      fontSize: "10px",
                     }}
                   >
-                    {v > 0 ? formatMoney(v) : "—"}
+                    {v > 0 ? formatMoneyExact(v) : "—"}
                     {showReal && hasReal && (
                       <div className="font-normal" style={{ color: "var(--text-muted)", fontSize: "10px" }}>
-                        {realColTotals[i] > 0 ? formatMoney(realColTotals[i]) : "—"}{" "}
+                        {realColTotals[i] > 0 ? formatMoneyExact(realColTotals[i]) : "—"}{" "}
                         <PctBadge p={realColTotals[i] > 0 && v > 0 ? v / realColTotals[i] - 1 : null} inline />
                       </div>
                     )}
@@ -779,12 +779,12 @@ export function BudgetEditorClient({
                 ))}
                 <td
                   className="sticky bottom-0 z-20 border-l border-t px-3 py-2 text-right font-bold"
-                  style={{ background: "var(--accent-soft)", borderColor: "var(--border)", color: "var(--accent)", fontSize: "12px" }}
+                  style={{ background: "var(--accent-soft)", borderColor: "var(--border)", color: "var(--accent)", fontSize: "11px" }}
                 >
-                  {formatMoney(grandTotal)}
+                  {formatMoneyExact(grandTotal)}
                   {showReal && hasReal && (
                     <div className="font-normal" style={{ color: "var(--text-secondary)", fontSize: "10px" }}>
-                      {realGrandTotal > 0 ? formatMoney(realGrandTotal) : "—"}{" "}
+                      {realGrandTotal > 0 ? formatMoneyExact(realGrandTotal) : "—"}{" "}
                       <PctBadge p={realGrandTotal > 0 && grandTotal > 0 ? grandTotal / realGrandTotal - 1 : null} inline />
                     </div>
                   )}
@@ -855,18 +855,33 @@ function BudgetCellInput({
   dirty: boolean;
   onChange: (v: number) => void;
 }) {
+  // Muestra "1,250,000" cuando no está enfocado; al editar, solo dígitos.
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState("");
+  const display = focused
+    ? draft
+    : value === 0
+      ? ""
+      : Math.round(value).toLocaleString("es-MX", { maximumFractionDigits: 0 });
   return (
     <input
-      type="number"
-      min="0"
-      step="1000"
-      value={value === 0 ? "" : value}
-      onChange={(e) => {
-        const v = e.target.value === "" ? 0 : parseFloat(e.target.value);
-        onChange(isNaN(v) ? 0 : v);
+      type="text"
+      inputMode="numeric"
+      value={display}
+      onFocus={(e) => {
+        setDraft(value === 0 ? "" : String(Math.round(value)));
+        setFocused(true);
+        const el = e.currentTarget;
+        setTimeout(() => el.select(), 0);
       }}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^\d]/g, "");
+        setDraft(raw);
+        onChange(raw === "" ? 0 : parseInt(raw, 10));
+      }}
+      onBlur={() => setFocused(false)}
       placeholder="—"
-      className="w-full min-w-[84px] rounded-[var(--radius-sm)] border bg-transparent px-2 py-1 text-right text-xs outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+      className="w-full min-w-[70px] rounded-[var(--radius-sm)] border bg-transparent px-1.5 py-0.5 text-right text-[11px] outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
       style={{
         borderColor: dirty ? "var(--accent)" : "var(--border)",
         background: dirty ? "var(--accent-soft)" : "transparent",

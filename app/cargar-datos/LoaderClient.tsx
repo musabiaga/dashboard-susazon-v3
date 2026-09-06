@@ -306,19 +306,20 @@ export function LoaderClient({
         </div>
 
         <p className="mt-2 text-xs" style={{ color: "var(--text-secondary)" }}>
-          Cada día a las <strong>06:00 CDMX</strong> se refresca el{" "}
+          Cada día a las <strong>19:30 CDMX</strong> se refresca el{" "}
           <strong>mes en curso</strong> de Susazón + Suve (lo mismo que haces a
-          mano). Vercel puede ejecutarla hasta 1 h después de la hora. El botón
-          manual de abajo sigue disponible siempre.
+          mano), para capturar la venta del día. Vercel puede ejecutarla hasta
+          1 h después de la hora. El botón manual de abajo sigue disponible
+          siempre.
         </p>
 
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Stat
             label="Próxima corrida"
-            value={autoEnabled ? "Mañana 06:00" : "—"}
+            value={autoEnabled ? `${nextRunDayLabel()} 19:30` : "—"}
             sublabel={
               autoEnabled
-                ? "CDMX · ventana 06:00–07:00"
+                ? "CDMX · ventana 19:30–20:30"
                 : "Activa el modo Automático para programarla"
             }
             tone={autoEnabled ? "success" : "neutral"}
@@ -919,6 +920,13 @@ function statusLabel(s: string): string {
       running: "En progreso",
     }[s] ?? s
   );
+}
+
+/** "Hoy" si en CDMX aún no son las 19:30; si no, "Mañana". */
+function nextRunDayLabel(): string {
+  const nowMx = new Date(Date.now() - 6 * 3600 * 1000);
+  const minutes = nowMx.getUTCHours() * 60 + nowMx.getUTCMinutes();
+  return minutes < 19 * 60 + 30 ? "Hoy" : "Mañana";
 }
 
 function sourceLabel(source: string): string {
